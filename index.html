@@ -6247,45 +6247,27 @@ async function completeInvoice(event) {
 
   if (button) {
     button.disabled = true;
-    button.innerHTML = "⏳ Saving...";
+    button.innerHTML = "⚡ Checking...";
   }
 
   try {
-    // Bank Transaction ID is shared with all Invoice and A/R bank payments.
-    // Check it BEFORE saving the invoice so a duplicate cannot create
-    // an invoice without its matching payment row.
-    if (invoiceNeedsBank) {
-      const txCheck =
-        await checkPaymentTransactionIdAvailable(payload.transactionId);
+    /*
+     * FAST CHECK:
+     * Invoice No. and Bank Transaction ID are independent checks.
+     * Run them at the SAME time instead of waiting one-by-one.
+     */
+    const numberPromise =
+      checkInvoiceNumberAvailable(payload.invoiceNo);
 
-      if (txCheck.exists || txCheck.pending) {
-        if (button) {
-          button.disabled = false;
-          button.innerHTML = oldText;
-        }
+    const txPromise =
+      invoiceNeedsBank
+        ? checkPaymentTransactionIdAvailable(payload.transactionId)
+        : Promise.resolve({ success: true, exists: false, pending: false });
 
-        window.bbInvoiceSaving = false;
-
-        alert(
-          "Transaction ID already exists.\n\n" +
-          "Transaction ID: " + payload.transactionId + "\n" +
-          "Please check the bank transaction and enter a unique Transaction ID.\n\n" +
-          "Your invoice information is still here."
-        );
-        return;
-      }
-    }
-
-    // Check the exact number immediately before saving.
-    // Manual numbers are allowed, but the exact same Invoice No. may not be saved twice.
-    const numberCheck = await checkInvoiceNumberAvailable(payload.invoiceNo);
+    const [numberCheck, txCheck] =
+      await Promise.all([numberPromise, txPromise]);
 
     if (numberCheck.exists) {
-      if (button) {
-        button.disabled = false;
-        button.innerHTML = oldText;
-      }
-      window.bbInvoiceSaving = false;
       alert(
         "Invoice No. " + payload.invoiceNo + " already exists in Sales Database.\n\n" +
         "Please check the hand-written invoice number.\n" +
@@ -6294,28 +6276,47 @@ async function completeInvoice(event) {
       return;
     }
 
-    await postSalesInvoice(payload);
-
-    // Save the actual payment event separately.
-    // Credit invoices do not create a payment transaction.
-    if (shouldCreatePaymentRecord(payload)) {
-      await postSalesPayment(buildPaymentPayload(payload));
+    if (invoiceNeedsBank && (txCheck.exists || txCheck.pending)) {
+      alert(
+        "Transaction ID already exists.\n\n" +
+        "Transaction ID: " + payload.transactionId + "\n" +
+        "Please check the bank transaction and enter a unique Transaction ID.\n\n" +
+        "Your invoice information is still here."
+      );
+      return;
     }
 
+    if (button) {
+      button.innerHTML = "⚡ Completing...";
+    }
+
+    /*
+     * ONE SAVE REQUEST:
+     * Invoice + line items + initial payment are now submitted together.
+     * Credit invoices send paymentData = null.
+     */
+    const paymentPayload =
+      shouldCreatePaymentRecord(payload)
+        ? buildPaymentPayload(payload)
+        : null;
+
+    await postSalesInvoiceBundle(payload, paymentPayload);
+
     alert(
-      "Invoice saved successfully to the Sales Data database.\n\n" +
+      "Invoice completed successfully.\n\n" +
       "Invoice No.: " + payload.invoiceNo +
-      (shouldCreatePaymentRecord(payload)
-        ? "\nPayment record saved successfully."
-        : "\nNo payment record created (Credit invoice).")
+      (paymentPayload
+        ? "\nInvoice + payment sent together."
+        : "\nCredit invoice saved without a payment record.")
     );
 
     clearAllAfterSuccessfulSave();
 
   } catch (error) {
-    console.error("Sales invoice save failed:", error);
+    console.error("Fast invoice complete failed:", error);
+
     alert(
-      "Could not save the invoice to Sales Data.\n\n" +
+      "Could not complete the invoice.\n\n" +
       (error?.message || "Please try again.") +
       "\n\nThe invoice was NOT cleared."
     );
@@ -6407,6 +6408,73 @@ function postSalesPayment(payload) {
     setTimeout(() => finish(true, null), 2500);
   });
 }
+
+
+function postSalesInvoiceBundle(invoicePayload, paymentPayload) {
+  return new Promise((resolve, reject) => {
+    const iframeName = "bbInvoiceBundleFrame_" + Date.now();
+    const iframe = document.createElement("iframe");
+    iframe.name = iframeName;
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = SALES_DATABASE_API_URL;
+    form.target = iframeName;
+    form.style.display = "none";
+
+    const actionInput = document.createElement("input");
+    actionInput.type = "hidden";
+    actionInput.name = "action";
+    actionInput.value = "saveInvoiceBundle";
+    form.appendChild(actionInput);
+
+    const bundleInput = document.createElement("input");
+    bundleInput.type = "hidden";
+    bundleInput.name = "bundleData";
+    bundleInput.value = JSON.stringify({
+      invoiceData: invoicePayload,
+      paymentData: paymentPayload || null
+    });
+    form.appendChild(bundleInput);
+
+    document.body.appendChild(form);
+
+    let settled = false;
+
+    const finish = (success, error) => {
+      if (settled) return;
+      settled = true;
+
+      setTimeout(() => {
+        form.remove();
+        iframe.remove();
+      }, 2500);
+
+      if (success) resolve();
+      else reject(error || new Error("Invoice save timed out."));
+    };
+
+    try {
+      form.submit();
+    } catch (error) {
+      finish(false, error);
+      return;
+    }
+
+    /*
+     * The hidden Apps Script form is cross-origin, so GitHub Pages cannot
+     * read the POST response. The old workflow waited 2.5s for Invoice and
+     * another 2.5s for Payment. This bundled workflow sends BOTH in one POST.
+     *
+     * We only need a short hand-off delay before continuing the UI.
+     * The Apps Script request keeps running independently in the hidden frame.
+     */
+    setTimeout(() => finish(true, null), 1100);
+  });
+}
+
 
 function postSalesInvoice(payload) {
   return new Promise((resolve, reject) => {

@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>
-   BIG BROTHER — Invoice Generator
-  </title>
+  <title>BIG BROTHER — Invoice Generator Fast Key-In V2</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -2741,12 +2739,401 @@ input:focus {
 
 /* Shipping destination: manual field beside Address */
 .address-shipping-row{align-items:end}
+
+/* PRICE prompt when no customer special price */
+.bb-price-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:99991;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  background:rgba(11,29,51,.70);
+}
+
+.bb-price-modal.open{display:flex;}
+
+.bb-price-dialog{
+  width:min(410px,100%);
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:15px;
+  overflow:hidden;
+  background:#fff;
+  box-shadow:0 24px 70px rgba(0,0,0,.28);
+}
+
+.bb-price-dialog-head{padding:16px 16px 12px;}
+
+.bb-price-kicker{
+  color:#73869a;
+  font-size:10px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.35px;
+}
+
+.bb-price-product-name{
+  margin-top:4px;
+  color:#173f77;
+  font-size:18px;
+  font-weight:900;
+  line-height:1.25;
+}
+
+.bb-price-product-meta{
+  margin-top:5px;
+  color:#6c7e92;
+  font-size:11px;
+  line-height:1.35;
+}
+
+.bb-price-body{
+  padding:0 16px 12px;
+}
+
+.bb-price-label{
+  display:block;
+  margin-bottom:8px;
+  color:#173f77;
+  font-size:12px;
+  font-weight:800;
+}
+
+.bb-price-input-wrap{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:8px;
+  align-items:center;
+}
+
+#invoicePriceCurrencySymbol{
+  color:#173f77;
+  font-size:22px;
+  font-weight:900;
+}
+
+#invoicePriceInput{
+  width:100% !important;
+  min-height:54px !important;
+  padding:8px 12px !important;
+  border:2px solid #6596d5 !important;
+  border-radius:10px !important;
+  color:#173f77 !important;
+  font-size:24px !important;
+  font-weight:900 !important;
+}
+
+.bb-price-help{
+  margin-top:8px;
+  color:#718298;
+  font-size:11px;
+  line-height:1.35;
+}
+
+.bb-price-message{
+  min-height:18px;
+  margin-top:6px;
+  color:#c0392b;
+  font-size:11px;
+}
+
+.bb-price-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:13px 16px 16px;
+  border-top:1px solid #edf1f5;
+}
+
+.bb-price-actions button{
+  min-height:44px;
+  border:0;
+  border-radius:9px;
+  font-size:13px;
+  font-weight:800;
+}
+
+.bb-price-cancel{
+  background:#e9eef5;
+  color:#23456d;
+}
+
+.bb-price-confirm{
+  background:#245fae;
+  color:#fff;
+}
+
 @media(max-width:720px){.address-shipping-row{grid-template-columns:1fr!important}}
 
 /* FINAL PAPER V3 — APPROVED SHIPPING LAYOUT */
 .final-header{display:flex!important;justify-content:space-between!important;align-items:flex-start!important;gap:25px!important;min-height:70px!important}
 .final-company{line-height:1.15!important}.final-company-name{font-size:25px!important;font-weight:800!important;letter-spacing:1.2px!important;color:#174a91!important;margin-bottom:2px!important}.final-company-tagline{font-size:11px!important;font-weight:500!important;letter-spacing:.8px!important;color:#56657a!important}.final-header-message{text-align:right!important;color:#2867b2!important;font-size:11px!important;line-height:1.35!important;padding-top:5px!important}
 .final-bill-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 205px!important;gap:20px!important;margin-bottom:18px!important;min-height:105px!important}.final-bill,.final-shipping{font-size:13px!important;line-height:1.5!important;min-width:0!important}.final-shipping{border-left:1px solid #9eacc0!important;padding-left:20px!important}.final-bill-label,.final-shipping-label{font-weight:800!important;font-size:14px!important;margin-bottom:10px!important}.final-bill-detail-row{display:grid!important;grid-template-columns:112px 10px minmax(0,1fr)!important;gap:4px!important;margin-bottom:7px!important;align-items:start!important}.final-bill-detail-label{font-weight:700!important;white-space:nowrap!important}.final-shipping-value{white-space:pre-line!important;overflow-wrap:anywhere!important}
+
+
+/* ==========================================================
+   BIG BROTHER — FAST KEY-IN FLOW V2
+   UI flow only. Invoice/accounting behavior is unchanged.
+========================================================== */
+
+.bb-fast-product-toolbar{
+  display:block !important;
+  margin-bottom:8px !important;
+}
+
+.bb-product-search-wrap{
+  position:relative;
+  display:block !important;
+  margin:0 0 10px !important;
+  padding:0 !important;
+  background:transparent !important;
+  border:0 !important;
+  overflow:visible !important;
+}
+
+#productSearch{
+  width:100% !important;
+  min-height:44px !important;
+  padding:10px 40px 10px 12px !important;
+  border:1px solid #c9d6e5 !important;
+  border-radius:9px !important;
+  background:#fff !important;
+  color:#172033 !important;
+  font-size:14px !important;
+  box-shadow:none !important;
+}
+
+#productSearch:focus{
+  outline:2px solid rgba(38,100,180,.16) !important;
+  border-color:#5f8fcd !important;
+}
+
+.bb-product-search-icon{
+  position:absolute;
+  right:12px;
+  top:22px;
+  transform:translateY(-50%);
+  color:#75889e;
+  font-size:16px;
+  pointer-events:none;
+}
+
+.bb-product-search-options{
+  display:none;
+  position:absolute;
+  z-index:5000;
+  top:calc(100% + 5px);
+  left:0;
+  right:0;
+  max-height:310px;
+  overflow:auto;
+  padding:5px;
+  border:1px solid #cad7e6;
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 14px 34px rgba(30,58,93,.18);
+}
+
+.bb-product-search-options.open{
+  display:block;
+}
+
+.bb-product-option{
+  width:100%;
+  min-height:48px;
+  border:0;
+  border-radius:8px;
+  background:#fff;
+  padding:8px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  text-align:left;
+  color:#172033;
+  cursor:pointer;
+}
+
+.bb-product-option:hover,
+.bb-product-option:focus{
+  background:#eef5ff;
+  outline:none;
+}
+
+.bb-product-option-main{min-width:0;}
+
+.bb-product-option-name{
+  display:block;
+  color:#173f77;
+  font-size:13px;
+  font-weight:800;
+  line-height:1.25;
+}
+
+.bb-product-option-meta{
+  display:block;
+  margin-top:3px;
+  color:#718298;
+  font-size:10px;
+  line-height:1.25;
+}
+
+.bb-product-option-unit{
+  flex:0 0 auto;
+  border-radius:999px;
+  padding:4px 7px;
+  background:#f1f5f9;
+  color:#58708a;
+  font-size:9px;
+  font-weight:800;
+}
+
+.bb-product-search-empty{
+  padding:14px 10px;
+  color:#728398;
+  text-align:center;
+  font-size:12px;
+}
+
+/* QTY prompt */
+.bb-qty-modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:99990;
+  align-items:center;
+  justify-content:center;
+  padding:16px;
+  background:rgba(11,29,51,.68);
+}
+
+.bb-qty-modal.open{display:flex;}
+
+.bb-qty-dialog{
+  width:min(410px,100%);
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:15px;
+  overflow:hidden;
+  background:#fff;
+  box-shadow:0 24px 70px rgba(0,0,0,.28);
+}
+
+.bb-qty-dialog-head{padding:16px 16px 12px;}
+
+.bb-qty-kicker{
+  color:#73869a;
+  font-size:10px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.35px;
+}
+
+.bb-qty-product-name{
+  margin-top:4px;
+  color:#173f77;
+  font-size:18px;
+  font-weight:900;
+  line-height:1.25;
+}
+
+.bb-qty-product-meta{
+  margin-top:5px;
+  color:#6c7e92;
+  font-size:11px;
+  line-height:1.35;
+}
+
+.bb-qty-stepper{
+  display:grid;
+  grid-template-columns:52px minmax(0,1fr) 52px;
+  gap:8px;
+  align-items:center;
+  padding:0 16px 12px;
+}
+
+.bb-qty-stepper button{
+  min-height:50px;
+  border:1px solid #cbd8e7;
+  border-radius:10px;
+  background:#f4f7fb;
+  color:#173f77;
+  font-size:24px;
+  font-weight:900;
+}
+
+#invoiceQtyInput{
+  width:100% !important;
+  min-height:54px !important;
+  padding:8px !important;
+  border:2px solid #6596d5 !important;
+  border-radius:10px !important;
+  text-align:center !important;
+  color:#173f77 !important;
+  font-size:24px !important;
+  font-weight:900 !important;
+}
+
+.bb-qty-message{
+  min-height:18px;
+  padding:0 16px 8px;
+  color:#c0392b;
+  font-size:11px;
+}
+
+.bb-qty-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  padding:13px 16px 16px;
+  border-top:1px solid #edf1f5;
+}
+
+.bb-qty-actions button{
+  min-height:44px;
+  border:0;
+  border-radius:9px;
+  font-size:13px;
+  font-weight:800;
+}
+
+.bb-qty-cancel{
+  background:#e9eef5;
+  color:#23456d;
+}
+
+.bb-qty-confirm{
+  background:#245fae;
+  color:#fff;
+}
+
+@media(max-width:720px){
+  #productSearch{
+    min-height:48px !important;
+    font-size:16px !important;
+  }
+
+  .bb-product-search-options{max-height:260px;}
+
+  .bb-product-option{
+    min-height:52px;
+    padding:9px 10px;
+  }
+
+  .bb-product-option-name{font-size:14px;}
+
+  .bb-qty-modal{padding:10px;}
+
+  .bb-qty-dialog,.bb-price-dialog{width:100%;}
+
+  .bb-qty-stepper{
+    grid-template-columns:50px minmax(0,1fr) 50px;
+  }
+}
 
 </style>
  </head>
@@ -2865,18 +3252,22 @@ input:focus {
    </div>
 <div class="desktop-product-card">
     <div class="desktop-card-title">Product / Items</div>
-     <div class="desktop-product-toolbar no-print">
-      <div class="desktop-product-hint">Search/select product from database, then enter quantity and price.</div>
-      <button class="add-btn no-print" onclick="showProductSelector(event)" type="button">
-       ＋ Add Product
-      </button>
+     <div class="desktop-product-toolbar no-print bb-fast-product-toolbar">
+      <div class="desktop-product-hint">Type a product name or code. Products only appear after typing. If no special price exists, price will pop up after QTY.</div>
      </div>
-    <div class="product-selector no-print" id="productSelector">
-     <select id="productChoice" onchange="addSelectedProduct()">
-      <option value="">
-       Select Product
-      </option>
-     </select>
+    <div class="bb-product-search-wrap no-print" id="productSelector">
+      <input
+        autocomplete="off"
+        id="productSearch"
+        inputmode="search"
+        placeholder="Search product name, code or barcode..."
+        type="search"
+        aria-label="Search product"
+        aria-autocomplete="list"
+        aria-controls="productSearchOptions"
+      />
+      <span class="bb-product-search-icon" aria-hidden="true">⌕</span>
+      <div class="bb-product-search-options" id="productSearchOptions" role="listbox"></div>
     </div>
     <div class="product-table-head no-print">
      <span>
@@ -3094,7 +3485,75 @@ input:focus {
     </div>
    </div>
 
-   <div aria-hidden="true" class="invoice-preview-modal no-print" id="invoicePreviewModal">
+   
+<div class="bb-qty-modal no-print" id="invoiceQtyModal" aria-hidden="true">
+  <form class="bb-qty-dialog" id="invoiceQtyForm">
+    <div class="bb-qty-dialog-head">
+      <div class="bb-qty-kicker">Quantity</div>
+      <div class="bb-qty-product-name" id="invoiceQtyProductName">Product</div>
+      <div class="bb-qty-product-meta" id="invoiceQtyProductMeta"></div>
+    </div>
+
+    <div class="bb-qty-stepper">
+      <button type="button" id="invoiceQtyMinus" aria-label="Decrease quantity">−</button>
+      <input
+        id="invoiceQtyInput"
+        type="number"
+        min="0.01"
+        step="0.01"
+        inputmode="decimal"
+        value="1"
+        required
+        aria-label="Quantity"
+      />
+      <button type="button" id="invoiceQtyPlus" aria-label="Increase quantity">＋</button>
+    </div>
+
+    <div class="bb-qty-message" id="invoiceQtyMessage"></div>
+
+    <div class="bb-qty-actions">
+      <button type="button" class="bb-qty-cancel" id="invoiceQtyCancel">Cancel</button>
+      <button type="submit" class="bb-qty-confirm">Add Product</button>
+    </div>
+  </form>
+</div>
+
+
+<div class="bb-price-modal no-print" id="invoicePriceModal" aria-hidden="true">
+  <form class="bb-price-dialog" id="invoicePriceForm">
+    <div class="bb-price-dialog-head">
+      <div class="bb-price-kicker">Price</div>
+      <div class="bb-price-product-name" id="invoicePriceProductName">Product</div>
+      <div class="bb-price-product-meta" id="invoicePriceProductMeta"></div>
+    </div>
+
+    <div class="bb-price-body">
+      <label class="bb-price-label" for="invoicePriceInput">Enter selling price</label>
+      <div class="bb-price-input-wrap">
+        <span id="invoicePriceCurrencySymbol">$</span>
+        <input
+          id="invoicePriceInput"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          value="0"
+          required
+          aria-label="Selling price"
+        />
+      </div>
+      <div class="bb-price-help">Shown only when the customer has no special price for this product.</div>
+      <div class="bb-price-message" id="invoicePriceMessage"></div>
+    </div>
+
+    <div class="bb-price-actions">
+      <button type="button" class="bb-price-cancel" id="invoicePriceCancel">Cancel</button>
+      <button type="submit" class="bb-price-confirm">Add Product</button>
+    </div>
+  </form>
+</div>
+
+<div aria-hidden="true" class="invoice-preview-modal no-print" id="invoicePreviewModal">
     <div class="invoice-preview-dialog">
      <div class="invoice-preview-header">
       <strong>
@@ -3670,6 +4129,11 @@ function handleLocationChange(fromSession = false) {
   if (salesInput) salesInput.dataset.locationDefault = location.salespersonName || "";
 
   loadCustomersByLocation(code);
+
+  // Fast key-in flow: Location -> Customer Name.
+  setTimeout(() => {
+    document.getElementById("customerName")?.focus();
+  }, 40);
 }
 
 function loadCustomersByLocation(locationCode) {
@@ -4009,6 +4473,11 @@ function selectCustomer(customer) {
     "none";
 
   loadCustomerPrices(customer.name);
+
+  // Fast key-in flow: Customer -> Product Search.
+  setTimeout(() => {
+    document.getElementById("productSearch")?.focus();
+  }, 40);
 }
 
 
@@ -4165,14 +4634,15 @@ function formatMoney(value, currency) {
 ========================================== */
 
 function loadProducts() {
-  const selector = document.getElementById("productSelector");
-  const choice = document.getElementById("productChoice");
+  const searchInput = document.getElementById("productSearch");
+  const options = document.getElementById("productSearchOptions");
 
-  if (!selector || !choice) return;
+  if (!searchInput || !options) return;
 
   productDatabaseLoaded = false;
-  choice.innerHTML = `<option value="">Loading products...</option>`;
-  choice.disabled = true;
+  searchInput.disabled = true;
+  searchInput.placeholder = "Loading products...";
+  options.innerHTML = "";
 
   const callbackName =
     "bbProducts_" + Date.now();
@@ -4192,8 +4662,9 @@ function loadProducts() {
   window[callbackName] = function(data) {
     if (!Array.isArray(data)) {
       products = [];
-      choice.innerHTML = `<option value="">Product database unavailable</option>`;
-      choice.disabled = true;
+      productDatabaseLoaded = false;
+      searchInput.disabled = true;
+      searchInput.placeholder = "Product database unavailable";
       finish();
       return;
     }
@@ -4212,15 +4683,15 @@ function loadProducts() {
       .filter(product => product.name && product.active);
 
     productDatabaseLoaded = true;
-    choice.innerHTML = `<option value="">Select Product</option>`;
-    choice.disabled = false;
+    searchInput.disabled = false;
+    searchInput.placeholder = "Search product name, code or barcode...";
     finish();
   };
 
   script.onerror = function() {
     finish();
-    choice.innerHTML = `<option value="">Still loading products... retrying</option>`;
-    choice.disabled = true;
+    searchInput.disabled = true;
+    searchInput.placeholder = "Still loading products... retrying";
     retryDatabaseLoad(loadProducts, () => productDatabaseLoaded);
   };
 
@@ -4235,8 +4706,8 @@ function loadProducts() {
   setTimeout(() => {
     if (!done) {
       finish();
-      choice.innerHTML = `<option value="">Still loading products... retrying</option>`;
-      choice.disabled = true;
+      searchInput.disabled = true;
+      searchInput.placeholder = "Still loading products... retrying";
       retryDatabaseLoad(loadProducts, () => productDatabaseLoaded);
     }
   }, DB_REQUEST_TIMEOUT_MS);
@@ -4244,98 +4715,101 @@ function loadProducts() {
 
 
 /* ==========================================
-   SHOW PRODUCT SELECTOR
+   FAST PRODUCT SEARCH
+   Search -> select -> QTY prompt automatically
 ========================================== */
 
-function showProductSelector(event) {
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
+let pendingInvoiceProduct = null;
+let pendingInvoicePriceContext = null;
 
-  if (!productDatabaseLoaded) {
-    alert("Product database is still loading. Please wait a moment and try again.");
-    loadProducts();
-    return;
-  }
+function getFilteredInvoiceProducts(query) {
+  const q = String(query || "").trim().toLowerCase();
 
-  const selector =
-    document.getElementById("productSelector");
+  return products
+    .filter(product => {
+      if (!q) return true;
 
-  const choice =
-    document.getElementById("productChoice");
-
-  // Same product may be added as many times as needed.
-  const availableProducts = products.slice();
-
-  if (availableProducts.length === 0) {
-    alert("No products are available.");
-    return;
-  }
-
-  /*
-   * Open the product dropdown immediately.
-   * The user can select a product without needing
-   * another Add button.
-   */
-  selector.style.display = "block";
-
-  choice.innerHTML = `
-    <option value="">Select Product</option>
-  `;
-
-  availableProducts.forEach(product => {
-    const option =
-      document.createElement("option");
-
-    option.value = product.name;
-    option.textContent = product.name;
-
-    choice.appendChild(option);
-  });
-
-  /*
-   * Put the cursor/focus directly on the dropdown.
-   * On mobile this opens the native picker when supported.
-   */
-  choice.focus();
-
-  /*
-   * Scroll just enough to keep the picker visible.
-   */
-  setTimeout(() => {
-    selector.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest"
-    });
-  }, 50);
+      return [
+        product.name,
+        product.code,
+        product.barcode,
+        product.productBarcode,
+        product.unit,
+        product.category
+      ].some(value =>
+        String(value || "").toLowerCase().includes(q)
+      );
+    })
+    .slice(0, 18);
 }
 
+function hideInvoiceProductOptions() {
+  const options = document.getElementById("productSearchOptions");
+  if (!options) return;
+  options.classList.remove("open");
+}
 
-/* ==========================================
-   ADD SELECTED PRODUCT - INSTANT
-========================================== */
+function renderInvoiceProductOptions() {
+  const input = document.getElementById("productSearch");
+  const options = document.getElementById("productSearchOptions");
 
-function addSelectedProduct() {
-  const choice =
-    document.getElementById("productChoice");
+  if (!input || !options || !productDatabaseLoaded) return;
 
-  const productName =
-    choice.value;
+  const query = String(input.value || "").trim();
 
-  if (!productName) return;
+  if (!query) {
+    options.innerHTML = "";
+    options.classList.remove("open");
+    return;
+  }
 
-  const product =
-    products.find(
-      p => p.name === productName
-    );
+  const matches = getFilteredInvoiceProducts(query);
 
+  if (!matches.length) {
+    options.innerHTML =
+      `<div class="bb-product-search-empty">No product found.</div>`;
+    options.classList.add("open");
+    return;
+  }
+
+  options.innerHTML = matches.map(product => `
+    <button
+      type="button"
+      class="bb-product-option"
+      data-product-code="${escapeHtml(product.code)}"
+      role="option"
+    >
+      <span class="bb-product-option-main">
+        <span class="bb-product-option-name">${escapeHtml(product.name)}</span>
+        <span class="bb-product-option-meta">${
+          [product.code, product.barcode || product.productBarcode]
+            .filter(Boolean)
+            .map(escapeHtml)
+            .join(" • ")
+        }</span>
+      </span>
+      <span class="bb-product-option-unit">${escapeHtml(product.unit || "-")}</span>
+    </button>
+  `).join("");
+
+  options.classList.add("open");
+
+  options.querySelectorAll(".bb-product-option").forEach(button => {
+    button.addEventListener("click", function() {
+      const code = String(this.dataset.productCode || "").trim();
+      const product = products.find(item => item.code === code);
+      if (product) selectInvoiceProduct(product);
+    });
+  });
+}
+
+function hasSpecialCustomerPrice(product) {
+  if (!product) return false;
+  return Object.prototype.hasOwnProperty.call(customerPrices, product.code);
+}
+
+function finalizeInvoiceProductAdd(product, effectiveUsdPrice, qty, manualPrice = false) {
   if (!product) return;
-
-  /*
-   * Add immediately when the user selects it.
-   */
-  const effectiveUsdPrice = getPriceForProduct(product);
 
   const lineId =
     "LINE-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
@@ -4344,43 +4818,258 @@ function addSelectedProduct() {
     id: lineId,
     productName: product.name,
     productCode: product.code,
-    usdPrice: effectiveUsdPrice,
-    manualPrice: false
+    usdPrice: Number(effectiveUsdPrice) || 0,
+    manualPrice: !!manualPrice
   });
 
   createProduct(
     product.name,
-    effectiveUsdPrice,
-    lineId
+    Number(effectiveUsdPrice) || 0,
+    lineId,
+    qty
   );
 
   calculate();
 
-  /*
-   * Refresh the same dropdown so the user can
-   * immediately choose another product.
-   *
-   * No need to press "+ Add Product" again.
-   */
-  // Keep every product available, including products already used above.
-  const availableProducts = products.slice();
+  const searchInput = document.getElementById("productSearch");
+  if (searchInput) {
+    searchInput.value = "";
+    setTimeout(() => searchInput.focus(), 35);
+  }
+}
 
-  choice.innerHTML = `
-    <option value="">＋ Select another product</option>
-  `;
+function openInvoicePricePrompt(product, qty, effectiveUsdPrice) {
+  const modal = document.getElementById("invoicePriceModal");
+  const input = document.getElementById("invoicePriceInput");
 
-  availableProducts.forEach(product => {
-    const option =
-      document.createElement("option");
+  if (!modal || !input || !product) return;
 
-    option.value = product.name;
-    option.textContent = product.name;
+  pendingInvoicePriceContext = {
+    product,
+    qty: Number(qty) || 0,
+    defaultUsdPrice: Number(effectiveUsdPrice) || 0
+  };
 
-    choice.appendChild(option);
-  });
+  const currency = getCurrency();
+  const displayPrice = usdToSelected(Number(effectiveUsdPrice) || 0, currency);
 
-  // Keep the picker ready because products can be selected repeatedly.
-  choice.focus();
+  document.getElementById("invoicePriceProductName").textContent = product.name;
+  document.getElementById("invoicePriceProductMeta").textContent =
+    [product.code, product.unit, "Qty: " + qty].filter(Boolean).join(" • ");
+  document.getElementById("invoicePriceCurrencySymbol").textContent =
+    currency === "KHR" ? "៛" : "$";
+  input.step = currency === "KHR" ? "1" : "0.01";
+  input.value = currency === "KHR"
+    ? String(Math.round(displayPrice))
+    : String(Number(displayPrice.toFixed(2)));
+
+  const message = document.getElementById("invoicePriceMessage");
+  if (message) message.textContent = "";
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+
+  setTimeout(() => {
+    input.focus();
+    input.select();
+  }, 35);
+}
+
+function closeInvoicePricePrompt() {
+  const modal = document.getElementById("invoicePriceModal");
+  const searchInput = document.getElementById("productSearch");
+
+  pendingInvoicePriceContext = null;
+
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  const message = document.getElementById("invoicePriceMessage");
+  if (message) message.textContent = "";
+
+  if (searchInput) {
+    searchInput.value = "";
+    setTimeout(() => searchInput.focus(), 30);
+  }
+}
+
+function confirmInvoiceProductPrice(event) {
+  if (event) event.preventDefault();
+
+  if (!pendingInvoicePriceContext) {
+    closeInvoicePricePrompt();
+    return;
+  }
+
+  const input = document.getElementById("invoicePriceInput");
+  const enteredDisplayPrice = Number(input?.value) || 0;
+
+  if (!(enteredDisplayPrice > 0)) {
+    const message = document.getElementById("invoicePriceMessage");
+    if (message) message.textContent = "Price must be greater than zero.";
+    input?.focus();
+    return;
+  }
+
+  const currency = getCurrency();
+  const usdPrice = selectedToUsd(enteredDisplayPrice, currency);
+
+  finalizeInvoiceProductAdd(
+    pendingInvoicePriceContext.product,
+    usdPrice,
+    pendingInvoicePriceContext.qty,
+    true
+  );
+
+  const modal = document.getElementById("invoicePriceModal");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  pendingInvoicePriceContext = null;
+}
+
+function selectInvoiceProduct(product) {
+  if (!product) return;
+
+  const input = document.getElementById("productSearch");
+  if (input) input.value = product.name;
+
+  hideInvoiceProductOptions();
+
+  const effectiveUsdPrice = getPriceForProduct(product);
+  openInvoiceQtyPrompt(product, effectiveUsdPrice);
+}
+
+function openInvoiceQtyPrompt(product, effectiveUsdPrice) {
+  const modal = document.getElementById("invoiceQtyModal");
+  const qtyInput = document.getElementById("invoiceQtyInput");
+
+  if (!modal || !qtyInput || !product) return;
+
+  pendingInvoiceProduct = {
+    product,
+    effectiveUsdPrice: Number(effectiveUsdPrice) || 0
+  };
+
+  document.getElementById("invoiceQtyProductName").textContent =
+    product.name;
+
+  const currency = getCurrency();
+  const displayPrice =
+    usdToSelected(Number(effectiveUsdPrice) || 0, currency);
+
+  document.getElementById("invoiceQtyProductMeta").textContent =
+    [product.code, product.unit, formatMoney(displayPrice, currency)]
+      .filter(Boolean)
+      .join(" • ");
+
+  document.getElementById("invoiceQtyMessage").textContent = "";
+  qtyInput.value = "1";
+
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+
+  setTimeout(() => {
+    qtyInput.focus();
+    qtyInput.select();
+  }, 35);
+}
+
+function closeInvoiceQtyPrompt() {
+  const modal = document.getElementById("invoiceQtyModal");
+  const input = document.getElementById("productSearch");
+
+  pendingInvoiceProduct = null;
+
+  if (modal) {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden", "true");
+  }
+
+  const message = document.getElementById("invoiceQtyMessage");
+  if (message) message.textContent = "";
+
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.focus(), 30);
+  }
+}
+
+function adjustInvoiceQty(amount) {
+  const input = document.getElementById("invoiceQtyInput");
+  if (!input) return;
+
+  const current = Number(input.value) || 0;
+  const next = Math.max(0.01, current + amount);
+
+  input.value =
+    Number.isInteger(next)
+      ? String(next)
+      : String(Number(next.toFixed(2)));
+
+  input.focus();
+}
+
+function confirmInvoiceProductQty(event) {
+  if (event) event.preventDefault();
+
+  if (!pendingInvoiceProduct) {
+    closeInvoiceQtyPrompt();
+    return;
+  }
+
+  const qtyInput = document.getElementById("invoiceQtyInput");
+  const qty = Number(qtyInput?.value) || 0;
+
+  if (!(qty > 0)) {
+    const message = document.getElementById("invoiceQtyMessage");
+    if (message) {
+      message.textContent = "Quantity must be greater than zero.";
+    }
+    qtyInput?.focus();
+    return;
+  }
+
+  const product = pendingInvoiceProduct.product;
+  const effectiveUsdPrice =
+    Number(pendingInvoiceProduct.effectiveUsdPrice) || 0;
+
+  const qtyModal = document.getElementById("invoiceQtyModal");
+  if (qtyModal) {
+    qtyModal.classList.remove("open");
+    qtyModal.setAttribute("aria-hidden", "true");
+  }
+
+  pendingInvoiceProduct = null;
+
+  if (!hasSpecialCustomerPrice(product)) {
+    openInvoicePricePrompt(product, qty, effectiveUsdPrice);
+    return;
+  }
+
+  finalizeInvoiceProductAdd(
+    product,
+    effectiveUsdPrice,
+    qty,
+    false
+  );
+}
+
+function focusInvoiceProductSearch() {
+  const input = document.getElementById("productSearch");
+  const options = document.getElementById("productSearchOptions");
+  if (!input) return;
+
+  input.value = "";
+  if (options) {
+    options.innerHTML = "";
+    options.classList.remove("open");
+  }
+  input.focus();
 }
 
 
@@ -4388,7 +5077,7 @@ function addSelectedProduct() {
    CREATE PRODUCT
 ========================================== */
 
-function createProduct(name, defaultUsdPrice, lineId) {
+function createProduct(name, defaultUsdPrice, lineId, initialQty = "") {
   const container = document.getElementById("productList");
   const div = document.createElement("div");
   const productRecord = products.find(p => p.name === name);
@@ -4424,7 +5113,7 @@ function createProduct(name, defaultUsdPrice, lineId) {
         class="product-qty-input"
         type="number"
         min="0"
-        value=""
+        value="${initialQty}"
         placeholder="0"
         inputmode="decimal"
         aria-label="Quantity for ${escapeHtml(name)}"
@@ -4469,13 +5158,6 @@ function createProduct(name, defaultUsdPrice, lineId) {
     });
   }
 
-  /*
-   * After selecting the product, immediately move the user
-   * into QTY. No extra button or click is required.
-   */
-  if (qtyInput) {
-    setTimeout(() => qtyInput.focus(), 80);
-  }
 }
 
 
@@ -4526,19 +5208,8 @@ function handleProductInputEnter(event, fieldType) {
 
   calculate();
 
-  /*
-   * After Qty + Price are finished, pressing Enter on Price
-   * opens the product selector for the next item.
-   */
-  showProductSelector();
-
-  setTimeout(() => {
-    const productChoice = document.getElementById("productChoice");
-    if (productChoice) {
-      productChoice.value = "";
-      productChoice.focus();
-    }
-  }, 80);
+  // Fast key-in flow: after editing Price, go straight to next Product Search.
+  focusInvoiceProductSearch();
 }
 
 /* ==========================================
@@ -6539,7 +7210,13 @@ function clearAllAfterSuccessfulSave() {
   selectedProducts = [];
 
   document.getElementById("productList").innerHTML = "";
-  document.getElementById("productSelector").style.display = "none";
+  const productSearch = document.getElementById("productSearch");
+  const productSearchOptions = document.getElementById("productSearchOptions");
+  if (productSearch) productSearch.value = "";
+  if (productSearchOptions) {
+    productSearchOptions.innerHTML = "";
+    productSearchOptions.classList.remove("open");
+  }
 
   document.getElementById("discount").value = 0;
   document.getElementById("amountPaid").value = 0;
@@ -6586,7 +7263,13 @@ function clearAll() {
   selectedProducts = [];
 
   document.getElementById("productList").innerHTML = "";
-  document.getElementById("productSelector").style.display = "none";
+  const productSearch = document.getElementById("productSearch");
+  const productSearchOptions = document.getElementById("productSearchOptions");
+  if (productSearch) productSearch.value = "";
+  if (productSearchOptions) {
+    productSearchOptions.innerHTML = "";
+    productSearchOptions.classList.remove("open");
+  }
 
   document.getElementById("discount").value = 0;
   document.getElementById("amountPaid").value = 0;
@@ -6632,6 +7315,82 @@ function escapeHtml(text) {
 /* ==========================================
    EVENTS
 ========================================== */
+
+const productSearchInput =
+  document.getElementById("productSearch");
+
+if (productSearchInput) {
+  productSearchInput.addEventListener("input", function() {
+    renderInvoiceProductOptions();
+  });
+
+  productSearchInput.addEventListener("focus", function() {
+    renderInvoiceProductOptions();
+  });
+
+  productSearchInput.addEventListener("keydown", function(event) {
+    if (event.key !== "Enter") return;
+
+    const firstOption =
+      document.querySelector("#productSearchOptions .bb-product-option");
+
+    if (!firstOption) return;
+
+    event.preventDefault();
+
+    const code =
+      String(firstOption.dataset.productCode || "").trim();
+
+    const product =
+      products.find(item => item.code === code);
+
+    if (product) selectInvoiceProduct(product);
+  });
+}
+
+document.addEventListener("click", function(event) {
+  const wrap = document.getElementById("productSelector");
+
+  if (wrap && !wrap.contains(event.target)) {
+    hideInvoiceProductOptions();
+  }
+});
+
+document.getElementById("invoiceQtyForm")
+  ?.addEventListener("submit", confirmInvoiceProductQty);
+
+document.getElementById("invoiceQtyCancel")
+  ?.addEventListener("click", closeInvoiceQtyPrompt);
+
+document.getElementById("invoiceQtyMinus")
+  ?.addEventListener("click", function() {
+    adjustInvoiceQty(-1);
+  });
+
+document.getElementById("invoiceQtyPlus")
+  ?.addEventListener("click", function() {
+    adjustInvoiceQty(1);
+  });
+
+document.getElementById("invoiceQtyModal")
+  ?.addEventListener("click", function(event) {
+    if (event.target === this) {
+      closeInvoiceQtyPrompt();
+    }
+  });
+
+document.getElementById("invoicePriceForm")
+  ?.addEventListener("submit", confirmInvoiceProductPrice);
+
+document.getElementById("invoicePriceCancel")
+  ?.addEventListener("click", closeInvoicePricePrompt);
+
+document.getElementById("invoicePriceModal")
+  ?.addEventListener("click", function(event) {
+    if (event.target === this) {
+      closeInvoicePricePrompt();
+    }
+  });
 
 document.getElementById("currency")
   .addEventListener("change", changeCurrency);

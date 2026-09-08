@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator Fast Key-In V2.1 Simple Batch Link</title>
+  <title>BIG BROTHER — Invoice Generator Fast Key-In V2.2 Old UI + Batch Groups</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -3136,27 +3136,6 @@ input:focus {
 }
 
 
-#batchNumber{
-  width:100%;
-  min-width:0;
-}
-
-.bb-simple-batch-status{
-  margin-top:5px;
-  min-height:14px;
-  color:#718399;
-  font-size:8px;
-  line-height:1.35;
-}
-
-.bb-simple-batch-status.ok{
-  color:#17865d;
-  font-weight:800;
-}
-
-.bb-simple-batch-status.warn{
-  color:#a66a00;
-}
 
   </style>
  </head>
@@ -3237,9 +3216,6 @@ input:focus {
       <select id="batchNumber">
        <option value="">No Batch — Direct Sale</option>
       </select>
-      <div id="batchSimpleStatus" class="bb-simple-batch-status">
-       Loading active Batch list...
-      </div>
      </div>
     </div>
     <div class="grid-2 customer-field">
@@ -3771,15 +3747,10 @@ const SALESPERSON_SESSION_KEY = "bb_invoice_salesperson_override_v1";
 ========================================== */
 
 function setSimpleBatchStatus(message, type = "") {
-  const el =
-    document.getElementById("batchSimpleStatus");
-
-  if (!el) return;
-
-  el.textContent = message || "";
-  el.className =
-    "bb-simple-batch-status" +
-    (type ? " " + type : "");
+  /*
+   * V2.2 keeps the exact old V2 layout.
+   * No extra Batch helper row is rendered.
+   */
 }
 
 function getSelectedSimpleBatch() {
@@ -3957,7 +3928,35 @@ function normalizeSimpleBatchRows(openBatches) {
       locationName:
         String(batch.locationName || "").trim(),
       status:
-        String(batch.status || "Open").trim()
+        String(batch.status || "Open").trim(),
+      totalPhysicalRemainingQty:
+        Number(batch.totalPhysicalRemainingQty) || 0,
+      groupItems:
+        Array.isArray(batch.groupItems)
+          ? batch.groupItems.map(group => ({
+              groupCode:
+                String(group.groupCode || "").trim(),
+              groupName:
+                String(group.groupName || "").trim(),
+              unit:
+                String(group.unit || "").trim(),
+              remainingQty:
+                Number(group.remainingQty) || 0,
+              members:
+                Array.isArray(group.members)
+                  ? group.members.map(member => ({
+                      productCode:
+                        String(member.productCode || "").trim(),
+                      productName:
+                        String(member.productName || "").trim(),
+                      unit:
+                        String(member.unit || "").trim(),
+                      remainingQty:
+                        Number(member.remainingQty) || 0
+                    }))
+                  : []
+            }))
+          : []
     }))
     .filter(batch =>
       batch.batchId &&
@@ -4104,6 +4103,10 @@ async function loadSimpleBatchPicker() {
 
     updateSimpleBatchStatus();
 
+    if(productDatabaseLoaded){
+      renderInvoiceProductOptions();
+    }
+
   } catch (error) {
     simpleBatchLoaded = false;
 
@@ -4179,6 +4182,17 @@ function handleSimpleBatchChange() {
    * No extra save-time request.
    */
   applySimpleBatchLocation();
+
+  const searchInput=
+    document.getElementById("productSearch");
+
+  if(searchInput){
+    searchInput.value="";
+  }
+
+  if(productDatabaseLoaded){
+    renderInvoiceProductOptions();
+  }
 }
 
 /* ==========================================
@@ -4847,10 +4861,64 @@ function loadCustomerPrices(customerName) {
 }
 
 function getPriceForProduct(product) {
-  if (!product) return 0;
-  if (Object.prototype.hasOwnProperty.call(customerPrices, product.code)) {
+  if(!product) return 0;
+
+  if(
+    String(product.entryType || "")
+      .toUpperCase()==="GROUP"
+  ){
+    const members=
+      Array.isArray(product.members)
+        ? product.members
+        : [];
+
+    const values=members
+      .map(member=>{
+        const master=
+          products.find(
+            p=>p.code===member.productCode
+          );
+
+        if(!master) return null;
+
+        if(
+          Object.prototype.hasOwnProperty.call(
+            customerPrices,
+            master.code
+          )
+        ){
+          return Number(
+            customerPrices[master.code]
+          ) || 0;
+        }
+
+        return Number(master.usdPrice) || 0;
+      })
+      .filter(value=>value!==null);
+
+    if(!values.length) return 0;
+
+    const first=values[0] || 0;
+
+    return values.every(
+      value=>
+        Math.abs(
+          (Number(value)||0)-first
+        )<0.000001
+    )
+      ? first
+      : 0;
+  }
+
+  if(
+    Object.prototype.hasOwnProperty.call(
+      customerPrices,
+      product.code
+    )
+  ){
     return customerPrices[product.code];
   }
+
   return product.usdPrice;
 }
 
@@ -4863,7 +4931,9 @@ function applyCustomerPricesToProducts() {
     const name = row.dataset.product || "";
     const lineId = row.dataset.lineId || "";
     const item = selectedProducts.find(p => p.id === lineId);
-    const product = products.find(p => p.code === code || p.name === name);
+    const product =
+      getInvoiceSearchPool()
+        .find(p => p.code === code || p.name === name);
 
     if (!item || !product || item.manualPrice) return;
 
@@ -5094,6 +5164,58 @@ function formatMoney(value, currency) {
 }
 
 
+
+function getSelectedBatchGroupProducts() {
+  const batch=getSelectedSimpleBatch();
+
+  if(!batch) return [];
+
+  return (batch.groupItems || [])
+    .filter(group=>
+      group.groupCode &&
+      group.groupName &&
+      Number(group.remainingQty || 0)>0
+    )
+    .map(group=>({
+      entryType:"GROUP",
+      code:group.groupCode,
+      name:group.groupName,
+      groupCode:group.groupCode,
+      groupName:group.groupName,
+      unit:group.unit || "",
+      barcode:"",
+      productBarcode:"",
+      category:"Product Group",
+      usdPrice:0,
+      active:true,
+      members:Array.isArray(group.members)
+        ? group.members
+        : []
+    }));
+}
+
+function getInvoiceSearchPool() {
+  const groups=getSelectedBatchGroupProducts();
+
+  return [
+    ...groups,
+    ...products.map(product=>({
+      ...product,
+      entryType:"EXACT"
+    }))
+  ];
+}
+
+function findInvoiceSearchProductByCode(code) {
+  const wanted=String(code || "").trim();
+
+  if(!wanted) return null;
+
+  return getInvoiceSearchPool()
+    .find(item=>item.code===wanted) ||
+    null;
+}
+
 /* ==========================================
    LOAD PRODUCTS
    Google Sheets -> Apps Script Web App
@@ -5159,6 +5281,13 @@ function loadProducts() {
     searchInput.disabled = false;
     searchInput.placeholder = "Search product name, code or barcode...";
     finish();
+
+    if(getSelectedSimpleBatch()){
+      setTimeout(
+        ()=>renderInvoiceProductOptions(),
+        0
+      );
+    }
   };
 
   script.onerror = function() {
@@ -5196,11 +5325,27 @@ let pendingInvoiceProduct = null;
 let pendingInvoicePriceContext = null;
 
 function getFilteredInvoiceProducts(query) {
-  const q = String(query || "").trim().toLowerCase();
+  const q=String(query || "").trim().toLowerCase();
+  const hasBatch=!!getSelectedSimpleBatch();
 
-  return products
-    .filter(product => {
-      if (!q) return true;
+  const pool=getInvoiceSearchPool();
+
+  /*
+   * Empty search + Batch:
+   * automatically show Group Item Names only.
+   */
+  const source=
+    !q && hasBatch
+      ? pool.filter(
+          product=>
+            String(product.entryType || "")
+              .toUpperCase()==="GROUP"
+        )
+      : pool;
+
+  return source
+    .filter(product=>{
+      if(!q) return true;
 
       return [
         product.name,
@@ -5208,12 +5353,15 @@ function getFilteredInvoiceProducts(query) {
         product.barcode,
         product.productBarcode,
         product.unit,
-        product.category
-      ].some(value =>
-        String(value || "").toLowerCase().includes(q)
+        product.category,
+        product.groupName
+      ].some(value=>
+        String(value || "")
+          .toLowerCase()
+          .includes(q)
       );
     })
-    .slice(0, 18);
+    .slice(0,18);
 }
 
 function hideInvoiceProductOptions() {
@@ -5223,91 +5371,192 @@ function hideInvoiceProductOptions() {
 }
 
 function renderInvoiceProductOptions() {
-  const input = document.getElementById("productSearch");
-  const options = document.getElementById("productSearchOptions");
+  const input=document.getElementById("productSearch");
+  const options=document.getElementById("productSearchOptions");
 
-  if (!input || !options || !productDatabaseLoaded) return;
+  if(!input || !options || !productDatabaseLoaded) return;
 
-  const query = String(input.value || "").trim();
+  const query=String(input.value || "").trim();
+  const hasBatch=!!getSelectedSimpleBatch();
 
-  if (!query) {
-    options.innerHTML = "";
+  if(!query && !hasBatch){
+    options.innerHTML="";
     options.classList.remove("open");
     return;
   }
 
-  const matches = getFilteredInvoiceProducts(query);
+  const matches=getFilteredInvoiceProducts(query);
 
-  if (!matches.length) {
-    options.innerHTML =
-      `<div class="bb-product-search-empty">No product found.</div>`;
+  if(!matches.length){
+    options.innerHTML=
+      `<div class="bb-product-search-empty">${
+        hasBatch
+          ? "No matching Group Item or product."
+          : "No product found."
+      }</div>`;
+
     options.classList.add("open");
     return;
   }
 
-  options.innerHTML = matches.map(product => `
-    <button
-      type="button"
-      class="bb-product-option"
-      data-product-code="${escapeHtml(product.code)}"
-      role="option"
-    >
-      <span class="bb-product-option-main">
-        <span class="bb-product-option-name">${escapeHtml(product.name)}</span>
-        <span class="bb-product-option-meta">${
-          [product.code, product.barcode || product.productBarcode]
-            .filter(Boolean)
-            .map(escapeHtml)
-            .join(" • ")
+  options.innerHTML=matches.map(product=>{
+    const isGroup=
+      String(product.entryType || "")
+        .toUpperCase()==="GROUP";
+
+    return `
+      <button
+        type="button"
+        class="bb-product-option"
+        data-product-code="${escapeHtml(product.code)}"
+        role="option"
+      >
+        <span class="bb-product-option-main">
+          <span class="bb-product-option-name">${escapeHtml(product.name)}</span>
+          <span class="bb-product-option-meta">${
+            [
+              product.code,
+              isGroup
+                ? "Product Group"
+                : (product.barcode || product.productBarcode)
+            ]
+              .filter(Boolean)
+              .map(escapeHtml)
+              .join(" • ")
+          }</span>
+        </span>
+        <span class="bb-product-option-unit">${
+          isGroup
+            ? "GROUP"
+            : escapeHtml(product.unit || "-")
         }</span>
-      </span>
-      <span class="bb-product-option-unit">${escapeHtml(product.unit || "-")}</span>
-    </button>
-  `).join("");
+      </button>
+    `;
+  }).join("");
 
   options.classList.add("open");
 
-  options.querySelectorAll(".bb-product-option").forEach(button => {
-    button.addEventListener("click", function() {
-      const code = String(this.dataset.productCode || "").trim();
-      const product = products.find(item => item.code === code);
-      if (product) selectInvoiceProduct(product);
+  options
+    .querySelectorAll(".bb-product-option")
+    .forEach(button=>{
+      button.addEventListener(
+        "click",
+        function(){
+          const code=
+            String(
+              this.dataset.productCode || ""
+            ).trim();
+
+          const product=
+            findInvoiceSearchProductByCode(code);
+
+          if(product){
+            selectInvoiceProduct(product);
+          }
+        }
+      );
     });
-  });
 }
 
 function hasSpecialCustomerPrice(product) {
-  if (!product) return false;
-  return Object.prototype.hasOwnProperty.call(customerPrices, product.code);
+  if(!product) return false;
+
+  if(
+    String(product.entryType || "")
+      .toUpperCase()==="GROUP"
+  ){
+    const members=
+      Array.isArray(product.members)
+        ? product.members
+        : [];
+
+    if(!members.length) return false;
+
+    const prices=[];
+
+    for(const member of members){
+      const code=String(member.productCode || "").trim();
+
+      if(
+        !code ||
+        !Object.prototype.hasOwnProperty.call(
+          customerPrices,
+          code
+        )
+      ){
+        return false;
+      }
+
+      prices.push(
+        Number(customerPrices[code]) || 0
+      );
+    }
+
+    const first=prices[0] || 0;
+
+    return prices.length>0 &&
+      prices.every(
+        value=>
+          Math.abs(value-first)<0.000001
+      );
+  }
+
+  return Object.prototype.hasOwnProperty.call(
+    customerPrices,
+    product.code
+  );
 }
 
-function finalizeInvoiceProductAdd(product, effectiveUsdPrice, qty, manualPrice = false) {
-  if (!product) return;
+function finalizeInvoiceProductAdd(
+  product,
+  effectiveUsdPrice,
+  qty,
+  manualPrice = false
+) {
+  if(!product) return;
 
-  const lineId =
-    "LINE-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  const lineId=
+    "LINE-"+Date.now()+"-"+
+    Math.random().toString(36).slice(2,8);
 
   selectedProducts.push({
-    id: lineId,
-    productName: product.name,
-    productCode: product.code,
-    usdPrice: Number(effectiveUsdPrice) || 0,
-    manualPrice: !!manualPrice
+    id:lineId,
+    productName:product.name,
+    productCode:product.code,
+    usdPrice:Number(effectiveUsdPrice)||0,
+    manualPrice:!!manualPrice,
+    entryType:
+      String(product.entryType || "EXACT")
+        .toUpperCase(),
+    productGroupCode:
+      product.groupCode || "",
+    productGroupName:
+      product.groupName || ""
   });
 
   createProduct(
     product.name,
-    Number(effectiveUsdPrice) || 0,
+    Number(effectiveUsdPrice)||0,
     lineId,
-    qty
+    qty,
+    product
   );
 
   calculate();
 
-  const searchInput = document.getElementById("productSearch");
-  if (searchInput) {
-    searchInput.value = "";
-    setTimeout(() => searchInput.focus(), 35);
+  const searchInput=
+    document.getElementById("productSearch");
+
+  if(searchInput){
+    searchInput.value="";
+
+    setTimeout(()=>{
+      searchInput.focus();
+
+      if(getSelectedSimpleBatch()){
+        renderInvoiceProductOptions();
+      }
+    },35);
   }
 }
 
@@ -5538,11 +5787,17 @@ function focusInvoiceProductSearch() {
   if (!input) return;
 
   input.value = "";
-  if (options) {
-    options.innerHTML = "";
+
+  if(options){
+    options.innerHTML="";
     options.classList.remove("open");
   }
+
   input.focus();
+
+  if(getSelectedSimpleBatch()){
+    renderInvoiceProductOptions();
+  }
 }
 
 
@@ -5550,16 +5805,36 @@ function focusInvoiceProductSearch() {
    CREATE PRODUCT
 ========================================== */
 
-function createProduct(name, defaultUsdPrice, lineId, initialQty = "") {
+function createProduct(
+  name,
+  defaultUsdPrice,
+  lineId,
+  initialQty = "",
+  productMeta = null
+) {
   const container = document.getElementById("productList");
   const div = document.createElement("div");
-  const productRecord = products.find(p => p.name === name);
+  const productRecord =
+    productMeta ||
+    getInvoiceSearchPool()
+      .find(p => p.name === name) ||
+    {};
 
   div.className = "product";
   div.dataset.product = name;
-  div.dataset.productCode = productRecord ? productRecord.code : "";
-  div.dataset.productBarcode = productRecord ? (productRecord.productBarcode || productRecord.barcode || "") : "";
-  div.dataset.unit = productRecord ? (productRecord.unit || "") : "";
+  div.dataset.productCode = productRecord.code || "";
+  div.dataset.productBarcode =
+    productRecord.productBarcode ||
+    productRecord.barcode ||
+    "";
+  div.dataset.unit = productRecord.unit || "";
+  div.dataset.entryType =
+    String(productRecord.entryType || "EXACT")
+      .toUpperCase();
+  div.dataset.productGroupCode =
+    productRecord.groupCode || "";
+  div.dataset.productGroupName =
+    productRecord.groupName || "";
   div.dataset.lineId = lineId || ("LINE-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8));
   div.dataset.usdPrice = defaultUsdPrice;
 
@@ -6187,7 +6462,14 @@ function getFinalInvoiceState() {
     const productCode = product.dataset.productCode ||
       products.find(p => p.name === product.dataset.product)?.code || "";
 
-    const productRecord = products.find(p => p.code === productCode || p.name === product.dataset.product) || {};
+    const productRecord =
+      getInvoiceSearchPool()
+        .find(
+          p =>
+            p.code === productCode ||
+            p.name === product.dataset.product
+        ) || {};
+
     items.push({
       no: index + 1,
       lineId: product.dataset.lineId || "",
@@ -6200,7 +6482,19 @@ function getFinalInvoiceState() {
       qty,
       price,
       total: lineTotal,
-      unit: product.dataset.unit || productRecord.unit || ""
+      unit: product.dataset.unit || productRecord.unit || "",
+      entryType:
+        String(
+          product.dataset.entryType || "EXACT"
+        ).toUpperCase(),
+      productGroupCode:
+        product.dataset.productGroupCode || "",
+      groupCode:
+        product.dataset.productGroupCode || "",
+      productGroupName:
+        product.dataset.productGroupName || "",
+      groupName:
+        product.dataset.productGroupName || ""
     });
   });
 
@@ -7153,7 +7447,19 @@ function buildSalesInvoicePayload() {
       unit: item.unit || "",
       qty: item.qty,
       unitPrice: item.price,
-      amount: item.total
+      amount: item.total,
+      entryType:
+        String(item.entryType || "EXACT")
+          .toUpperCase(),
+      productGroupCode:
+        item.productGroupCode ||
+        item.groupCode ||
+        "",
+      productGroupName:
+        item.productGroupName ||
+        item.groupName ||
+        "",
+      stockAllocations:[]
     }))
   };
 }

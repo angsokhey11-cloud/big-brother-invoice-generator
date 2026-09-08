@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator Fast Key-In V2.2 Old UI + Batch Groups</title>
+  <title>BIG BROTHER — Invoice Generator Fast Key-In V2.3 Fit + Locked Batch</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -3137,7 +3137,45 @@ input:focus {
 
 
 
-  </style>
+  
+/* =====================================================
+   V2.3 DESKTOP VIEWPORT FIT
+   Keep the approved UI; only scale it enough to avoid page scrollbars.
+   ===================================================== */
+@media (min-width:1200px) and (min-height:700px){
+  html,
+  body{
+    width:100%;
+    height:100%;
+    overflow:hidden !important;
+  }
+
+  .calculator{
+    transform-origin:top center;
+    will-change:transform;
+  }
+
+  #mainLocation.bb-batch-location-locked{
+    background:#f2f7fc !important;
+    color:#31516f !important;
+    cursor:not-allowed !important;
+    opacity:1 !important;
+  }
+}
+
+@media print{
+  html,
+  body{
+    overflow:visible !important;
+    height:auto !important;
+  }
+
+  .calculator{
+    transform:none !important;
+  }
+}
+
+</style>
  </head>
  <body>
   <div class="calculator">
@@ -3929,8 +3967,8 @@ function normalizeSimpleBatchRows(openBatches) {
         String(batch.locationName || "").trim(),
       status:
         String(batch.status || "Open").trim(),
-      totalPhysicalRemainingQty:
-        Number(batch.totalPhysicalRemainingQty) || 0,
+      totalRemainingQty:
+        Number(batch.totalRemainingQty) || 0,
       groupItems:
         Array.isArray(batch.groupItems)
           ? batch.groupItems.map(group => ({
@@ -3955,6 +3993,19 @@ function normalizeSimpleBatchRows(openBatches) {
                         Number(member.remainingQty) || 0
                     }))
                   : []
+            }))
+          : [],
+      exactItems:
+        Array.isArray(batch.exactItems)
+          ? batch.exactItems.map(item => ({
+              productCode:
+                String(item.productCode || "").trim(),
+              productName:
+                String(item.productName || "").trim(),
+              unit:
+                String(item.unit || "").trim(),
+              remainingQty:
+                Number(item.remainingQty) || 0
             }))
           : []
     }))
@@ -4028,8 +4079,7 @@ function requestSimpleBatchList() {
      */
     script.src =
       STOCK_DATABASE_API_URL +
-      "?action=stockKeyinFast" +
-      "&forceSync=0" +
+      "?action=batchPickerFast" +
       "&callback=" +
       encodeURIComponent(callbackName) +
       "&t=" +
@@ -4083,7 +4133,7 @@ async function loadSimpleBatchPicker() {
 
     simpleBatchRows =
       normalizeSimpleBatchRows(
-        data.openBatches
+        data.batches
       );
 
     simpleBatchLoaded = true;
@@ -4125,50 +4175,88 @@ async function loadSimpleBatchPicker() {
   }
 }
 
+function unlockSimpleBatchLocation() {
+  const select=
+    document.getElementById("mainLocation");
+
+  if(!select) return;
+
+  select.classList.remove(
+    "bb-batch-location-locked"
+  );
+
+  if(locationDatabaseLoaded){
+    select.disabled=false;
+  }
+
+  select.title=
+    "Select Main Location";
+}
+
 function applySimpleBatchLocation() {
-  const batch =
+  const batch=
     getSelectedSimpleBatch();
 
-  if (!batch) {
-    simpleBatchPendingLocationCode = "";
+  const select=
+    document.getElementById("mainLocation");
+
+  if(!batch){
+    simpleBatchPendingLocationCode="";
+    unlockSimpleBatchLocation();
     return false;
   }
 
-  const code =
+  const code=
     String(
       batch.locationCode || ""
     ).trim();
 
-  if (!code) return false;
-
-  simpleBatchPendingLocationCode = code;
-
-  const select =
-    document.getElementById("mainLocation");
-
-  if (
-    !select ||
-    !locationDatabaseLoaded ||
-    !locations.some(
-      location =>
-        location.locationCode === code
-    )
-  ) {
+  if(!code){
     return false;
   }
 
-  const changed =
-    String(select.value || "").trim() !== code;
+  simpleBatchPendingLocationCode=code;
 
-  select.value = code;
-  simpleBatchPendingLocationCode = "";
+  if(
+    !select ||
+    !locationDatabaseLoaded ||
+    !locations.some(
+      location=>
+        location.locationCode===code
+    )
+  ){
+    return false;
+  }
 
-  if (
+  const changed=
+    String(select.value || "").trim()!==code;
+
+  select.value=code;
+  simpleBatchPendingLocationCode="";
+
+  /*
+   * Batch Location is authoritative.
+   * Accountant cannot manually move this Batch to another Location.
+   */
+  select.disabled=true;
+  select.classList.add(
+    "bb-batch-location-locked"
+  );
+  select.title=
+    "Location locked to "+batch.batchId;
+
+  if(
     changed ||
-    currentLocationCode !== code
-  ) {
+    currentLocationCode!==code
+  ){
     handleLocationChange(false);
   }
+
+  /*
+   * handleLocationChange does not intentionally unlock the field,
+   * but re-apply in case another UI routine touched it.
+   */
+  select.disabled=true;
 
   return true;
 }
@@ -4177,11 +4265,11 @@ function handleSimpleBatchChange() {
   rememberSimpleBatch();
   updateSimpleBatchStatus();
 
-  /*
-   * Preserve the safe Location link using already-loaded Batch metadata.
-   * No extra save-time request.
-   */
-  applySimpleBatchLocation();
+  if(getSelectedSimpleBatch()){
+    applySimpleBatchLocation();
+  }else{
+    unlockSimpleBatchLocation();
+  }
 
   const searchInput=
     document.getElementById("productSearch");
@@ -4474,7 +4562,7 @@ function loadLocations() {
 
   // Cached locations are usable immediately. The server refresh runs in the background.
   const hasCachedLocations = locations.length > 0;
-  select.disabled = !hasCachedLocations;
+  select.disabled = !hasCachedLocations || !!getSelectedSimpleBatch();
   if (!hasCachedLocations) {
     select.innerHTML = `<option value="">Loading locations...</option>`;
   } else {
@@ -4514,8 +4602,13 @@ function loadLocations() {
       select.innerHTML = `<option value="">Location database unavailable</option>`;
       select.disabled = true;
     } else {
-      select.disabled = false;
-      select.title = "Using cached locations";
+      select.disabled = !!getSelectedSimpleBatch();
+
+      if(getSelectedSimpleBatch()){
+        applySimpleBatchLocation();
+      }else{
+        select.title = "Using cached locations";
+      }
     }
   };
 
@@ -4531,8 +4624,13 @@ function loadLocations() {
         select.innerHTML = `<option value="">Location loading timed out — refresh to retry</option>`;
         select.disabled = true;
       } else {
-        select.disabled = false;
-        select.title = "Using cached locations; server refresh timed out";
+        select.disabled = !!getSelectedSimpleBatch();
+
+        if(getSelectedSimpleBatch()){
+          applySimpleBatchLocation();
+        }else{
+          select.title = "Using cached locations; server refresh timed out";
+        }
       }
     }
   }, LOCATION_REQUEST_TIMEOUT_MS);
@@ -4554,10 +4652,10 @@ function populateLocationSelect() {
   if (previous && locations.some(x => x.locationCode === previous)) {
     select.value = previous;
   }
-  select.disabled = false;
+  select.disabled = !!getSelectedSimpleBatch();
 
   /*
-   * If an active Batch is selected, its Location wins.
+   * If an active Batch is selected, its Location wins and locks.
    */
   if (
     getSelectedSimpleBatch() &&
@@ -7618,6 +7716,167 @@ function checkPaymentTransactionIdAvailable(transactionId) {
   });
 }
 
+
+function consumeSelectedBatchLocally(invoiceItems) {
+  const batch=getSelectedSimpleBatch();
+
+  if(
+    !batch ||
+    !Array.isArray(invoiceItems) ||
+    !invoiceItems.length
+  ){
+    return {
+      removed:false,
+      batchId:""
+    };
+  }
+
+  const groupItems=
+    Array.isArray(batch.groupItems)
+      ? batch.groupItems
+      : [];
+
+  const exactItems=
+    Array.isArray(batch.exactItems)
+      ? batch.exactItems
+      : [];
+
+  invoiceItems.forEach(item=>{
+    const qty=Math.max(
+      0,
+      Number(item.qty) || 0
+    );
+
+    if(!(qty>0)) return;
+
+    const entryType=
+      String(item.entryType || "EXACT")
+        .trim()
+        .toUpperCase();
+
+    if(entryType==="GROUP"){
+      const code=
+        String(
+          item.productGroupCode ||
+          item.groupCode ||
+          item.productCode ||
+          ""
+        ).trim();
+
+      const group=
+        groupItems.find(
+          row=>row.groupCode===code
+        );
+
+      if(group){
+        group.remainingQty=
+          Math.max(
+            0,
+            Number(group.remainingQty || 0)-qty
+          );
+      }
+
+      return;
+    }
+
+    const productCode=
+      String(item.productCode || "").trim();
+
+    let matchedGroup=false;
+
+    groupItems.forEach(group=>{
+      if(matchedGroup) return;
+
+      const belongs=
+        (group.members || [])
+          .some(
+            member=>
+              member.productCode===productCode
+          );
+
+      if(belongs){
+        group.remainingQty=
+          Math.max(
+            0,
+            Number(group.remainingQty || 0)-qty
+          );
+
+        matchedGroup=true;
+      }
+    });
+
+    if(!matchedGroup){
+      const exact=
+        exactItems.find(
+          row=>row.productCode===productCode
+        );
+
+      if(exact){
+        exact.remainingQty=
+          Math.max(
+            0,
+            Number(exact.remainingQty || 0)-qty
+          );
+      }
+    }
+  });
+
+  batch.groupItems=
+    groupItems.filter(
+      group=>
+        Number(group.remainingQty || 0)>0.000001
+    );
+
+  batch.exactItems=
+    exactItems.filter(
+      item=>
+        Number(item.remainingQty || 0)>0.000001
+    );
+
+  batch.totalRemainingQty=
+    batch.groupItems.reduce(
+      (sum,group)=>
+        sum+Number(group.remainingQty || 0),
+      0
+    )+
+    batch.exactItems.reduce(
+      (sum,item)=>
+        sum+Number(item.remainingQty || 0),
+      0
+    );
+
+  if(batch.totalRemainingQty>0.000001){
+    writeSimpleBatchCache(simpleBatchRows);
+    return {
+      removed:false,
+      batchId:batch.batchId
+    };
+  }
+
+  const finishedBatchId=batch.batchId;
+
+  simpleBatchRows=
+    simpleBatchRows.filter(
+      row=>row.batchId!==finishedBatchId
+    );
+
+  writeSimpleBatchCache(simpleBatchRows);
+
+  try{
+    localStorage.removeItem(
+      SIMPLE_BATCH_SELECTION_KEY
+    );
+  }catch(_){}
+
+  renderSimpleBatchPicker("");
+  unlockSimpleBatchLocation();
+
+  return {
+    removed:true,
+    batchId:finishedBatchId
+  };
+}
+
 async function completeInvoice(event) {
   if (event) {
     event.preventDefault();
@@ -7755,6 +8014,11 @@ async function completeInvoice(event) {
 
     await postSalesInvoiceBundle(payload, paymentPayload);
 
+    const batchLocalResult=
+      consumeSelectedBatchLocally(
+        payload.items
+      );
+
     alert(
       "Invoice completed successfully.\n\n" +
       "Invoice No.: " + payload.invoiceNo +
@@ -7763,7 +8027,14 @@ async function completeInvoice(event) {
         : "") +
       (paymentPayload
         ? "\nInvoice + payment sent together."
-        : "\nCredit invoice saved without a payment record.")
+        : "\nCredit invoice saved without a payment record.") +
+      (
+        batchLocalResult.removed
+          ? "\n\n✓ " +
+            batchLocalResult.batchId +
+            " reached 0 remaining and was removed from the Batch picker."
+          : ""
+      )
     );
 
     clearAllAfterSuccessfulSave();
@@ -8257,6 +8528,93 @@ document.addEventListener("DOMContentLoaded", () => {
     dueDisplay.addEventListener("click", openDueDatePicker);
   }
 });
-  </script>
+  
+/* =====================================================
+   V2.3 DESKTOP AUTO FIT
+   No redesign. Scale only when the natural page is taller than viewport.
+   ===================================================== */
+let bbInvoiceFitFrame=0;
+
+function fitInvoiceDesktopViewport(){
+  const root=document.querySelector(".calculator");
+
+  if(!root) return;
+
+  if(
+    window.innerWidth<1200 ||
+    window.innerHeight<700 ||
+    window.matchMedia("print").matches
+  ){
+    root.style.transform="";
+    document.documentElement.style.overflow="";
+    document.body.style.overflow="";
+    return;
+  }
+
+  root.style.transform="none";
+
+  const naturalHeight=
+    Math.max(
+      root.scrollHeight,
+      root.getBoundingClientRect().height
+    );
+
+  const availableHeight=
+    Math.max(
+      1,
+      window.innerHeight-4
+    );
+
+  const scale=
+    Math.min(
+      1,
+      availableHeight/naturalHeight
+    );
+
+  root.style.transform=
+    scale<0.999
+      ? "scale("+scale.toFixed(4)+")"
+      : "none";
+
+  document.documentElement.style.overflow="hidden";
+  document.body.style.overflow="hidden";
+}
+
+function requestInvoiceDesktopFit(){
+  cancelAnimationFrame(bbInvoiceFitFrame);
+
+  bbInvoiceFitFrame=
+    requestAnimationFrame(
+      ()=>fitInvoiceDesktopViewport()
+    );
+}
+
+window.addEventListener(
+  "resize",
+  requestInvoiceDesktopFit
+);
+
+window.addEventListener(
+  "load",
+  requestInvoiceDesktopFit
+);
+
+if("ResizeObserver" in window){
+  const bbInvoiceRoot=
+    document.querySelector(".calculator");
+
+  if(bbInvoiceRoot){
+    new ResizeObserver(
+      requestInvoiceDesktopFit
+    ).observe(bbInvoiceRoot);
+  }
+}
+
+setTimeout(
+  requestInvoiceDesktopFit,
+  0
+);
+
+</script>
  </body>
 </html>

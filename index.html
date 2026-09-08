@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator Fast Key-In V3 Batch Product Group</title>
+  <title>BIG BROTHER — Invoice Generator V3.1 Batch Picker + Persist</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -3005,6 +3005,23 @@ input:focus {
   font-size:9px;
   line-height:1.35;
 }
+
+#batchNumber{
+  width:100%;
+  min-height:38px;
+  border:1px solid #c7d6e8;
+  border-radius:9px;
+  background:#fff;
+  color:#24384c;
+  padding:8px 32px 8px 10px;
+  cursor:pointer;
+  font-weight:700;
+}
+#batchNumber:focus{
+  outline:none;
+  border-color:#79a8e8;
+  box-shadow:0 0 0 3px rgba(45,112,214,.10);
+}
 .bb-batch-stock-status.ok{color:#16855c;font-weight:800}
 .bb-batch-stock-status.warn{color:#a96c00;font-weight:800}
 .bb-batch-stock-status.error{color:#b43a3a;font-weight:800}
@@ -3261,9 +3278,11 @@ input:focus {
       <label for="batchNumber">
        Batch Number
       </label>
-      <input id="batchNumber" placeholder="Enter Batch Number" type="text" autocomplete="off"/>
+      <select id="batchNumber">
+       <option value="">No Batch — Direct Sale</option>
+      </select>
       <div id="batchStockStatus" class="bb-batch-stock-status">
-       No Batch selected — exact products only.
+       Loading remaining Batches...
       </div>
      </div>
     </div>
@@ -3306,7 +3325,7 @@ input:focus {
 <div class="desktop-product-card">
     <div class="desktop-card-title">Product / Items</div>
      <div class="desktop-product-toolbar no-print bb-fast-product-toolbar">
-      <div class="desktop-product-hint">No Batch: exact products only. With Batch: matching Product Groups + exact Batch Pending SKUs appear after typing. If no special price exists, price will pop up after QTY.</div>
+      <div class="desktop-product-hint">Batch picker shows only remaining Batches. No Batch = Direct Sale. With Batch: matching Product Groups + exact Batch Pending SKUs appear after typing.</div>
      </div>
     <div class="bb-product-search-wrap no-print" id="productSelector">
       <input
@@ -4680,8 +4699,20 @@ let selectedProducts = [];
 let batchStockCatalog = null;
 let batchStockCatalogLoading = false;
 let batchStockCatalogBatchId = "";
-let batchStockCatalogTimer = null;
 let batchStockCatalogRequestToken = 0;
+
+let availableBatchPickerRows = [];
+let batchPickerLoading = false;
+let batchPickerRequestToken = 0;
+
+const BATCH_PICKER_CACHE_KEY =
+  "bb_invoice_batch_picker_v31";
+
+const BATCH_SELECTION_KEY =
+  "bb_invoice_selected_batch_v31";
+
+const BATCH_PICKER_CACHE_MAX_AGE =
+  6 * 60 * 60 * 1000;
 
 // Load products only after the product state variables exist.
 loadProducts();
@@ -4730,13 +4761,14 @@ function formatMoney(value, currency) {
 
 
 /* ==========================================
-   BATCH PRODUCT GROUP CATALOG
-   Stock Database V3.3
+   BATCH PICKER + PRODUCT GROUP CATALOG
+   Stock Database V3.6+
 ========================================== */
 
 function setBatchStockStatus(message, type = "") {
   const el = document.getElementById("batchStockStatus");
   if (!el) return;
+
   el.textContent = message || "";
   el.className =
     "bb-batch-stock-status" +
@@ -4749,13 +4781,203 @@ function getCurrentBatchNumber() {
   ).trim();
 }
 
+function rememberSelectedBatch() {
+  try {
+    localStorage.setItem(
+      BATCH_SELECTION_KEY,
+      getCurrentBatchNumber()
+    );
+  } catch (_) {}
+}
+
+function getRememberedBatch() {
+  try {
+    return String(
+      localStorage.getItem(BATCH_SELECTION_KEY) || ""
+    ).trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+function clearRememberedBatch() {
+  try {
+    localStorage.removeItem(BATCH_SELECTION_KEY);
+  } catch (_) {}
+}
+
+function readBatchPickerCache() {
+  try {
+    const raw =
+      localStorage.getItem(BATCH_PICKER_CACHE_KEY);
+
+    if (!raw) return null;
+
+    const cached = JSON.parse(raw);
+
+    if (
+      !cached ||
+      !Array.isArray(cached.rows) ||
+      Date.now() - Number(cached.savedAt || 0) >
+        BATCH_PICKER_CACHE_MAX_AGE
+    ) {
+      localStorage.removeItem(BATCH_PICKER_CACHE_KEY);
+      return null;
+    }
+
+    return cached.rows;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeBatchPickerCache(rows) {
+  try {
+    localStorage.setItem(
+      BATCH_PICKER_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        rows: Array.isArray(rows) ? rows : []
+      })
+    );
+  } catch (_) {}
+}
+
+function getBatchTotalPending(batch) {
+  return (batch?.items || []).reduce(
+    (sum, item) =>
+      sum + Math.max(0, Number(item.pendingQty) || 0),
+    0
+  );
+}
+
+function getBatchPickerRowsFromOpenBatches(openBatches) {
+  return (Array.isArray(openBatches) ? openBatches : [])
+    .map(batch => ({
+      batchId: String(batch.batchId || "").trim(),
+      batchDate: String(batch.batchDate || "").trim(),
+      salesmanName: String(batch.salesmanName || "").trim(),
+      driverName: String(batch.driverName || "").trim(),
+      driver2Name: String(batch.driver2Name || "").trim(),
+      locationCode: String(batch.locationCode || "").trim(),
+      locationName: String(batch.locationName || "").trim(),
+      status: String(batch.status || "").trim(),
+      totalPending: getBatchTotalPending(batch)
+    }))
+    .filter(batch =>
+      batch.batchId &&
+      batch.totalPending > 0
+    );
+}
+
+function formatBatchPickerOption(batch) {
+  const place =
+    batch.locationName ||
+    batch.locationCode ||
+    "-";
+
+  const salesman =
+    batch.salesmanName || "No Salesman";
+
+  return (
+    batch.batchId +
+    " — " +
+    salesman +
+    " — " +
+    place +
+    " — Pending " +
+    Number(batch.totalPending || 0)
+      .toLocaleString("en-US", {
+        maximumFractionDigits: 2
+      })
+  );
+}
+
+function renderBatchPicker(options = {}) {
+  const select =
+    document.getElementById("batchNumber");
+
+  if (!select) return;
+
+  const preferredBatchId =
+    String(
+      options.preferredBatchId !== undefined
+        ? options.preferredBatchId
+        : getCurrentBatchNumber()
+    ).trim();
+
+  select.innerHTML =
+    '<option value="">No Batch — Direct Sale</option>' +
+    availableBatchPickerRows
+      .map(batch => `
+        <option value="${escapeHtml(batch.batchId)}">
+          ${escapeHtml(formatBatchPickerOption(batch))}
+        </option>
+      `)
+      .join("");
+
+  const exists =
+    preferredBatchId &&
+    availableBatchPickerRows.some(
+      batch => batch.batchId === preferredBatchId
+    );
+
+  select.value = exists
+    ? preferredBatchId
+    : "";
+
+  if (select.value) {
+    rememberSelectedBatch();
+  } else if (preferredBatchId) {
+    clearRememberedBatch();
+  }
+
+  return exists;
+}
+
+function getSelectedBatchPickerRow() {
+  const batchId = getCurrentBatchNumber();
+
+  return availableBatchPickerRows.find(
+    batch => batch.batchId === batchId
+  ) || null;
+}
+
+function setBatchStatusFromPicker() {
+  const batch = getSelectedBatchPickerRow();
+
+  if (!batch) {
+    setBatchStockStatus(
+      "No Batch selected — Direct Sale from Warehouse. Exact products only.",
+      ""
+    );
+    return;
+  }
+
+  setBatchStockStatus(
+    "✓ " +
+    batch.batchId +
+    " · Salesman: " +
+    (batch.salesmanName || "-") +
+    " · " +
+    (batch.locationName || batch.locationCode || "-") +
+    " · Pending " +
+    Number(batch.totalPending || 0)
+      .toLocaleString("en-US", {
+        maximumFractionDigits: 2
+      }),
+    "ok"
+  );
+}
+
 function clearBatchStockCatalog(message) {
   batchStockCatalog = null;
   batchStockCatalogBatchId = "";
   batchStockCatalogLoading = false;
 
   setBatchStockStatus(
-    message || "No Batch selected — exact products only.",
+    message ||
+      "No Batch selected — Direct Sale from Warehouse. Exact products only.",
     ""
   );
 
@@ -4776,8 +4998,12 @@ function jsonpStockRequest(action, params = {}) {
     function finish() {
       if (done) return;
       done = true;
+
       delete window[callbackName];
-      if (script.parentNode) script.parentNode.removeChild(script);
+
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
     }
 
     window[callbackName] = function(data) {
@@ -4787,7 +5013,10 @@ function jsonpStockRequest(action, params = {}) {
 
     script.onerror = function() {
       finish();
-      reject(new Error("Could not connect to Stock Database."));
+
+      reject(
+        new Error("Could not connect to Stock Database.")
+      );
     };
 
     const query = new URLSearchParams({
@@ -4795,7 +5024,9 @@ function jsonpStockRequest(action, params = {}) {
       callback: callbackName,
       t: String(Date.now()),
       ...Object.fromEntries(
-        Object.entries(params).map(([k,v]) => [k, String(v ?? "")])
+        Object.entries(params).map(
+          ([k,v]) => [k, String(v ?? "")]
+        )
       )
     });
 
@@ -4809,10 +5040,150 @@ function jsonpStockRequest(action, params = {}) {
     setTimeout(() => {
       if (!done) {
         finish();
-        reject(new Error("Stock Database request timed out."));
+
+        reject(
+          new Error("Stock Database request timed out.")
+        );
       }
     }, DB_REQUEST_TIMEOUT_MS);
   });
+}
+
+async function loadBatchPicker(
+  force = false,
+  preferredBatchId = null
+) {
+  if (batchPickerLoading) return availableBatchPickerRows;
+
+  const token = ++batchPickerRequestToken;
+  batchPickerLoading = true;
+
+  const current =
+    preferredBatchId !== null
+      ? String(preferredBatchId || "").trim()
+      : getCurrentBatchNumber();
+
+  if (!force && !availableBatchPickerRows.length) {
+    const cached = readBatchPickerCache();
+
+    if (cached?.length) {
+      availableBatchPickerRows = cached;
+
+      renderBatchPicker({
+        preferredBatchId:
+          current || getRememberedBatch()
+      });
+
+      setBatchStatusFromPicker();
+    }
+  }
+
+  try {
+    setBatchStockStatus(
+      "Refreshing remaining Batches...",
+      "warn"
+    );
+
+    const data =
+      await jsonpStockRequest(
+        "stockKeyinFast",
+        { forceSync: "0" }
+      );
+
+    if (token !== batchPickerRequestToken) {
+      return availableBatchPickerRows;
+    }
+
+    if (!data || data.success !== true) {
+      throw new Error(
+        data?.error ||
+        "Could not load remaining Batches."
+      );
+    }
+
+    availableBatchPickerRows =
+      getBatchPickerRowsFromOpenBatches(
+        data.openBatches
+      );
+
+    writeBatchPickerCache(
+      availableBatchPickerRows
+    );
+
+    const wanted =
+      current ||
+      getRememberedBatch();
+
+    const kept =
+      renderBatchPicker({
+        preferredBatchId: wanted
+      });
+
+    if (kept) {
+      setBatchStatusFromPicker();
+    } else {
+      setBatchStockStatus(
+        availableBatchPickerRows.length
+          ? "Select a remaining Batch, or use No Batch — Direct Sale."
+          : "No remaining Batch available — Direct Sale only.",
+        availableBatchPickerRows.length
+          ? ""
+          : "warn"
+      );
+    }
+
+    return availableBatchPickerRows;
+
+  } catch (error) {
+    if (availableBatchPickerRows.length) {
+      setBatchStockStatus(
+        "Saved Batch list ready · live refresh unavailable.",
+        "warn"
+      );
+
+      return availableBatchPickerRows;
+    }
+
+    setBatchStockStatus(
+      error?.message ||
+      "Could not load remaining Batches.",
+      "error"
+    );
+
+    return [];
+
+  } finally {
+    batchPickerLoading = false;
+  }
+}
+
+async function handleBatchPickerChange() {
+  rememberSelectedBatch();
+
+  const batchId = getCurrentBatchNumber();
+
+  selectedProducts = [];
+  document.getElementById("productList").innerHTML = "";
+
+  const productSearch =
+    document.getElementById("productSearch");
+
+  if (productSearch) {
+    productSearch.value = "";
+  }
+
+  hideInvoiceProductOptions();
+  calculate();
+
+  if (!batchId) {
+    clearBatchStockCatalog();
+    setBatchStatusFromPicker();
+    return;
+  }
+
+  setBatchStatusFromPicker();
+
+  await loadBatchStockCatalog(true);
 }
 
 async function loadBatchStockCatalog(force = false) {
@@ -4832,20 +5203,31 @@ async function loadBatchStockCatalog(force = false) {
   }
 
   const token = ++batchStockCatalogRequestToken;
+
   batchStockCatalogLoading = true;
-  setBatchStockStatus("Checking Batch stock...", "warn");
+
+  setBatchStockStatus(
+    "Checking " + batchId + " Stock...",
+    "warn"
+  );
 
   try {
-    const data = await jsonpStockRequest(
-      "batchSalesCatalog",
-      { batchId }
-    );
+    const data =
+      await jsonpStockRequest(
+        "batchSalesCatalog",
+        { batchId }
+      );
 
-    if (token !== batchStockCatalogRequestToken) {
+    if (
+      token !== batchStockCatalogRequestToken
+    ) {
       return null;
     }
 
-    if (!data || data.success !== true) {
+    if (
+      !data ||
+      data.success !== true
+    ) {
       batchStockCatalog = null;
       batchStockCatalogBatchId = "";
       batchStockCatalogLoading = false;
@@ -4860,7 +5242,11 @@ async function loadBatchStockCatalog(force = false) {
         errors[0] ||
         "Batch could not be loaded.";
 
-      setBatchStockStatus(message, "error");
+      setBatchStockStatus(
+        message,
+        "error"
+      );
+
       return null;
     }
 
@@ -4878,13 +5264,29 @@ async function loadBatchStockCatalog(force = false) {
         ? data.exactProducts.length
         : 0;
 
-    const batch = data.batch || {};
+    const batch =
+      data.batch || {};
+
+    const pickerRow =
+      getSelectedBatchPickerRow();
 
     setBatchStockStatus(
       "✓ " +
       (batch.batchId || batchId) +
+      " · Salesman: " +
+      (
+        batch.salesmanName ||
+        pickerRow?.salesmanName ||
+        "-"
+      ) +
       " · " +
-      (batch.salesmanName || "Batch") +
+      (
+        batch.locationName ||
+        batch.locationCode ||
+        pickerRow?.locationName ||
+        pickerRow?.locationCode ||
+        "-"
+      ) +
       " · " +
       groupCount +
       " group" +
@@ -4897,37 +5299,90 @@ async function loadBatchStockCatalog(force = false) {
     );
 
     renderInvoiceProductOptions();
+
     return data;
 
   } catch (error) {
-    if (token === batchStockCatalogRequestToken) {
+    if (
+      token === batchStockCatalogRequestToken
+    ) {
       batchStockCatalog = null;
       batchStockCatalogBatchId = "";
       batchStockCatalogLoading = false;
+
       setBatchStockStatus(
-        error?.message || "Could not load Batch stock.",
+        error?.message ||
+        "Could not load Batch stock.",
         "error"
       );
     }
+
     return null;
   }
 }
 
-function scheduleBatchStockCatalogLoad() {
-  clearTimeout(batchStockCatalogTimer);
+async function refreshBatchPickerAfterInvoiceSave(
+  usedBatchId
+) {
+  const oldBatchId =
+    String(usedBatchId || "").trim();
 
-  const batchId = getCurrentBatchNumber();
-
-  if (!batchId) {
-    clearBatchStockCatalog();
-    return;
+  if (!oldBatchId) {
+    await loadBatchPicker(true, "");
+    return {
+      fullySettled: false,
+      keptBatch: false
+    };
   }
 
-  setBatchStockStatus("Waiting for Batch Number...", "warn");
+  await loadBatchPicker(
+    true,
+    oldBatchId
+  );
 
-  batchStockCatalogTimer = setTimeout(() => {
-    loadBatchStockCatalog(true);
-  }, 450);
+  const stillExists =
+    availableBatchPickerRows.some(
+      batch => batch.batchId === oldBatchId
+    );
+
+  if (!stillExists) {
+    const select =
+      document.getElementById("batchNumber");
+
+    if (select) {
+      select.value = "";
+    }
+
+    clearRememberedBatch();
+
+    clearBatchStockCatalog(
+      "✓ " +
+      oldBatchId +
+      " fully settled · removed from remaining Batch list."
+    );
+
+    return {
+      fullySettled: true,
+      keptBatch: false
+    };
+  }
+
+  if (
+    document.getElementById("batchNumber")
+  ) {
+    document.getElementById("batchNumber").value =
+      oldBatchId;
+  }
+
+  rememberSelectedBatch();
+  setBatchStatusFromPicker();
+
+  await loadBatchStockCatalog(true);
+
+  return {
+    fullySettled: false,
+    keptBatch: true
+  };
 }
 
 function getBatchInvoiceSearchPool() {
@@ -7991,16 +8446,29 @@ async function completeInvoice(event) {
 
     await postSalesInvoiceBundle(payload, paymentPayload);
 
+    const usedBatchId =
+      String(payload.batchNumber || "").trim();
+
     const stockSync =
       await syncStockAfterInvoiceSave();
+
+    const batchResult =
+      await refreshBatchPickerAfterInvoiceSave(
+        usedBatchId
+      );
 
     const stockMessage =
       stockSync && Number(stockSync.errors || 0) > 0
         ? "\n⚠ Invoice saved, but Stock Sync has " +
           Number(stockSync.errors || 0) +
           " error(s). Check Stock Database."
-        : getCurrentBatchNumber()
-          ? "\n✓ Batch Pending Stock updated."
+        : usedBatchId
+          ? batchResult.fullySettled
+            ? "\n✓ " + usedBatchId +
+              " fully settled. Remaining Batch Stock = 0."
+            : "\n✓ Batch Pending Stock updated. " +
+              usedBatchId +
+              " stays selected for the next invoice."
           : "\n✓ Warehouse Stock sync requested.";
 
     alert(
@@ -8009,18 +8477,16 @@ async function completeInvoice(event) {
       (paymentPayload
         ? "\nInvoice + payment sent together."
         : "\nCredit invoice saved without a payment record.") +
-      stockMessage
+      stockMessage +
+      (
+        batchResult.fullySettled
+          ? "\n\nThe finished Batch was removed automatically. " +
+            "Please select another Batch for the next invoice."
+          : ""
+      )
     );
 
     clearAllAfterSuccessfulSave();
-
-    /*
-     * Keep Batch Number for fast next-invoice key-in.
-     * Reload its remaining pool after the previous invoice.
-     */
-    if (getCurrentBatchNumber()) {
-      await loadBatchStockCatalog(true);
-    }
 
   } catch (error) {
     console.error("Fast invoice complete failed:", error);
@@ -8360,24 +8826,8 @@ const batchNumberInput =
 
 if (batchNumberInput) {
   batchNumberInput.addEventListener(
-    "input",
-    scheduleBatchStockCatalogLoad
-  );
-
-  batchNumberInput.addEventListener(
     "change",
-    function() {
-      loadBatchStockCatalog(true);
-    }
-  );
-
-  batchNumberInput.addEventListener(
-    "blur",
-    function() {
-      if (getCurrentBatchNumber()) {
-        loadBatchStockCatalog(true);
-      }
-    }
+    handleBatchPickerChange
   );
 }
 
@@ -8472,6 +8922,15 @@ if (bankingSelect) {
 
 
 /* INITIAL CALCULATION */
+
+loadBatchPicker(
+  false,
+  getRememberedBatch()
+).then(() => {
+  if (getCurrentBatchNumber()) {
+    loadBatchStockCatalog(true);
+  }
+});
 
 calculate();
 

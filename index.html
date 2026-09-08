@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator Fast Key-In V2</title>
+  <title>BIG BROTHER — Invoice Generator Fast Key-In V3 Batch Product Group</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -2998,6 +2998,56 @@ input:focus {
   font-size:12px;
 }
 
+.bb-batch-stock-status{
+  margin-top:5px;
+  min-height:14px;
+  color:#718399;
+  font-size:9px;
+  line-height:1.35;
+}
+.bb-batch-stock-status.ok{color:#16855c;font-weight:800}
+.bb-batch-stock-status.warn{color:#a96c00;font-weight:800}
+.bb-batch-stock-status.error{color:#b43a3a;font-weight:800}
+
+.bb-product-option-side{
+  flex:0 0 auto;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:4px;
+}
+.bb-product-option-type{
+  border-radius:999px;
+  padding:3px 6px;
+  font-size:7px;
+  font-weight:1000;
+  letter-spacing:.03em;
+}
+.bb-product-option-type.group{
+  background:#fff3d7;
+  color:#9a6300;
+}
+.bb-product-option-type.exact{
+  background:#edf5ff;
+  color:#245fae;
+}
+.bb-product-option-available{
+  color:#718399;
+  font-size:8px;
+  font-weight:800;
+}
+.bb-product-group-badge{
+  display:inline-block;
+  margin-left:5px;
+  border-radius:999px;
+  padding:2px 5px;
+  background:#fff3d7;
+  color:#966100;
+  font-size:7px;
+  font-weight:1000;
+  vertical-align:middle;
+}
+
 /* QTY prompt */
 .bb-qty-modal{
   display:none;
@@ -3211,7 +3261,10 @@ input:focus {
       <label for="batchNumber">
        Batch Number
       </label>
-      <input id="batchNumber" placeholder="Enter Batch Number" type="text"/>
+      <input id="batchNumber" placeholder="Enter Batch Number" type="text" autocomplete="off"/>
+      <div id="batchStockStatus" class="bb-batch-stock-status">
+       No Batch selected — exact products only.
+      </div>
      </div>
     </div>
     <div class="grid-2 customer-field">
@@ -3253,7 +3306,7 @@ input:focus {
 <div class="desktop-product-card">
     <div class="desktop-card-title">Product / Items</div>
      <div class="desktop-product-toolbar no-print bb-fast-product-toolbar">
-      <div class="desktop-product-hint">Type a product name or code. Products only appear after typing. If no special price exists, price will pop up after QTY.</div>
+      <div class="desktop-product-hint">No Batch: exact products only. With Batch: matching Product Groups + exact Batch Pending SKUs appear after typing. If no special price exists, price will pop up after QTY.</div>
      </div>
     <div class="bb-product-search-wrap no-print" id="productSelector">
       <input
@@ -3707,6 +3760,9 @@ const CUSTOMER_API_URL =
 
 const SALES_DATABASE_API_URL =
   "https://script.google.com/macros/s/AKfycbyM5mUlz5SeMZ_oPJCo2FgLkPEcodAQ7wPl5wxAdrvfqLvsZLaHxiOtS02L1Q3ZRA3D/exec";
+
+const STOCK_DATABASE_API_URL =
+  "https://script.google.com/macros/s/AKfycbyVDVD72ed4zCxK32Rkx-kHZLgyG6aZwdnSmFH4S47RjVmm_C9b9v7xfpkCkgO1XVo3/exec";
 
 let customers = [];
 let locations = [];
@@ -4375,9 +4431,54 @@ function loadCustomerPrices(customerName) {
 
 function getPriceForProduct(product) {
   if (!product) return 0;
+
+  if (String(product.entryType || "").toUpperCase() === "GROUP") {
+    const members = Array.isArray(product.members)
+      ? product.members
+      : [];
+
+    const values = members
+      .map(member => {
+        const master =
+          products.find(p => p.code === member.productCode);
+
+        if (!master) return null;
+
+        if (Object.prototype.hasOwnProperty.call(
+          customerPrices,
+          master.code
+        )) {
+          return Number(customerPrices[master.code]) || 0;
+        }
+
+        return Number(master.usdPrice) || 0;
+      })
+      .filter(value => value !== null);
+
+    if (!values.length) {
+      return Number(product.usdPrice) || 0;
+    }
+
+    const first = values[0] || 0;
+
+    if (values.every(
+      value => Math.abs((Number(value) || 0) - first) < 0.000001
+    )) {
+      return first;
+    }
+
+    /*
+     * Member prices differ.
+     * Start from 0 so the normal Price prompt forces accountant
+     * to enter the paper invoice price instead of guessing.
+     */
+    return 0;
+  }
+
   if (Object.prototype.hasOwnProperty.call(customerPrices, product.code)) {
     return customerPrices[product.code];
   }
+
   return product.usdPrice;
 }
 
@@ -4576,6 +4677,12 @@ let products = [];
 let productDatabaseLoaded = false;
 let selectedProducts = [];
 
+let batchStockCatalog = null;
+let batchStockCatalogLoading = false;
+let batchStockCatalogBatchId = "";
+let batchStockCatalogTimer = null;
+let batchStockCatalogRequestToken = 0;
+
 // Load products only after the product state variables exist.
 loadProducts();
 
@@ -4618,6 +4725,312 @@ function formatMoney(value, currency) {
   }
 
   return "៛" + Math.round(Number(value)).toLocaleString("en-US");
+}
+
+
+
+/* ==========================================
+   BATCH PRODUCT GROUP CATALOG
+   Stock Database V3.3
+========================================== */
+
+function setBatchStockStatus(message, type = "") {
+  const el = document.getElementById("batchStockStatus");
+  if (!el) return;
+  el.textContent = message || "";
+  el.className =
+    "bb-batch-stock-status" +
+    (type ? " " + type : "");
+}
+
+function getCurrentBatchNumber() {
+  return String(
+    document.getElementById("batchNumber")?.value || ""
+  ).trim();
+}
+
+function clearBatchStockCatalog(message) {
+  batchStockCatalog = null;
+  batchStockCatalogBatchId = "";
+  batchStockCatalogLoading = false;
+
+  setBatchStockStatus(
+    message || "No Batch selected — exact products only.",
+    ""
+  );
+
+  hideInvoiceProductOptions();
+}
+
+function jsonpStockRequest(action, params = {}) {
+  return new Promise((resolve, reject) => {
+    const callbackName =
+      "bbStock_" +
+      Date.now() +
+      "_" +
+      Math.random().toString(36).slice(2);
+
+    const script = document.createElement("script");
+    let done = false;
+
+    function finish() {
+      if (done) return;
+      done = true;
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[callbackName] = function(data) {
+      finish();
+      resolve(data);
+    };
+
+    script.onerror = function() {
+      finish();
+      reject(new Error("Could not connect to Stock Database."));
+    };
+
+    const query = new URLSearchParams({
+      action,
+      callback: callbackName,
+      t: String(Date.now()),
+      ...Object.fromEntries(
+        Object.entries(params).map(([k,v]) => [k, String(v ?? "")])
+      )
+    });
+
+    script.src =
+      STOCK_DATABASE_API_URL +
+      "?" +
+      query.toString();
+
+    document.body.appendChild(script);
+
+    setTimeout(() => {
+      if (!done) {
+        finish();
+        reject(new Error("Stock Database request timed out."));
+      }
+    }, DB_REQUEST_TIMEOUT_MS);
+  });
+}
+
+async function loadBatchStockCatalog(force = false) {
+  const batchId = getCurrentBatchNumber();
+
+  if (!batchId) {
+    clearBatchStockCatalog();
+    return null;
+  }
+
+  if (
+    !force &&
+    batchStockCatalog &&
+    batchStockCatalogBatchId === batchId
+  ) {
+    return batchStockCatalog;
+  }
+
+  const token = ++batchStockCatalogRequestToken;
+  batchStockCatalogLoading = true;
+  setBatchStockStatus("Checking Batch stock...", "warn");
+
+  try {
+    const data = await jsonpStockRequest(
+      "batchSalesCatalog",
+      { batchId }
+    );
+
+    if (token !== batchStockCatalogRequestToken) {
+      return null;
+    }
+
+    if (!data || data.success !== true) {
+      batchStockCatalog = null;
+      batchStockCatalogBatchId = "";
+      batchStockCatalogLoading = false;
+
+      const errors =
+        Array.isArray(data?.configurationErrors)
+          ? data.configurationErrors
+          : [];
+
+      const message =
+        data?.error ||
+        errors[0] ||
+        "Batch could not be loaded.";
+
+      setBatchStockStatus(message, "error");
+      return null;
+    }
+
+    batchStockCatalog = data;
+    batchStockCatalogBatchId = batchId;
+    batchStockCatalogLoading = false;
+
+    const groupCount =
+      Array.isArray(data.groups)
+        ? data.groups.length
+        : 0;
+
+    const exactCount =
+      Array.isArray(data.exactProducts)
+        ? data.exactProducts.length
+        : 0;
+
+    const batch = data.batch || {};
+
+    setBatchStockStatus(
+      "✓ " +
+      (batch.batchId || batchId) +
+      " · " +
+      (batch.salesmanName || "Batch") +
+      " · " +
+      groupCount +
+      " group" +
+      (groupCount === 1 ? "" : "s") +
+      " · " +
+      exactCount +
+      " exact SKU" +
+      (exactCount === 1 ? "" : "s"),
+      "ok"
+    );
+
+    renderInvoiceProductOptions();
+    return data;
+
+  } catch (error) {
+    if (token === batchStockCatalogRequestToken) {
+      batchStockCatalog = null;
+      batchStockCatalogBatchId = "";
+      batchStockCatalogLoading = false;
+      setBatchStockStatus(
+        error?.message || "Could not load Batch stock.",
+        "error"
+      );
+    }
+    return null;
+  }
+}
+
+function scheduleBatchStockCatalogLoad() {
+  clearTimeout(batchStockCatalogTimer);
+
+  const batchId = getCurrentBatchNumber();
+
+  if (!batchId) {
+    clearBatchStockCatalog();
+    return;
+  }
+
+  setBatchStockStatus("Waiting for Batch Number...", "warn");
+
+  batchStockCatalogTimer = setTimeout(() => {
+    loadBatchStockCatalog(true);
+  }, 450);
+}
+
+function getBatchInvoiceSearchPool() {
+  const batchId = getCurrentBatchNumber();
+
+  if (!batchId) {
+    return products.map(product => ({
+      ...product,
+      entryType: "EXACT",
+      availableQty: null
+    }));
+  }
+
+  if (
+    !batchStockCatalog ||
+    batchStockCatalogBatchId !== batchId
+  ) {
+    return [];
+  }
+
+  const groups = (batchStockCatalog.groups || []).map(group => {
+    const memberProducts = (group.members || [])
+      .map(member =>
+        products.find(p => p.code === member.productCode)
+      )
+      .filter(Boolean);
+
+    /*
+     * Use a helpful default price only when all current member
+     * effective prices are the same. Otherwise Price popup starts
+     * at 0 and accountant explicitly enters the paper invoice price.
+     */
+    const effectivePrices = memberProducts
+      .map(getPriceForProduct)
+      .filter(v => Number.isFinite(Number(v)));
+
+    let commonPrice = 0;
+
+    if (effectivePrices.length) {
+      const first = Number(effectivePrices[0]) || 0;
+      if (effectivePrices.every(
+        value => Math.abs((Number(value) || 0) - first) < 0.000001
+      )) {
+        commonPrice = first;
+      }
+    }
+
+    return {
+      entryType: "GROUP",
+      code: group.groupCode,
+      name: group.groupName,
+      groupCode: group.groupCode,
+      groupName: group.groupName,
+      unit: group.unit || "",
+      barcode: "",
+      productBarcode: "",
+      usdPrice: commonPrice,
+      active: true,
+      availableQty: Number(group.availableQty) || 0,
+      members: Array.isArray(group.members)
+        ? group.members
+        : []
+    };
+  });
+
+  const exact = (batchStockCatalog.exactProducts || []).map(item => {
+    const master =
+      products.find(p => p.code === item.productCode) || {};
+
+    return {
+      ...master,
+      entryType: "EXACT",
+      code: item.productCode,
+      name: item.productName || master.name || item.productCode,
+      unit: item.unit || master.unit || "",
+      barcode: item.barcode || master.barcode || "",
+      productBarcode:
+        item.barcode ||
+        master.productBarcode ||
+        master.barcode ||
+        "",
+      usdPrice:
+        Number(master.usdPrice) ||
+        Number(item.usdPrice) ||
+        0,
+      active: true,
+      availableQty: Number(item.availableQty) || 0,
+      groupCode: item.groupCode || "",
+      groupName: item.groupName || ""
+    };
+  });
+
+  return [...groups, ...exact];
+}
+
+function findInvoiceSearchProductByCode(code) {
+  const wanted = String(code || "").trim();
+  if (!wanted) return null;
+
+  return getBatchInvoiceSearchPool()
+    .find(item => item.code === wanted) ||
+    products.find(item => item.code === wanted) ||
+    null;
 }
 
 
@@ -4724,8 +5137,15 @@ let pendingInvoicePriceContext = null;
 
 function getFilteredInvoiceProducts(query) {
   const q = String(query || "").trim().toLowerCase();
+  const batchId = getCurrentBatchNumber();
 
-  return products
+  if (batchId &&
+      (!batchStockCatalog ||
+       batchStockCatalogBatchId !== batchId)) {
+    return [];
+  }
+
+  return getBatchInvoiceSearchPool()
     .filter(product => {
       if (!q) return true;
 
@@ -4735,7 +5155,8 @@ function getFilteredInvoiceProducts(query) {
         product.barcode,
         product.productBarcode,
         product.unit,
-        product.category
+        product.category,
+        product.groupName
       ].some(value =>
         String(value || "").toLowerCase().includes(q)
       );
@@ -4766,38 +5187,66 @@ function renderInvoiceProductOptions() {
   const matches = getFilteredInvoiceProducts(query);
 
   if (!matches.length) {
+    const batchId = getCurrentBatchNumber();
+
     options.innerHTML =
-      `<div class="bb-product-search-empty">No product found.</div>`;
+      `<div class="bb-product-search-empty">${
+        batchId
+          ? (batchStockCatalogLoading
+              ? "Loading Batch products..."
+              : "No matching product with Batch Pending stock.")
+          : "No product found."
+      }</div>`;
+
     options.classList.add("open");
     return;
   }
 
-  options.innerHTML = matches.map(product => `
-    <button
-      type="button"
-      class="bb-product-option"
-      data-product-code="${escapeHtml(product.code)}"
-      role="option"
-    >
-      <span class="bb-product-option-main">
-        <span class="bb-product-option-name">${escapeHtml(product.name)}</span>
-        <span class="bb-product-option-meta">${
-          [product.code, product.barcode || product.productBarcode]
-            .filter(Boolean)
-            .map(escapeHtml)
-            .join(" • ")
-        }</span>
-      </span>
-      <span class="bb-product-option-unit">${escapeHtml(product.unit || "-")}</span>
-    </button>
-  `).join("");
+  options.innerHTML = matches.map(product => {
+    const isGroup =
+      String(product.entryType || "").toUpperCase() === "GROUP";
+
+    const available =
+      product.availableQty === null ||
+      product.availableQty === undefined
+        ? ""
+        : `Available: ${Number(product.availableQty).toLocaleString("en-US",{maximumFractionDigits:2})}`;
+
+    return `
+      <button
+        type="button"
+        class="bb-product-option"
+        data-product-code="${escapeHtml(product.code)}"
+        role="option"
+      >
+        <span class="bb-product-option-main">
+          <span class="bb-product-option-name">${escapeHtml(product.name)}</span>
+          <span class="bb-product-option-meta">${
+            [
+              product.code,
+              isGroup ? "Sales Product Group" : (product.barcode || product.productBarcode)
+            ]
+              .filter(Boolean)
+              .map(escapeHtml)
+              .join(" • ")
+          }</span>
+        </span>
+        <span class="bb-product-option-side">
+          <span class="bb-product-option-type ${isGroup ? "group" : "exact"}">
+            ${isGroup ? "GROUP" : "EXACT"}
+          </span>
+          ${available ? `<span class="bb-product-option-available">${escapeHtml(available)}</span>` : ""}
+        </span>
+      </button>
+    `;
+  }).join("");
 
   options.classList.add("open");
 
   options.querySelectorAll(".bb-product-option").forEach(button => {
     button.addEventListener("click", function() {
       const code = String(this.dataset.productCode || "").trim();
-      const product = products.find(item => item.code === code);
+      const product = findInvoiceSearchProductByCode(code);
       if (product) selectInvoiceProduct(product);
     });
   });
@@ -4805,7 +5254,39 @@ function renderInvoiceProductOptions() {
 
 function hasSpecialCustomerPrice(product) {
   if (!product) return false;
-  return Object.prototype.hasOwnProperty.call(customerPrices, product.code);
+
+  if (String(product.entryType || "").toUpperCase() === "GROUP") {
+    const members = Array.isArray(product.members)
+      ? product.members
+      : [];
+
+    if (!members.length) return false;
+
+    const prices = [];
+
+    for (const member of members) {
+      const code = String(member.productCode || "").trim();
+
+      if (!code ||
+          !Object.prototype.hasOwnProperty.call(customerPrices, code)) {
+        return false;
+      }
+
+      prices.push(Number(customerPrices[code]) || 0);
+    }
+
+    const first = prices[0] || 0;
+
+    return prices.length > 0 &&
+      prices.every(
+        price => Math.abs(price - first) < 0.000001
+      );
+  }
+
+  return Object.prototype.hasOwnProperty.call(
+    customerPrices,
+    product.code
+  );
 }
 
 function finalizeInvoiceProductAdd(product, effectiveUsdPrice, qty, manualPrice = false) {
@@ -4818,6 +5299,21 @@ function finalizeInvoiceProductAdd(product, effectiveUsdPrice, qty, manualPrice 
     id: lineId,
     productName: product.name,
     productCode: product.code,
+    entryType:
+      String(product.entryType || "EXACT").toUpperCase(),
+    productGroupCode:
+      String(product.groupCode || "").trim(),
+    productGroupName:
+      String(product.groupName || "").trim(),
+    batchAvailableQty:
+      product.availableQty === null ||
+      product.availableQty === undefined
+        ? null
+        : Number(product.availableQty) || 0,
+    members:
+      Array.isArray(product.members)
+        ? product.members
+        : [],
     usdPrice: Number(effectiveUsdPrice) || 0,
     manualPrice: !!manualPrice
   });
@@ -4826,7 +5322,8 @@ function finalizeInvoiceProductAdd(product, effectiveUsdPrice, qty, manualPrice 
     product.name,
     Number(effectiveUsdPrice) || 0,
     lineId,
-    qty
+    qty,
+    product
   );
 
   calculate();
@@ -4962,8 +5459,25 @@ function openInvoiceQtyPrompt(product, effectiveUsdPrice) {
   const displayPrice =
     usdToSelected(Number(effectiveUsdPrice) || 0, currency);
 
+  const availableText =
+    product.availableQty === null ||
+    product.availableQty === undefined
+      ? ""
+      : "Available: " +
+        Number(product.availableQty).toLocaleString(
+          "en-US",
+          {maximumFractionDigits:2}
+        );
+
   document.getElementById("invoiceQtyProductMeta").textContent =
-    [product.code, product.unit, formatMoney(displayPrice, currency)]
+    [
+      product.code,
+      String(product.entryType || "").toUpperCase() === "GROUP"
+        ? "PRODUCT GROUP"
+        : product.unit,
+      availableText,
+      formatMoney(displayPrice, currency)
+    ]
       .filter(Boolean)
       .join(" • ");
 
@@ -5035,6 +5549,26 @@ function confirmInvoiceProductQty(event) {
   }
 
   const product = pendingInvoiceProduct.product;
+
+  if (
+    getCurrentBatchNumber() &&
+    product.availableQty !== null &&
+    product.availableQty !== undefined &&
+    qty - Number(product.availableQty || 0) > 0.000001
+  ) {
+    const message = document.getElementById("invoiceQtyMessage");
+    if (message) {
+      message.textContent =
+        "Batch has only " +
+        Number(product.availableQty || 0).toLocaleString(
+          "en-US",
+          {maximumFractionDigits:2}
+        ) +
+        " available for this selection.";
+    }
+    qtyInput?.focus();
+    return;
+  }
   const effectiveUsdPrice =
     Number(pendingInvoiceProduct.effectiveUsdPrice) || 0;
 
@@ -5077,17 +5611,46 @@ function focusInvoiceProductSearch() {
    CREATE PRODUCT
 ========================================== */
 
-function createProduct(name, defaultUsdPrice, lineId, initialQty = "") {
+function createProduct(
+  name,
+  defaultUsdPrice,
+  lineId,
+  initialQty = "",
+  productMeta = null
+) {
   const container = document.getElementById("productList");
   const div = document.createElement("div");
-  const productRecord = products.find(p => p.name === name);
+
+  const productRecord =
+    productMeta ||
+    products.find(p => p.name === name) ||
+    {};
+
+  const entryType =
+    String(productRecord.entryType || "EXACT").toUpperCase();
 
   div.className = "product";
   div.dataset.product = name;
-  div.dataset.productCode = productRecord ? productRecord.code : "";
-  div.dataset.productBarcode = productRecord ? (productRecord.productBarcode || productRecord.barcode || "") : "";
-  div.dataset.unit = productRecord ? (productRecord.unit || "") : "";
-  div.dataset.lineId = lineId || ("LINE-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8));
+  div.dataset.productCode =
+    productRecord.code ||
+    productRecord.productCode ||
+    "";
+  div.dataset.productBarcode =
+    productRecord.productBarcode ||
+    productRecord.barcode ||
+    "";
+  div.dataset.unit = productRecord.unit || "";
+  div.dataset.entryType = entryType;
+  div.dataset.productGroupCode =
+    productRecord.groupCode || "";
+  div.dataset.productGroupName =
+    productRecord.groupName || "";
+  div.dataset.lineId =
+    lineId ||
+    ("LINE-" +
+      Date.now() +
+      "-" +
+      Math.random().toString(36).slice(2, 8));
   div.dataset.usdPrice = defaultUsdPrice;
 
   const currency = getCurrency();
@@ -5096,7 +5659,11 @@ function createProduct(name, defaultUsdPrice, lineId, initialQty = "") {
   div.innerHTML = `
     <div class="product-name-cell product-description-editor">
       <div class="product-name-wrap">
-        <div class="product-name">${escapeHtml(name)}</div>
+        <div class="product-name">${escapeHtml(name)}${
+          entryType === "GROUP"
+            ? '<span class="bb-product-group-badge">GROUP</span>'
+            : ""
+        }</div>
         ${productRecord && (productRecord.productBarcode || productRecord.barcode) ? `<div class="product-barcode">Barcode: ${escapeHtml(productRecord.productBarcode || productRecord.barcode)}</div>` : ""}
         <textarea class="product-note-input no-print" rows="1" placeholder="Product note (optional)" aria-label="Product note for ${escapeHtml(name)}"></textarea>
       </div>
@@ -5727,7 +6294,17 @@ function getFinalInvoiceState() {
       qty,
       price,
       total: lineTotal,
-      unit: product.dataset.unit || productRecord.unit || ""
+      unit: product.dataset.unit || productRecord.unit || "",
+      entryType:
+        String(product.dataset.entryType || "EXACT").toUpperCase(),
+      productGroupCode:
+        product.dataset.productGroupCode || "",
+      groupCode:
+        product.dataset.productGroupCode || "",
+      productGroupName:
+        product.dataset.productGroupName || "",
+      groupName:
+        product.dataset.productGroupName || ""
     });
   });
 
@@ -6640,11 +7217,419 @@ function generateClientInvoiceId() {
   return "BB-" + stamp + "-" + random;
 }
 
+
+/* ==========================================
+   BATCH GROUP -> EXACT SKU ALLOCATION
+========================================== */
+
+function isWholeQty(value) {
+  return Math.abs(Number(value) - Math.round(Number(value))) < 0.000001;
+}
+
+function allocateQtyFromGroupPool(
+  group,
+  requestedQty,
+  pool
+) {
+  const requested = Number(requestedQty) || 0;
+
+  const members = (group.members || [])
+    .map(member => ({
+      productCode: String(member.productCode || "").trim(),
+      productName: String(member.productName || "").trim(),
+      unit: String(member.unit || "").trim(),
+      availableQty: Math.max(
+        0,
+        Number(pool[member.productCode] || 0)
+      )
+    }))
+    .filter(member =>
+      member.productCode &&
+      member.availableQty > 0
+    );
+
+  const totalAvailable =
+    members.reduce(
+      (sum, member) => sum + member.availableQty,
+      0
+    );
+
+  if (requested - totalAvailable > 0.000001) {
+    throw new Error(
+      group.groupName +
+      " has only " +
+      totalAvailable.toLocaleString(
+        "en-US",
+        {maximumFractionDigits:2}
+      ) +
+      " Batch Pending Qty remaining."
+    );
+  }
+
+  if (!(requested > 0)) return [];
+
+  const allWhole =
+    isWholeQty(requested) &&
+    members.every(member => isWholeQty(member.availableQty));
+
+  const allocations = [];
+
+  if (allWhole) {
+    const target = Math.round(requested);
+
+    const shares = members.map(member => {
+      const raw =
+        totalAvailable > 0
+          ? target * member.availableQty / totalAvailable
+          : 0;
+
+      const base = Math.min(
+        Math.floor(raw),
+        Math.round(member.availableQty)
+      );
+
+      return {
+        ...member,
+        raw,
+        qty: base,
+        fraction: raw - Math.floor(raw)
+      };
+    });
+
+    let remaining =
+      target -
+      shares.reduce((sum, member) => sum + member.qty, 0);
+
+    shares
+      .slice()
+      .sort((a,b) => {
+        if (Math.abs(b.fraction - a.fraction) > 0.000001) {
+          return b.fraction - a.fraction;
+        }
+        return b.availableQty - a.availableQty;
+      })
+      .forEach(member => {
+        if (remaining <= 0) return;
+
+        const original = shares.find(
+          x => x.productCode === member.productCode
+        );
+
+        const capacity =
+          Math.round(original.availableQty) -
+          original.qty;
+
+        if (capacity <= 0) return;
+
+        const add = Math.min(capacity, remaining);
+        original.qty += add;
+        remaining -= add;
+      });
+
+    if (remaining > 0) {
+      throw new Error(
+        "Could not allocate Product Group Qty exactly. " +
+        "Please refresh the Batch."
+      );
+    }
+
+    shares.forEach(member => {
+      if (member.qty > 0) {
+        allocations.push({
+          productCode: member.productCode,
+          productName: member.productName,
+          unit: member.unit,
+          qty: member.qty
+        });
+      }
+    });
+
+  } else {
+    let remaining = requested;
+
+    members.forEach((member, index) => {
+      let qty;
+
+      if (index === members.length - 1) {
+        qty = remaining;
+      } else {
+        qty =
+          totalAvailable > 0
+            ? requested *
+              member.availableQty /
+              totalAvailable
+            : 0;
+
+        qty = Math.min(
+          member.availableQty,
+          Number(qty.toFixed(6))
+        );
+      }
+
+      qty = Math.max(0, Math.min(qty, remaining));
+
+      if (qty > 0) {
+        allocations.push({
+          productCode: member.productCode,
+          productName: member.productName,
+          unit: member.unit,
+          qty: Number(qty.toFixed(6))
+        });
+
+        remaining =
+          Number((remaining - qty).toFixed(6));
+      }
+    });
+
+    if (remaining > 0.000001) {
+      throw new Error(
+        "Could not allocate all Product Group Qty. " +
+        "Please refresh the Batch."
+      );
+    }
+  }
+
+  allocations.forEach(allocation => {
+    pool[allocation.productCode] =
+      Number((
+        Number(pool[allocation.productCode] || 0) -
+        Number(allocation.qty || 0)
+      ).toFixed(6));
+  });
+
+  return allocations;
+}
+
+function buildBatchStockAllocationPlan(items) {
+  const batchId = getCurrentBatchNumber();
+  const visibleItems = Array.isArray(items) ? items : [];
+
+  /*
+   * Direct Sale / no Batch:
+   * Product Groups are not allowed.
+   */
+  if (!batchId) {
+    return visibleItems.map(item => {
+      if (String(item.entryType || "EXACT").toUpperCase() === "GROUP") {
+        throw new Error(
+          "Product Group can only be used with a Batch Number."
+        );
+      }
+
+      return {
+        lineId: item.lineId,
+        stockAllocations: [{
+          productCode: item.productCode,
+          productName: item.productName || item.name,
+          unit: item.unit || "",
+          qty: Number(item.qty) || 0
+        }]
+      };
+    });
+  }
+
+  if (
+    !batchStockCatalog ||
+    batchStockCatalogBatchId !== batchId
+  ) {
+    throw new Error(
+      "Batch stock is not ready. Please check the Batch Number."
+    );
+  }
+
+  const pool = {};
+
+  (batchStockCatalog.exactProducts || []).forEach(item => {
+    pool[item.productCode] =
+      Math.max(0, Number(item.availableQty) || 0);
+  });
+
+  const plan = [];
+
+  visibleItems.forEach(item => {
+    const entryType =
+      String(item.entryType || "EXACT").toUpperCase();
+
+    const qty = Math.max(0, Number(item.qty) || 0);
+
+    if (!(qty > 0)) {
+      plan.push({
+        lineId: item.lineId,
+        stockAllocations: []
+      });
+      return;
+    }
+
+    if (entryType === "GROUP") {
+      const groupCode =
+        String(
+          item.productGroupCode ||
+          item.groupCode ||
+          item.productCode ||
+          ""
+        ).trim();
+
+      const group =
+        (batchStockCatalog.groups || [])
+          .find(g => g.groupCode === groupCode);
+
+      if (!group) {
+        throw new Error(
+          "Product Group is no longer available in this Batch: " +
+          (item.productGroupName ||
+           item.productName ||
+           item.name ||
+           groupCode)
+        );
+      }
+
+      const allocations =
+        allocateQtyFromGroupPool(
+          group,
+          qty,
+          pool
+        );
+
+      plan.push({
+        lineId: item.lineId,
+        entryType: "GROUP",
+        groupCode: group.groupCode,
+        groupName: group.groupName,
+        stockAllocations: allocations
+      });
+
+      return;
+    }
+
+    const code =
+      String(item.productCode || "").trim();
+
+    const available =
+      Math.max(0, Number(pool[code] || 0));
+
+    if (!code || qty - available > 0.000001) {
+      throw new Error(
+        (item.productName || item.name || code || "Product") +
+        " has only " +
+        available.toLocaleString(
+          "en-US",
+          {maximumFractionDigits:2}
+        ) +
+        " Batch Pending Qty remaining."
+      );
+    }
+
+    pool[code] =
+      Number((available - qty).toFixed(6));
+
+    plan.push({
+      lineId: item.lineId,
+      entryType: "EXACT",
+      stockAllocations: [{
+        productCode: code,
+        productName: item.productName || item.name || code,
+        unit: item.unit || "",
+        qty: qty
+      }]
+    });
+  });
+
+  return plan;
+}
+
+function attachStockAllocationsToInvoiceItems(items) {
+  const plan =
+    buildBatchStockAllocationPlan(items);
+
+  const byLine = {};
+  plan.forEach(line => {
+    byLine[line.lineId] = line;
+  });
+
+  return items.map(item => {
+    const line = byLine[item.lineId] || {
+      stockAllocations: []
+    };
+
+    return {
+      ...item,
+      entryType:
+        String(item.entryType || "EXACT").toUpperCase(),
+      productGroupCode:
+        item.productGroupCode ||
+        item.groupCode ||
+        "",
+      productGroupName:
+        item.productGroupName ||
+        item.groupName ||
+        "",
+      stockAllocations:
+        Array.isArray(line.stockAllocations)
+          ? line.stockAllocations
+          : []
+    };
+  });
+}
+
+async function ensureBatchStockReadyForSave() {
+  const batchId = getCurrentBatchNumber();
+  if (!batchId) return true;
+
+  const data = await loadBatchStockCatalog(true);
+
+  if (!data || data.success !== true) {
+    throw new Error(
+      "Batch stock could not be verified. " +
+      "Please check the Batch Number."
+    );
+  }
+
+  return true;
+}
+
+async function syncStockAfterInvoiceSave() {
+  /*
+   * Best-effort immediate sync.
+   * Stock Database is idempotent by Invoice ID, so retry is safe.
+   */
+  let last = null;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      last = await jsonpStockRequest(
+        "syncSalesStock",
+        {}
+      );
+
+      if (last && last.success) {
+        if (
+          Number(last.synced || 0) > 0 ||
+          Number(last.errors || 0) > 0
+        ) {
+          return last;
+        }
+      }
+    } catch (_) {}
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 650)
+    );
+  }
+
+  return last;
+}
+
+
 function buildSalesInvoicePayload() {
   calculate();
 
   const state = getFinalInvoiceState();
   const invoiceNo = state.invoiceNo || "";
+
+  const allocatedItems =
+    attachStockAllocationsToInvoiceItems(
+      state.items
+    );
 
   return {
     invoiceId: generateClientInvoiceId(),
@@ -6671,7 +7656,7 @@ function buildSalesInvoicePayload() {
     outstanding: state.creditAmount,
     status: state.creditAmount > 0 ? (state.amountPaid > 0 ? "Processing" : "Unpaid") : "Paid",
     note: state.note,
-    items: state.items.map(item => ({
+    items: allocatedItems.map(item => ({
       lineId: item.lineId,
       productCode: item.productCode,
       productName: item.productName || item.name,
@@ -6680,7 +7665,20 @@ function buildSalesInvoicePayload() {
       unit: item.unit || "",
       qty: item.qty,
       unitPrice: item.price,
-      amount: item.total
+      amount: item.total,
+      entryType: item.entryType || "EXACT",
+      productGroupCode:
+        item.productGroupCode ||
+        item.groupCode ||
+        "",
+      productGroupName:
+        item.productGroupName ||
+        item.groupName ||
+        "",
+      stockAllocations:
+        Array.isArray(item.stockAllocations)
+          ? item.stockAllocations
+          : []
     }))
   };
 }
@@ -6851,7 +7849,27 @@ async function completeInvoice(event) {
 
   if (window.bbInvoiceSaving) return;
 
-  const payload = buildSalesInvoicePayload();
+  try {
+    await ensureBatchStockReadyForSave();
+  } catch (error) {
+    alert(
+      "Could not verify Batch stock.\n\n" +
+      (error?.message || "Please check the Batch Number.")
+    );
+    return;
+  }
+
+  let payload;
+
+  try {
+    payload = buildSalesInvoicePayload();
+  } catch (error) {
+    alert(
+      "Stock allocation could not be calculated.\n\n" +
+      (error?.message || "Please refresh the Batch and try again.")
+    );
+    return;
+  }
 
   if (!payload.locationCode) {
     alert("Please select a Main Location before completing the invoice.");
@@ -6973,15 +7991,36 @@ async function completeInvoice(event) {
 
     await postSalesInvoiceBundle(payload, paymentPayload);
 
+    const stockSync =
+      await syncStockAfterInvoiceSave();
+
+    const stockMessage =
+      stockSync && Number(stockSync.errors || 0) > 0
+        ? "\n⚠ Invoice saved, but Stock Sync has " +
+          Number(stockSync.errors || 0) +
+          " error(s). Check Stock Database."
+        : getCurrentBatchNumber()
+          ? "\n✓ Batch Pending Stock updated."
+          : "\n✓ Warehouse Stock sync requested.";
+
     alert(
       "Invoice completed successfully.\n\n" +
       "Invoice No.: " + payload.invoiceNo +
       (paymentPayload
         ? "\nInvoice + payment sent together."
-        : "\nCredit invoice saved without a payment record.")
+        : "\nCredit invoice saved without a payment record.") +
+      stockMessage
     );
 
     clearAllAfterSuccessfulSave();
+
+    /*
+     * Keep Batch Number for fast next-invoice key-in.
+     * Reload its remaining pool after the previous invoice.
+     */
+    if (getCurrentBatchNumber()) {
+      await loadBatchStockCatalog(true);
+    }
 
   } catch (error) {
     console.error("Fast invoice complete failed:", error);
@@ -7316,6 +8355,32 @@ function escapeHtml(text) {
    EVENTS
 ========================================== */
 
+const batchNumberInput =
+  document.getElementById("batchNumber");
+
+if (batchNumberInput) {
+  batchNumberInput.addEventListener(
+    "input",
+    scheduleBatchStockCatalogLoad
+  );
+
+  batchNumberInput.addEventListener(
+    "change",
+    function() {
+      loadBatchStockCatalog(true);
+    }
+  );
+
+  batchNumberInput.addEventListener(
+    "blur",
+    function() {
+      if (getCurrentBatchNumber()) {
+        loadBatchStockCatalog(true);
+      }
+    }
+  );
+}
+
 const productSearchInput =
   document.getElementById("productSearch");
 
@@ -7342,7 +8407,7 @@ if (productSearchInput) {
       String(firstOption.dataset.productCode || "").trim();
 
     const product =
-      products.find(item => item.code === code);
+      findInvoiceSearchProductByCode(code);
 
     if (product) selectInvoiceProduct(product);
   });

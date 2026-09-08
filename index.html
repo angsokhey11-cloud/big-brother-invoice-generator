@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator Fast Key-In V2.3 Fit + Locked Batch</title>
+  <title>BIG BROTHER — Invoice Generator V2.4.1 Restored Clean Batch</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -3175,6 +3175,69 @@ input:focus {
   }
 }
 
+
+/* =====================================================
+   V2.4.1 SAFE UI RESTORE
+   - hide BIG BROTHER title
+   - keep currency controls
+   - make invoice workspace larger
+   - widen Batch box
+   - keep V2.3 working auto-fit logic
+   ===================================================== */
+@media (min-width:1200px){
+  .header-main{
+    justify-content:flex-end !important;
+    margin-bottom:8px !important;
+    padding-bottom:6px !important;
+    border-bottom:none !important;
+  }
+
+  .header-main h1{
+    display:none !important;
+  }
+
+  .calculator{
+    max-width:1540px !important;
+    padding:10px 16px 18px !important;
+  }
+
+  .bb-desktop-workspace{
+    grid-template-columns:minmax(0,1fr) 350px !important;
+    gap:14px !important;
+  }
+
+  .bb-left-column,
+  .bb-right-column{
+    gap:12px !important;
+  }
+
+  .invoice-card .invoice-grid{
+    grid-template-columns:.78fr 1.25fr .88fr .88fr 1.72fr !important;
+    gap:10px 10px !important;
+  }
+
+  #batchNumber{
+    width:100% !important;
+    min-width:0 !important;
+    font-size:13px !important;
+    font-weight:700 !important;
+    padding-right:34px !important;
+  }
+
+  .invoice-card input,
+  .invoice-card select{
+    min-height:41px !important;
+  }
+
+  #mainLocation.bb-batch-location-locked,
+  #mainLocation:disabled{
+    background:#f2f7fc !important;
+    color:#31516f !important;
+    cursor:not-allowed !important;
+    opacity:1 !important;
+  }
+}
+
 </style>
  </head>
  <body>
@@ -3874,18 +3937,12 @@ function simpleBatchOptionText(batch) {
     batch.locationCode ||
     "-";
 
-  const date =
-    batch.batchDate
-      ? simpleBatchDateText(batch.batchDate)
-      : "";
-
   return (
     batch.batchId +
     " — " +
     salesman +
     " — " +
-    location +
-    (date ? " — " + date : "")
+    location
   );
 }
 

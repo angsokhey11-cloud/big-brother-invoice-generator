@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator V2.4.2 Native Sharp UI</title>
+  <title>BIG BROTHER — Invoice Generator V2.4.3 Crisp High Contrast</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -3444,6 +3444,132 @@ input:focus {
 
   .calculator{
     transform:none !important;
+  }
+}
+
+
+/* =====================================================
+   V2.4.3 CRISP / NATURAL TEXT
+   -----------------------------------------------------
+   Native 100% rendering only.
+   Stronger contrast, Windows-friendly font stack,
+   clearer inputs/labels without changing business flow.
+   ===================================================== */
+
+html,
+body,
+button,
+input,
+select,
+textarea{
+  font-family:
+    "Segoe UI",
+    Tahoma,
+    Arial,
+    sans-serif !important;
+  -webkit-font-smoothing:auto !important;
+  text-rendering:auto !important;
+}
+
+body{
+  color:#13243a !important;
+}
+
+label{
+  color:#203d5d !important;
+  font-weight:700 !important;
+}
+
+.section-title,
+.desktop-card-title{
+  color:#0e438e !important;
+  font-weight:800 !important;
+}
+
+input,
+select,
+textarea{
+  color:#14283f !important;
+  background:#ffffff !important;
+  border-color:#b9c8d8 !important;
+  font-weight:500 !important;
+}
+
+input::placeholder,
+textarea::placeholder{
+  color:#74869a !important;
+  opacity:1 !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+  border-color:#4b83cf !important;
+  box-shadow:0 0 0 2px rgba(75,131,207,.10) !important;
+  outline:none !important;
+}
+
+#invoiceNumber{
+  color:#0b376d !important;
+  font-weight:800 !important;
+}
+
+#batchNumber{
+  color:#183a61 !important;
+  font-weight:700 !important;
+}
+
+#mainLocation.bb-batch-location-locked,
+#mainLocation:disabled{
+  color:#244b73 !important;
+  background:#f3f7fb !important;
+  border-color:#b5c7da !important;
+  opacity:1 !important;
+  -webkit-text-fill-color:#244b73 !important;
+}
+
+.customer-status,
+.location-help,
+.bb-product-option-meta,
+.bb-product-option-unit{
+  color:#5f7388 !important;
+}
+
+.bb-product-option-name{
+  color:#173b65 !important;
+  font-weight:700 !important;
+}
+
+@media (min-width:1200px){
+  .invoice-card input,
+  .invoice-card select,
+  .transaction-details input,
+  .transaction-details select,
+  .note-card select,
+  .note-card textarea,
+  .banking-input-card select{
+    font-size:14px !important;
+    letter-spacing:0 !important;
+  }
+
+  label{
+    font-size:12.5px !important;
+    letter-spacing:0 !important;
+  }
+
+  .section-title,
+  .desktop-card-title{
+    font-size:15px !important;
+    letter-spacing:0 !important;
+  }
+
+  .bb-product-option-name{
+    font-size:13px !important;
+  }
+
+  .bb-product-option-meta,
+  .bb-product-option-unit{
+    font-size:11px !important;
   }
 }
 

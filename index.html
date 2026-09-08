@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator V2.4.1 Restored Clean Batch</title>
+  <title>BIG BROTHER — Invoice Generator V2.4.2 Native Sharp UI</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -3150,10 +3150,6 @@ input:focus {
     overflow:hidden !important;
   }
 
-  .calculator{
-    transform-origin:top center;
-    will-change:transform;
-  }
 
   #mainLocation.bb-batch-location-locked{
     background:#f2f7fc !important;
@@ -3235,6 +3231,219 @@ input:focus {
     color:#31516f !important;
     cursor:not-allowed !important;
     opacity:1 !important;
+  }
+}
+
+
+/* =====================================================
+   V2.4.2 NATIVE SHARP DESKTOP UI
+   -----------------------------------------------------
+   No transform scaling.
+   No fractional browser rendering.
+   Text stays sharp at native 100%.
+   Layout fits by reducing only unused vertical spacing.
+   ===================================================== */
+@media (min-width:1200px){
+  html,
+  body{
+    width:100%;
+    min-height:100%;
+    height:auto !important;
+    overflow-x:hidden !important;
+    overflow-y:auto !important;
+  }
+
+  body{
+    padding:0 !important;
+  }
+
+  .calculator{
+    transform:none !important;
+    width:100% !important;
+    max-width:1540px !important;
+    margin:0 auto !important;
+    padding:8px 16px 14px !important;
+  }
+
+  .header-main{
+    justify-content:flex-end !important;
+    margin:0 0 6px !important;
+    padding:0 0 4px !important;
+    border-bottom:none !important;
+    min-height:0 !important;
+  }
+
+  .header-main h1{
+    display:none !important;
+  }
+
+  .header-currency{
+    margin-left:auto !important;
+    padding:6px 8px !important;
+  }
+
+  .header-currency select{
+    height:36px !important;
+  }
+
+  .header-rate input{
+    height:36px !important;
+  }
+
+  .bb-desktop-workspace{
+    grid-template-columns:minmax(0,1fr) 350px !important;
+    gap:12px !important;
+    align-items:start !important;
+  }
+
+  .bb-left-column,
+  .bb-right-column{
+    gap:10px !important;
+  }
+
+  .invoice-card{
+    padding:12px 14px !important;
+  }
+
+  .section-title,
+  .desktop-card-title{
+    margin-bottom:8px !important;
+  }
+
+  .invoice-card .invoice-grid{
+    grid-template-columns:.78fr 1.25fr .88fr .88fr 1.72fr !important;
+    gap:8px 10px !important;
+    align-items:end !important;
+  }
+
+  .invoice-card .customer-field.grid-2{
+    gap:8px 10px !important;
+  }
+
+  label{
+    margin-bottom:3px !important;
+  }
+
+  .invoice-card input,
+  .invoice-card select,
+  .transaction-details input,
+  .transaction-details select,
+  .note-card select,
+  .note-card textarea,
+  .banking-input-card select{
+    min-height:39px !important;
+    height:auto !important;
+    padding-top:7px !important;
+    padding-bottom:7px !important;
+  }
+
+  #batchNumber{
+    width:100% !important;
+    min-width:0 !important;
+    font-size:13px !important;
+    font-weight:700 !important;
+    padding-right:34px !important;
+    text-overflow:ellipsis !important;
+  }
+
+  .desktop-product-card,
+  .transaction-details,
+  .banking-input-card,
+  .totals-box,
+  .convert-box,
+  .note-card,
+  .bb-action-card,
+  .card{
+    margin-top:0 !important;
+  }
+
+  .desktop-product-card{
+    padding-top:12px !important;
+    padding-bottom:12px !important;
+  }
+
+  .bb-action-card{
+    padding-top:12px !important;
+    padding-bottom:12px !important;
+  }
+
+  .note-card{
+    padding-top:12px !important;
+    padding-bottom:12px !important;
+  }
+
+  .banking-input-card{
+    padding-top:12px !important;
+    padding-bottom:12px !important;
+  }
+
+  #mainLocation.bb-batch-location-locked,
+  #mainLocation:disabled{
+    background:#f2f7fc !important;
+    color:#31516f !important;
+    cursor:not-allowed !important;
+    opacity:1 !important;
+  }
+}
+
+/*
+ * Slightly tighter vertical rhythm for common laptop heights,
+ * still at native 100% scale.
+ */
+@media (min-width:1200px) and (max-height:820px){
+  .calculator{
+    padding-top:6px !important;
+    padding-bottom:8px !important;
+  }
+
+  .header-main{
+    margin-bottom:4px !important;
+  }
+
+  .bb-left-column,
+  .bb-right-column{
+    gap:8px !important;
+  }
+
+  .invoice-card{
+    padding-top:10px !important;
+    padding-bottom:10px !important;
+  }
+
+  .section-title,
+  .desktop-card-title{
+    margin-bottom:6px !important;
+  }
+
+  .invoice-card input,
+  .invoice-card select,
+  .transaction-details input,
+  .transaction-details select,
+  .note-card select,
+  .note-card textarea,
+  .banking-input-card select{
+    min-height:37px !important;
+    padding-top:6px !important;
+    padding-bottom:6px !important;
+  }
+
+  .desktop-product-card,
+  .bb-action-card,
+  .note-card,
+  .banking-input-card{
+    padding-top:10px !important;
+    padding-bottom:10px !important;
+  }
+}
+
+@media print{
+  html,
+  body{
+    overflow:visible !important;
+  }
+
+  .calculator{
+    transform:none !important;
   }
 }
 
@@ -8586,92 +8795,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
   
-/* =====================================================
-   V2.3 DESKTOP AUTO FIT
-   No redesign. Scale only when the natural page is taller than viewport.
-   ===================================================== */
-let bbInvoiceFitFrame=0;
-
-function fitInvoiceDesktopViewport(){
-  const root=document.querySelector(".calculator");
-
-  if(!root) return;
-
-  if(
-    window.innerWidth<1200 ||
-    window.innerHeight<700 ||
-    window.matchMedia("print").matches
-  ){
-    root.style.transform="";
-    document.documentElement.style.overflow="";
-    document.body.style.overflow="";
-    return;
-  }
-
-  root.style.transform="none";
-
-  const naturalHeight=
-    Math.max(
-      root.scrollHeight,
-      root.getBoundingClientRect().height
-    );
-
-  const availableHeight=
-    Math.max(
-      1,
-      window.innerHeight-4
-    );
-
-  const scale=
-    Math.min(
-      1,
-      availableHeight/naturalHeight
-    );
-
-  root.style.transform=
-    scale<0.999
-      ? "scale("+scale.toFixed(4)+")"
-      : "none";
-
-  document.documentElement.style.overflow="hidden";
-  document.body.style.overflow="hidden";
-}
-
-function requestInvoiceDesktopFit(){
-  cancelAnimationFrame(bbInvoiceFitFrame);
-
-  bbInvoiceFitFrame=
-    requestAnimationFrame(
-      ()=>fitInvoiceDesktopViewport()
-    );
-}
-
-window.addEventListener(
-  "resize",
-  requestInvoiceDesktopFit
-);
-
-window.addEventListener(
-  "load",
-  requestInvoiceDesktopFit
-);
-
-if("ResizeObserver" in window){
-  const bbInvoiceRoot=
-    document.querySelector(".calculator");
-
-  if(bbInvoiceRoot){
-    new ResizeObserver(
-      requestInvoiceDesktopFit
-    ).observe(bbInvoiceRoot);
-  }
-}
-
-setTimeout(
-  requestInvoiceDesktopFit,
-  0
-);
-
 </script>
  </body>
 </html>

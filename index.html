@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator V2.4.4 Light Batch</title>
+  <title>BIG BROTHER — Invoice Generator V2.4.5 Fast Master Bootstrap</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -4116,7 +4116,7 @@ function loadNextInvoiceNumber() {
   };
 
   script.src =
-    CUSTOMER_API_URL +
+    SALES_DATABASE_API_URL +
     "?action=getNextInvoiceNumber&callback=" +
     encodeURIComponent(callbackName) +
     "&t=" + Date.now();
@@ -5581,10 +5581,12 @@ document.addEventListener("click", function(event) {
   }
 });
 
-loadLocations();
+/*
+ * V2.4.5:
+ * Master references load together in ONE request below.
+ * Salesperson remains a local/free-text field.
+ */
 loadSalespersons();
-loadNoteTemplates();
-loadBankingDetails();
 
 const invoiceNumberInput = document.getElementById("invoiceNumber");
 if (invoiceNumberInput) {
@@ -5621,8 +5623,8 @@ let products = [];
 let productDatabaseLoaded = false;
 let selectedProducts = [];
 
-// Load products only after the product state variables exist.
-loadProducts();
+// Load Products + Locations + Notes + Banking in ONE Master request.
+loadInvoiceBootstrapFast();
 
 
 /* ==========================================
@@ -5715,6 +5717,214 @@ function findInvoiceSearchProductByCode(code) {
   return getInvoiceSearchPool()
     .find(item=>item.code===wanted) ||
     null;
+}
+
+
+function applyInvoiceBootstrapFast(data) {
+  if(!data || data.success!==true){
+    return false;
+  }
+
+  if(Array.isArray(data.locations)){
+    locations=data.locations
+      .map(row=>({
+        locationCode:String(row.locationCode||row.code||"").trim(),
+        locationName:String(row.locationName||row.name||"").trim(),
+        salespersonName:String(row.salespersonName||row.salesperson||"").trim(),
+        active:
+          row.active===true ||
+          String(row.active).toLowerCase()==="true"
+      }))
+      .filter(x=>
+        x.locationCode &&
+        x.locationName &&
+        x.active!==false
+      );
+
+    if(locations.length){
+      locationDatabaseLoaded=true;
+      cacheSet(LOCATION_CACHE_KEY,locations);
+      populateLocationSelect();
+    }
+  }
+
+  if(Array.isArray(data.notes)){
+    const select=document.getElementById("noteTemplate");
+
+    noteTemplates=data.notes
+      .map(row=>({
+        name:String(row.name||"").trim(),
+        note:String(row.note||row.text||"").trim(),
+        active:
+          row.active===true ||
+          String(row.active).toLowerCase()==="true"
+      }))
+      .filter(item=>item.name&&item.note&&item.active);
+
+    noteDatabaseLoaded=true;
+
+    if(select){
+      select.innerHTML='<option value="">Select saved note</option>';
+
+      noteTemplates.forEach((item,index)=>{
+        const option=document.createElement("option");
+        option.value=String(index);
+        option.textContent=item.name;
+        select.appendChild(option);
+      });
+
+      select.disabled=false;
+    }
+  }
+
+  if(Array.isArray(data.banking)){
+    const select=document.getElementById("bankingDetails");
+
+    bankingDetails=data.banking
+      .map(row=>({
+        name:String(row.name||"").trim(),
+        bank:String(row.bank||"").trim(),
+        account:String(row.account||"").trim(),
+        active:
+          row.active===true ||
+          String(row.active).toLowerCase()==="true"
+      }))
+      .filter(item=>
+        (item.name||item.bank||item.account) &&
+        item.active
+      );
+
+    bankingDatabaseLoaded=true;
+
+    if(select){
+      select.innerHTML='<option value="">Select banking detail</option>';
+
+      bankingDetails.forEach((item,index)=>{
+        const option=document.createElement("option");
+        option.value=String(index);
+        option.textContent=item.name||item.bank||item.account;
+        select.appendChild(option);
+      });
+
+      select.disabled=false;
+      updateBankingPreview();
+    }
+  }
+
+  if(Array.isArray(data.products)){
+    const searchInput=document.getElementById("productSearch");
+
+    products=data.products
+      .map(row=>({
+        code:String(row.code||"").trim(),
+        name:String(row.name||"").trim(),
+        category:String(row.category||"").trim(),
+        unit:String(row.unit||"").trim(),
+        barcode:String(row.productBarcode||row.barcode||"").trim(),
+        productBarcode:String(row.productBarcode||row.barcode||"").trim(),
+        usdPrice:Number(row.priceUSD ?? row.usdPrice)||0,
+        active:
+          row.active===true ||
+          String(row.active).toLowerCase()==="true"
+      }))
+      .filter(product=>product.name&&product.active);
+
+    productDatabaseLoaded=true;
+
+    if(searchInput){
+      searchInput.disabled=false;
+      searchInput.placeholder="Search product name, code or barcode...";
+    }
+
+    if(getSelectedSimpleBatch()){
+      setTimeout(()=>renderInvoiceProductOptions(),0);
+    }
+  }
+
+  return true;
+}
+
+function loadInvoiceBootstrapFast() {
+  const searchInput=document.getElementById("productSearch");
+  const noteSelect=document.getElementById("noteTemplate");
+  const bankSelect=document.getElementById("bankingDetails");
+
+  if(searchInput){
+    searchInput.disabled=true;
+    searchInput.placeholder="Loading invoice data...";
+  }
+
+  if(noteSelect){
+    noteSelect.disabled=true;
+    noteSelect.innerHTML='<option value="">Loading notes...</option>';
+  }
+
+  if(bankSelect){
+    bankSelect.disabled=true;
+    bankSelect.innerHTML='<option value="">Loading banking details...</option>';
+  }
+
+  const cached=cacheGet(LOCATION_CACHE_KEY);
+
+  if(Array.isArray(cached)&&cached.length){
+    locations=cached;
+    locationDatabaseLoaded=true;
+    populateLocationSelect();
+  }
+
+  const callbackName=
+    "bbInvoiceBootstrap_"+
+    Date.now();
+
+  const script=document.createElement("script");
+  let done=false;
+
+  function finish(){
+    if(done)return;
+    done=true;
+
+    try{
+      delete window[callbackName];
+    }catch(_){}
+
+    script.remove();
+  }
+
+  function fallback(){
+    loadLocations();
+    loadNoteTemplates();
+    loadBankingDetails();
+    loadProducts();
+  }
+
+  window[callbackName]=function(data){
+    finish();
+
+    if(!applyInvoiceBootstrapFast(data)){
+      fallback();
+    }
+  };
+
+  script.onerror=function(){
+    finish();
+    fallback();
+  };
+
+  script.src=
+    CUSTOMER_API_URL+
+    "?action=invoiceBootstrapFast"+
+    "&callback="+
+    encodeURIComponent(callbackName)+
+    "&t="+
+    Date.now();
+
+  document.body.appendChild(script);
+
+  setTimeout(()=>{
+    if(done)return;
+    finish();
+    fallback();
+  },DB_REQUEST_TIMEOUT_MS);
 }
 
 /* ==========================================

@@ -22,7 +22,7 @@
   <script>
   (async function () {
     try {
-      const response = await fetch('legacy-google-v2.4.5.html?v=20260910-2', {
+      const response = await fetch('legacy-google-v2.4.5.html?v=20260910-3', {
         cache: 'no-store'
       });
 
@@ -32,11 +32,7 @@
 
       let html = await response.text();
 
-      /*
-       * Stop the old automatic Google-database startup only.
-       * The original UI and existing functions remain available;
-       * supabase-adapter.js replaces the database functions at runtime.
-       */
+      /* Disable only the old automatic Google startup calls. */
       html = html.replace(
         'loadNextInvoiceNumber();',
         '/* Supabase boot owns Invoice No. */'
@@ -67,11 +63,22 @@
         '<title>BIG BROTHER — Invoice Generator V3.0 Supabase</title>'
       );
 
-      /* Split the tag text so this loader script cannot be closed early by HTML parsing. */
+      /*
+       * IMPORTANT: the legacy source contains </body> text inside invoice-print
+       * template strings. Inject only before the REAL final closing body tag.
+       */
       const adapter =
-        '<scr' + 'ipt src="supabase-adapter.js?v=20260910-2"></scr' + 'ipt>';
+        '<scr' + 'ipt src="supabase-adapter.js?v=20260910-3"></scr' + 'ipt>';
 
-      html = html.replace('</body>', adapter + '\n</body>');
+      const bodyCloseIndex = html.toLowerCase().lastIndexOf('</body>');
+      if (bodyCloseIndex < 0) {
+        throw new Error('Invoice Generator source is missing its closing body tag.');
+      }
+
+      html =
+        html.slice(0, bodyCloseIndex) +
+        adapter + '\n' +
+        html.slice(bodyCloseIndex);
 
       document.open();
       document.write(html);

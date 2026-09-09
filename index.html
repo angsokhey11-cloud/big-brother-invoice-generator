@@ -12,34 +12,81 @@
   </style>
 </head>
 <body>
-  <div class="bb-loader"><div class="bb-loader-card">Loading BIG BROTHER Invoice Generator…<div class="bb-loader-sub">Secure Supabase database</div></div></div>
+  <div class="bb-loader">
+    <div class="bb-loader-card">
+      Loading BIG BROTHER Invoice Generator…
+      <div class="bb-loader-sub">Secure Supabase database</div>
+    </div>
+  </div>
+
   <script>
-  (async function(){
-    try{
-      const response=await fetch('legacy-google-v2.4.5.html',{cache:'no-store'});
-      if(!response.ok) throw new Error('Could not load Invoice Generator source.');
-      let html=await response.text();
+  (async function () {
+    try {
+      const response = await fetch('legacy-google-v2.4.5.html?v=20260910-2', {
+        cache: 'no-store'
+      });
 
-      // Stop the old automatic Google database boot. Existing UI/functions remain intact;
-      // the Supabase adapter below owns all database reads/writes.
-      html=html.replace('loadNextInvoiceNumber();','/* Supabase boot owns Invoice No. */');
-      html=html.replace('loadInvoiceBootstrapFast();','/* Supabase boot owns Master bootstrap. */');
-      html=html.replace('loadSimpleBatchPicker();','/* Supabase boot owns Batch picker. */');
+      if (!response.ok) {
+        throw new Error('Could not load Invoice Generator source.');
+      }
 
-      html=html.replaceAll('This will save the invoice to the Sales Data Google Sheet.','This will save the invoice to the BIG BROTHER Database.');
-      html=html.replaceAll('Google Sheets -> separate Sales Data file','Supabase PostgreSQL -> Sales Database');
-      html=html.replace('<title>BIG BROTHER — Invoice Generator V2.4.5 Fast Master Bootstrap</title>','<title>BIG BROTHER — Invoice Generator V3.0 Supabase</title>');
+      let html = await response.text();
 
-      const adapter='<script src="supabase-adapter.js?v=20260910-1"><\\/script>';
-      html=html.replace('</body>',adapter+'\n</body>');
+      /*
+       * Stop the old automatic Google-database startup only.
+       * The original UI and existing functions remain available;
+       * supabase-adapter.js replaces the database functions at runtime.
+       */
+      html = html.replace(
+        'loadNextInvoiceNumber();',
+        '/* Supabase boot owns Invoice No. */'
+      );
+
+      html = html.replace(
+        'loadInvoiceBootstrapFast();',
+        '/* Supabase boot owns Master bootstrap. */'
+      );
+
+      html = html.replace(
+        'loadSimpleBatchPicker();',
+        '/* Supabase boot owns Batch picker. */'
+      );
+
+      html = html.replaceAll(
+        'This will save the invoice to the Sales Data Google Sheet.',
+        'This will save the invoice to the BIG BROTHER Database.'
+      );
+
+      html = html.replaceAll(
+        'Google Sheets -> separate Sales Data file',
+        'Supabase PostgreSQL -> Sales Database'
+      );
+
+      html = html.replace(
+        '<title>BIG BROTHER — Invoice Generator V2.4.5 Fast Master Bootstrap</title>',
+        '<title>BIG BROTHER — Invoice Generator V3.0 Supabase</title>'
+      );
+
+      /* Split the tag text so this loader script cannot be closed early by HTML parsing. */
+      const adapter =
+        '<scr' + 'ipt src="supabase-adapter.js?v=20260910-2"></scr' + 'ipt>';
+
+      html = html.replace('</body>', adapter + '\n</body>');
 
       document.open();
       document.write(html);
       document.close();
-    }catch(error){
-      document.body.innerHTML='<div class="bb-loader"><div class="bb-loader-card">Could not open Invoice Generator<div class="bb-loader-sub">'+String(error&&error.message||error)+'</div></div></div>';
+
+    } catch (error) {
+      console.error('Invoice Generator loader failed:', error);
+      document.body.innerHTML =
+        '<div class="bb-loader"><div class="bb-loader-card">' +
+        'Could not open Invoice Generator' +
+        '<div class="bb-loader-sub">' +
+        String(error && error.message || error) +
+        '</div></div></div>';
     }
   })();
-  <\/script>
+  </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
  <head>
-  <title>BIG BROTHER — Invoice Generator V2.4.3 Crisp High Contrast</title>
+  <title>BIG BROTHER — Invoice Generator V2.4.4 Light Batch</title>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
@@ -4371,7 +4371,11 @@ function normalizeSimpleBatchRows(openBatches) {
               unit:
                 String(group.unit || "").trim(),
               remainingQty:
-                Number(group.remainingQty) || 0,
+                Number(
+                  group.remainingQty !== undefined
+                    ? group.remainingQty
+                    : group.issuedQty
+                ) || 0,
               members:
                 Array.isArray(group.members)
                   ? group.members.map(member => ({
@@ -4382,7 +4386,11 @@ function normalizeSimpleBatchRows(openBatches) {
                       unit:
                         String(member.unit || "").trim(),
                       remainingQty:
-                        Number(member.remainingQty) || 0
+                        Number(
+                          member.remainingQty !== undefined
+                            ? member.remainingQty
+                            : member.issuedQty
+                        ) || 0
                     }))
                   : []
             }))
@@ -4397,7 +4405,11 @@ function normalizeSimpleBatchRows(openBatches) {
               unit:
                 String(item.unit || "").trim(),
               remainingQty:
-                Number(item.remainingQty) || 0
+                Number(
+                  item.remainingQty !== undefined
+                    ? item.remainingQty
+                    : item.issuedQty
+                ) || 0
             }))
           : []
     }))
@@ -5663,8 +5675,7 @@ function getSelectedBatchGroupProducts() {
   return (batch.groupItems || [])
     .filter(group=>
       group.groupCode &&
-      group.groupName &&
-      Number(group.remainingQty || 0)>0
+      group.groupName
     )
     .map(group=>({
       entryType:"GROUP",
@@ -8110,162 +8121,20 @@ function checkPaymentTransactionIdAvailable(transactionId) {
 
 
 function consumeSelectedBatchLocally(invoiceItems) {
+  /*
+   * V2.4.4 LIGHT DAILY FLOW
+   * ---------------------------------------------------------
+   * Do NOT calculate Batch remaining in the Generator.
+   * Do NOT remove a Batch because local invoice Qty appears to reach zero.
+   *
+   * Batch Report owns reconciliation.
+   * A Batch disappears from Generator only after Batch Report closes it.
+   */
   const batch=getSelectedSimpleBatch();
 
-  if(
-    !batch ||
-    !Array.isArray(invoiceItems) ||
-    !invoiceItems.length
-  ){
-    return {
-      removed:false,
-      batchId:""
-    };
-  }
-
-  const groupItems=
-    Array.isArray(batch.groupItems)
-      ? batch.groupItems
-      : [];
-
-  const exactItems=
-    Array.isArray(batch.exactItems)
-      ? batch.exactItems
-      : [];
-
-  invoiceItems.forEach(item=>{
-    const qty=Math.max(
-      0,
-      Number(item.qty) || 0
-    );
-
-    if(!(qty>0)) return;
-
-    const entryType=
-      String(item.entryType || "EXACT")
-        .trim()
-        .toUpperCase();
-
-    if(entryType==="GROUP"){
-      const code=
-        String(
-          item.productGroupCode ||
-          item.groupCode ||
-          item.productCode ||
-          ""
-        ).trim();
-
-      const group=
-        groupItems.find(
-          row=>row.groupCode===code
-        );
-
-      if(group){
-        group.remainingQty=
-          Math.max(
-            0,
-            Number(group.remainingQty || 0)-qty
-          );
-      }
-
-      return;
-    }
-
-    const productCode=
-      String(item.productCode || "").trim();
-
-    let matchedGroup=false;
-
-    groupItems.forEach(group=>{
-      if(matchedGroup) return;
-
-      const belongs=
-        (group.members || [])
-          .some(
-            member=>
-              member.productCode===productCode
-          );
-
-      if(belongs){
-        group.remainingQty=
-          Math.max(
-            0,
-            Number(group.remainingQty || 0)-qty
-          );
-
-        matchedGroup=true;
-      }
-    });
-
-    if(!matchedGroup){
-      const exact=
-        exactItems.find(
-          row=>row.productCode===productCode
-        );
-
-      if(exact){
-        exact.remainingQty=
-          Math.max(
-            0,
-            Number(exact.remainingQty || 0)-qty
-          );
-      }
-    }
-  });
-
-  batch.groupItems=
-    groupItems.filter(
-      group=>
-        Number(group.remainingQty || 0)>0.000001
-    );
-
-  batch.exactItems=
-    exactItems.filter(
-      item=>
-        Number(item.remainingQty || 0)>0.000001
-    );
-
-  batch.totalRemainingQty=
-    batch.groupItems.reduce(
-      (sum,group)=>
-        sum+Number(group.remainingQty || 0),
-      0
-    )+
-    batch.exactItems.reduce(
-      (sum,item)=>
-        sum+Number(item.remainingQty || 0),
-      0
-    );
-
-  if(batch.totalRemainingQty>0.000001){
-    writeSimpleBatchCache(simpleBatchRows);
-    return {
-      removed:false,
-      batchId:batch.batchId
-    };
-  }
-
-  const finishedBatchId=batch.batchId;
-
-  simpleBatchRows=
-    simpleBatchRows.filter(
-      row=>row.batchId!==finishedBatchId
-    );
-
-  writeSimpleBatchCache(simpleBatchRows);
-
-  try{
-    localStorage.removeItem(
-      SIMPLE_BATCH_SELECTION_KEY
-    );
-  }catch(_){}
-
-  renderSimpleBatchPicker("");
-  unlockSimpleBatchLocation();
-
   return {
-    removed:true,
-    batchId:finishedBatchId
+    removed:false,
+    batchId:batch ? batch.batchId : ""
   };
 }
 
@@ -8406,6 +8275,10 @@ async function completeInvoice(event) {
 
     await postSalesInvoiceBundle(payload, paymentPayload);
 
+    /*
+     * V2.4.4: this no longer performs Batch balance math.
+     * Batch Report owns reconciliation/close.
+     */
     const batchLocalResult=
       consumeSelectedBatchLocally(
         payload.items

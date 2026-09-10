@@ -1,0 +1,13 @@
+name: Invoice Batch V2 JS Check
+on:
+  push:
+    paths:
+      - 'batch-v2-invoice-guard.js'
+      - '.github/workflows/batch-v2-invoice-check.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Invoice Batch V2 JavaScript syntax
+        run: node --check batch-v2-invoice-guard.js

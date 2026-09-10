@@ -1,4 +1,4 @@
-/* BIG BROTHER — Invoice Generator Batch V2 availability layer */
+/* BIG BROTHER — Invoice Generator Batch V2 availability layer V1.1 */
 (function(){
 'use strict';
 const EPS=0.000001;
@@ -31,6 +31,13 @@ function groupRows(b){
       members:(Array.isArray(g.members)?g.members:[]).filter(m=>remaining(m)>EPS)
     }));
 }
+function pendingProduct(){
+  try{
+    if(typeof pendingInvoiceProduct==='undefined'||!pendingInvoiceProduct)return null;
+    return pendingInvoiceProduct.product||pendingInvoiceProduct;
+  }catch(_){return null}
+}
+function formatQty(v){return num(v).toLocaleString(undefined,{maximumFractionDigits:3})}
 
 /* When a Batch is selected, its live stock becomes the product catalogue. */
 window.getSelectedBatchGroupProducts=function(){const b=batch();return b?groupRows(b):[]};
@@ -63,12 +70,30 @@ function refreshBatchHint(){
   const status=document.getElementById('simpleBatchStatus');
   if(!status||!b)return;
   const rem=num(b.totalRemainingQty);
-  status.textContent='✓ '+clean(b.batchId)+' · Live Batch stock '+rem.toLocaleString(undefined,{maximumFractionDigits:3})+' remaining · zero-stock items are unavailable.';
+  status.textContent='✓ '+clean(b.batchId)+' · Live Batch stock '+formatQty(rem)+' remaining · zero-stock items are unavailable.';
   status.style.color='#2f855a';
 }
 const oldChange=window.handleSimpleBatchChange;
 if(typeof oldChange==='function'){
   window.handleSimpleBatchChange=function(){const r=oldChange.apply(this,arguments);setTimeout(refreshBatchHint,0);return r};
+}
+
+/* Show live availability inside the quantity popup. */
+const oldQtyPrompt=window.openInvoiceQtyPrompt;
+if(typeof oldQtyPrompt==='function'){
+  window.openInvoiceQtyPrompt=function(product,effectiveUsdPrice){
+    const out=oldQtyPrompt.apply(this,arguments);
+    const b=batch();
+    const m=document.getElementById('invoiceQtyMessage');
+    if(b&&m&&product){
+      const limit=remaining(product);
+      m.textContent=limit>EPS
+        ? 'Batch Available: '+formatQty(limit)+' in '+clean(b.batchId)+'.'
+        : 'This item has no stock remaining in '+clean(b.batchId)+'.';
+      m.style.color=limit>EPS?'#2f855a':'#c53030';
+    }
+    return out;
+  };
 }
 
 /* Stop obvious over-quantity entries before save; Supabase remains authoritative. */
@@ -77,20 +102,22 @@ if(qtyForm){
   qtyForm.addEventListener('submit',function(event){
     const b=batch();
     if(!b)return;
-    let p=null;
-    try{p=typeof pendingInvoiceProduct!=='undefined'?pendingInvoiceProduct:null}catch(_){p=null}
+    const p=pendingProduct();
     if(!p)return;
     const q=num(document.getElementById('invoiceQtyInput')?.value);
-    const limit=num(p.remainingQty);
+    const limit=remaining(p);
+    const m=document.getElementById('invoiceQtyMessage');
     if(!(limit>EPS)){
       event.preventDefault();event.stopImmediatePropagation();
-      const m=document.getElementById('invoiceQtyMessage');if(m)m.textContent='This item has no stock remaining in '+clean(b.batchId)+'.';
+      if(m){m.textContent='This item has no stock remaining in '+clean(b.batchId)+'.';m.style.color='#c53030';}
       return;
     }
     if(q>limit+EPS){
       event.preventDefault();event.stopImmediatePropagation();
-      const m=document.getElementById('invoiceQtyMessage');if(m)m.textContent='Only '+limit.toLocaleString(undefined,{maximumFractionDigits:3})+' remaining in '+clean(b.batchId)+'.';
+      if(m){m.textContent='Only '+formatQty(limit)+' remaining in '+clean(b.batchId)+'.';m.style.color='#c53030';}
+      return;
     }
+    if(m){m.textContent='Batch Available after this line: '+formatQty(limit-q)+' in '+clean(b.batchId)+'.';m.style.color='#2f855a';}
   },true);
 }
 

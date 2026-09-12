@@ -1,86 +1,464 @@
 <!doctype html>
+
 <html lang="en">
+
 <head>
+
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>BIG BROTHER — Invoice Generator</title>
+
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  >
+
+  <title>
+    BIG BROTHER — Invoice Generator
+  </title>
+
+
   <style>
-    html,body{margin:0;min-height:100%;background:#eef3f8;font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#173b70}
-    .bb-loader{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
-    .bb-loader-card{background:#fff;border:1px solid #d7e2ef;border-radius:16px;padding:22px 28px;box-shadow:0 12px 30px rgba(21,49,83,.08);font-weight:800}
-    .bb-loader-sub{margin-top:7px;font-size:12px;color:#6d7f92;font-weight:600}
+
+    html,
+    body{
+
+      margin:0;
+
+      min-height:100%;
+
+      background:#eef3f8;
+
+      font-family:
+        "Segoe UI",
+        Tahoma,
+        Arial,
+        sans-serif;
+
+      color:#173b70;
+
+    }
+
+
+    .bb-loader{
+
+      min-height:100vh;
+
+      display:flex;
+
+      align-items:center;
+
+      justify-content:center;
+
+      padding:24px;
+
+      text-align:center;
+
+    }
+
+
+    .bb-loader-card{
+
+      background:#fff;
+
+      border:1px solid #d7e2ef;
+
+      border-radius:16px;
+
+      padding:22px 28px;
+
+      box-shadow:
+        0 12px 30px
+        rgba(21,49,83,.08);
+
+      font-weight:800;
+
+    }
+
+
+    .bb-loader-sub{
+
+      margin-top:7px;
+
+      font-size:12px;
+
+      color:#6d7f92;
+
+      font-weight:600;
+
+    }
+
   </style>
-  <script src="dual-currency-invoice-patch.js?v=20260910-1"></script>
+
+
+  <script
+    src="dual-currency-invoice-patch.js?v=20260910-1"
+  ></script>
+
 </head>
+
+
 <body>
+
+
   <div class="bb-loader">
+
     <div class="bb-loader-card">
+
       Loading BIG BROTHER Invoice Generator…
-      <div class="bb-loader-sub">Secure Supabase database · USD + KHR customer pricing</div>
+
+      <div class="bb-loader-sub">
+        Secure Supabase · Purchased + Zero-Cost Direct Sale
+      </div>
+
     </div>
+
   </div>
 
+
+
   <script>
+
   (async function () {
+
+
     try {
-      const [sourceResponse, adapterResponse] = await Promise.all([
-        fetch('legacy-google-v2.4.5.html?v=20260910-5', {cache:'no-store'}),
-        fetch('supabase-adapter.js?v=20260910-5', {cache:'no-store'})
-      ]);
 
-      if (!sourceResponse.ok) throw new Error('Could not load Invoice Generator source.');
-      if (!adapterResponse.ok) throw new Error('Could not load Invoice Generator Supabase adapter.');
 
-      let html = await sourceResponse.text();
-      let adapterJs = await adapterResponse.text();
+      /* =======================================================
+         LOAD LEGACY UI + SUPABASE ADAPTER
+         ======================================================= */
 
-      if(!window.BBInvoiceDualCurrencyPatch) {
-        throw new Error('Invoice dual-currency patch did not load.');
+      const [
+        sourceResponse,
+        adapterResponse
+      ] =
+        await Promise.all([
+
+          fetch(
+            'legacy-google-v2.4.5.html?v=20260913-1',
+            {
+              cache:'no-store'
+            }
+          ),
+
+          fetch(
+            'supabase-adapter.js?v=20260913-1',
+            {
+              cache:'no-store'
+            }
+          )
+
+        ]);
+
+
+
+      if (
+        !sourceResponse.ok
+      ) {
+
+        throw new Error(
+          'Could not load Invoice Generator source.'
+        );
+
       }
 
-      html = window.BBInvoiceDualCurrencyPatch.patchLegacy(html);
-      adapterJs = window.BBInvoiceDualCurrencyPatch.patchAdapter(adapterJs);
 
-      /* Disable only the old automatic Google startup calls. */
-      html = html.replace('loadNextInvoiceNumber();','/* Supabase boot owns Invoice No. */');
-      html = html.replace('loadInvoiceBootstrapFast();','/* Supabase boot owns Master bootstrap. */');
-      html = html.replace('loadSimpleBatchPicker();','/* Supabase boot owns Batch picker. */');
+      if (
+        !adapterResponse.ok
+      ) {
 
-      html = html.replaceAll(
-        'This will save the invoice to the Sales Data Google Sheet.',
-        'This will save the invoice to the BIG BROTHER Database.'
-      );
-      html = html.replaceAll(
-        'Google Sheets -> separate Sales Data file',
-        'Supabase PostgreSQL -> Sales Database'
-      );
-      html = html.replace(
-        '<title>BIG BROTHER — Invoice Generator V2.4.5 Fast Master Bootstrap</title>',
-        '<title>BIG BROTHER — Invoice Generator V3.2 Dual Currency</title>'
-      );
+        throw new Error(
+          'Could not load Invoice Generator Supabase adapter.'
+        );
 
-      /* Inject the patched Supabase adapter before the real final body close. */
-      const safeAdapter = adapterJs.replace(/<\/script/gi,'<\\/script');
-      const adapter =
-        '<scr' + 'ipt>' + safeAdapter + '</scr' + 'ipt>\n' +
-        '<scr' + 'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr' + 'ipt>';
+      }
 
-      const bodyCloseIndex = html.toLowerCase().lastIndexOf('</body>');
-      if (bodyCloseIndex < 0) throw new Error('Invoice Generator source is missing its closing body tag.');
 
-      html = html.slice(0, bodyCloseIndex) + adapter + '\n' + html.slice(bodyCloseIndex);
+
+      let html =
+        await sourceResponse.text();
+
+
+      let adapterJs =
+        await adapterResponse.text();
+
+
+
+      /* =======================================================
+         DUAL CURRENCY PATCH
+         ======================================================= */
+
+      if (
+        !window.BBInvoiceDualCurrencyPatch
+      ) {
+
+        throw new Error(
+          'Invoice dual-currency patch did not load.'
+        );
+
+      }
+
+
+      html =
+        window
+          .BBInvoiceDualCurrencyPatch
+          .patchLegacy(
+            html
+          );
+
+
+      adapterJs =
+        window
+          .BBInvoiceDualCurrencyPatch
+          .patchAdapter(
+            adapterJs
+          );
+
+
+
+      /* =======================================================
+         SUPABASE OWNS STARTUP
+         ======================================================= */
+
+      html =
+        html.replace(
+
+          'loadNextInvoiceNumber();',
+
+          '/* Supabase boot owns Invoice No. */'
+
+        );
+
+
+      html =
+        html.replace(
+
+          'loadInvoiceBootstrapFast();',
+
+          '/* Supabase boot owns Master bootstrap. */'
+
+        );
+
+
+      html =
+        html.replace(
+
+          'loadSimpleBatchPicker();',
+
+          '/* Supabase boot owns Batch picker. */'
+
+        );
+
+
+
+      /* =======================================================
+         DATABASE TEXT
+         ======================================================= */
+
+      html =
+        html.replaceAll(
+
+          'This will save the invoice to the Sales Data Google Sheet.',
+
+          'This will save the invoice to the BIG BROTHER Database.'
+
+        );
+
+
+      html =
+        html.replaceAll(
+
+          'Google Sheets -> separate Sales Data file',
+
+          'Supabase PostgreSQL -> Sales Database'
+
+        );
+
+
+
+      /* =======================================================
+         TITLE
+         ======================================================= */
+
+      html =
+        html.replace(
+
+          '<title>BIG BROTHER — Invoice Generator V2.4.5 Fast Master Bootstrap</title>',
+
+          '<title>BIG BROTHER — Invoice Generator V3.3 Direct Sale Source</title>'
+
+        );
+
+
+
+      /* =======================================================
+         INJECT SUPABASE + STOCK SOURCE FEATURES
+
+         ORDER MATTERS:
+
+         1. Supabase Adapter
+         2. Batch Sale Guard
+         3. Direct Sale Source Selector
+
+         Therefore:
+         Batch Sale stays Zero-Cost First.
+         Direct Sale becomes manual Purchased / Zero-Cost / Mixed.
+         ======================================================= */
+
+      const safeAdapter =
+
+        adapterJs.replace(
+          /<\/script/gi,
+          '<\\/script'
+        );
+
+
+      const featureScripts =
+
+        '<scr'
+        +
+        'ipt>'
+        +
+        safeAdapter
+        +
+        '</scr'
+        +
+        'ipt>\n'
+
+        +
+
+        '<scr'
+        +
+        'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'
+        +
+        'ipt>\n'
+
+        +
+
+        '<scr'
+        +
+        'ipt src="direct-sale-source-v1.js?v=20260913-1"></scr'
+        +
+        'ipt>';
+
+
+
+      /* =======================================================
+         INSERT BEFORE FINAL BODY CLOSE
+         ======================================================= */
+
+      const bodyCloseIndex =
+
+        html
+          .toLowerCase()
+          .lastIndexOf(
+            '</body>'
+          );
+
+
+      if (
+        bodyCloseIndex
+        <
+        0
+      ) {
+
+        throw new Error(
+          'Invoice Generator source is missing its closing body tag.'
+        );
+
+      }
+
+
+      html =
+
+        html.slice(
+          0,
+          bodyCloseIndex
+        )
+
+        +
+
+        featureScripts
+
+        +
+
+        '\n'
+
+        +
+
+        html.slice(
+          bodyCloseIndex
+        );
+
+
+
+      /* =======================================================
+         OPEN FINAL APP
+         ======================================================= */
 
       document.open();
-      document.write(html);
+
+      document.write(
+        html
+      );
+
       document.close();
+
+
+
     } catch (error) {
-      console.error('Invoice Generator loader failed:', error);
+
+
+      console.error(
+        'Invoice Generator loader failed:',
+        error
+      );
+
+
       document.body.innerHTML =
-        '<div class="bb-loader"><div class="bb-loader-card">' +
-        'Could not open Invoice Generator' +
-        '<div class="bb-loader-sub">' + String(error && error.message || error) + '</div></div></div>';
+
+        '<div class="bb-loader">'
+
+        +
+
+        '<div class="bb-loader-card">'
+
+        +
+
+        'Could not open Invoice Generator'
+
+        +
+
+        '<div class="bb-loader-sub">'
+
+        +
+
+        String(
+          error?.message
+          ||
+          error
+        )
+
+        +
+
+        '</div>'
+
+        +
+
+        '</div>'
+
+        +
+
+        '</div>';
+
+
     }
+
+
   })();
+
   </script>
+
+
 </body>
+
 </html>

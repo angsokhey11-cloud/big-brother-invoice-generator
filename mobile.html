@@ -133,6 +133,7 @@
     if(headClose<0)throw new Error('Invoice Generator source is missing </head>.');
     html=html.slice(0,headClose)
       +'<link rel="stylesheet" href="mobile-invoice.css?v=20260914-1">\n'
+      +'<link rel="stylesheet" href="mobile-invoice-preview.css?v=20260914-1">\n'
       +html.slice(headClose);
 
     const safeAdapter=adapterJs.replace(/<\/script/gi,'<\\/script');
@@ -140,7 +141,8 @@
       '<scr'+'ipt>'+safeAdapter+'</scr'+'ipt>\n'
       +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'+'ipt>\n'
       +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260913-1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="mobile-invoice.js?v=20260914-1"></scr'+'ipt>';
+      +'<scr'+'ipt src="mobile-invoice.js?v=20260914-1"></scr'+'ipt>\n'
+      +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>';
 
     const bodyCloseIndex=html.toLowerCase().lastIndexOf('</body>');
     if(bodyCloseIndex<0)throw new Error('Invoice Generator source is missing its closing body tag.');

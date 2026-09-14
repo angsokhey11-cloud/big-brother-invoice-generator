@@ -1,0 +1,512 @@
+/* BIG BROTHER — Invoice Generator Mobile UI V1
+   Mobile presentation only. Desktop index.html / legacy UI remain untouched. */
+
+html.bb-mobile-invoice-page,
+html.bb-mobile-invoice-page body{
+  min-height:100%;
+  background:#eef3f8 !important;
+  overflow-x:hidden !important;
+}
+
+html.bb-mobile-invoice-page body{
+  padding:6px 7px 86px !important;
+  color:#13243a !important;
+}
+
+html.bb-mobile-invoice-page .calculator{
+  width:100% !important;
+  max-width:680px !important;
+  margin:0 auto !important;
+  padding:0 !important;
+  transform:none !important;
+}
+
+/* Header = Currency + Exchange Rate + Batch only. */
+html.bb-mobile-invoice-page .header-main{
+  position:sticky;
+  top:0;
+  z-index:4500;
+  display:block !important;
+  margin:0 0 7px !important;
+  padding:6px !important;
+  border:1px solid #d7e3f1 !important;
+  border-radius:12px !important;
+  background:rgba(255,255,255,.97) !important;
+  box-shadow:0 4px 14px rgba(23,59,112,.07) !important;
+  backdrop-filter:blur(10px);
+}
+html.bb-mobile-invoice-page .header-main h1{
+  display:none !important;
+}
+html.bb-mobile-invoice-page .header-currency{
+  width:100% !important;
+  display:grid !important;
+  grid-template-columns:76px 132px minmax(0,1fr) !important;
+  gap:6px !important;
+  align-items:end !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+}
+html.bb-mobile-invoice-page .header-currency>select{
+  width:76px !important;
+  min-width:0 !important;
+  height:40px !important;
+  min-height:40px !important;
+  padding:6px 26px 6px 9px !important;
+  font-size:13px !important;
+  font-weight:800 !important;
+}
+html.bb-mobile-invoice-page .header-rate{
+  display:grid !important;
+  grid-template-columns:auto minmax(0,1fr) auto !important;
+  gap:4px !important;
+  align-items:center !important;
+  min-width:0 !important;
+  height:40px !important;
+  padding:0 6px !important;
+  border:1px solid #c7d6e7 !important;
+  border-radius:9px !important;
+  background:#fff !important;
+  color:#516a86 !important;
+  font-size:10px !important;
+  white-space:nowrap !important;
+}
+html.bb-mobile-invoice-page .header-rate input{
+  width:100% !important;
+  min-width:0 !important;
+  height:30px !important;
+  min-height:30px !important;
+  padding:3px 4px !important;
+  border:0 !important;
+  text-align:center !important;
+  font-size:12px !important;
+  font-weight:800 !important;
+  box-shadow:none !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-batch-field{
+  min-width:0 !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-batch-field label{
+  display:none !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-batch-field::before{
+  content:"Batch";
+  display:block;
+  margin:0 0 2px 2px;
+  color:#31516f;
+  font-size:9px;
+  font-weight:800;
+}
+html.bb-mobile-invoice-page #batchNumber{
+  width:100% !important;
+  min-width:0 !important;
+  height:40px !important;
+  min-height:40px !important;
+  padding:6px 28px 6px 9px !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  white-space:nowrap !important;
+  font-size:11px !important;
+  font-weight:700 !important;
+}
+
+html.bb-mobile-invoice-page .bb-desktop-workspace{
+  display:block !important;
+  width:100% !important;
+}
+html.bb-mobile-invoice-page .bb-left-column{
+  display:flex !important;
+  flex-direction:column !important;
+  gap:7px !important;
+  width:100% !important;
+}
+html.bb-mobile-invoice-page .bb-right-column{
+  display:none !important;
+}
+
+/* Compact card language. */
+html.bb-mobile-invoice-page .card,
+html.bb-mobile-invoice-page .desktop-product-card,
+html.bb-mobile-invoice-page .totals-box,
+html.bb-mobile-invoice-page .convert-box,
+html.bb-mobile-invoice-page .banking-input-card,
+html.bb-mobile-invoice-page .transaction-details,
+html.bb-mobile-invoice-page .note-card,
+html.bb-mobile-invoice-page .bb-action-card{
+  width:100% !important;
+  margin:0 !important;
+  padding:9px !important;
+  border:1px solid #c9d9eb !important;
+  border-radius:12px !important;
+  background:#fff !important;
+  box-shadow:0 4px 14px rgba(23,59,112,.05) !important;
+}
+html.bb-mobile-invoice-page .invoice-card{
+  border-top:3px solid #2f7eea !important;
+}
+html.bb-mobile-invoice-page .invoice-card>.section-title{
+  display:none !important;
+}
+
+html.bb-mobile-invoice-page label{
+  margin-bottom:3px !important;
+  color:#203d5d !important;
+  font-size:11px !important;
+  font-weight:800 !important;
+}
+html.bb-mobile-invoice-page input,
+html.bb-mobile-invoice-page select,
+html.bb-mobile-invoice-page textarea{
+  min-height:39px !important;
+  padding:7px 9px !important;
+  border:1px solid #bfd0e3 !important;
+  border-radius:8px !important;
+  font-size:13px !important;
+}
+
+/* Invoice info remains the same fields, just a two-column phone grid. */
+html.bb-mobile-invoice-page .invoice-card .invoice-grid{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+  gap:7px 8px !important;
+  align-items:end !important;
+}
+html.bb-mobile-invoice-page .invoice-card .customer-field.grid-2{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+  gap:7px 8px !important;
+  margin-top:7px !important;
+}
+html.bb-mobile-invoice-page .invoice-card .address-shipping-row{
+  margin-top:6px !important;
+}
+html.bb-mobile-invoice-page .invoice-card .address-shipping-row[hidden]{
+  display:none !important;
+}
+html.bb-mobile-invoice-page .customer-status{
+  min-height:12px !important;
+  margin-top:5px !important;
+  font-size:9.5px !important;
+  line-height:1.25 !important;
+}
+
+/* Address + Shipping are preserved but collapsed by default. */
+html.bb-mobile-invoice-page .bb-mobile-address-toggle{
+  width:100%;
+  min-height:38px;
+  margin-top:7px;
+  padding:6px 9px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  border:1px solid #c5d6e8;
+  border-radius:9px;
+  background:#f8fbff;
+  color:#173f77;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+}
+html.bb-mobile-invoice-page .bb-mobile-address-toggle .bb-mobile-address-text{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:1px;
+}
+html.bb-mobile-invoice-page .bb-mobile-address-toggle small{
+  color:#718298;
+  font-size:9px;
+  font-weight:600;
+}
+html.bb-mobile-invoice-page .bb-mobile-address-toggle .bb-mobile-arrow{
+  flex:0 0 auto;
+  font-size:11px;
+  transition:transform .18s ease;
+}
+html.bb-mobile-invoice-page .bb-mobile-address-toggle[aria-expanded="true"] .bb-mobile-arrow{
+  transform:rotate(180deg);
+}
+
+/* Product key-in area: keep the same product system, reduce wasted height. */
+html.bb-mobile-invoice-page .desktop-product-card{
+  border-top:3px solid #2f7eea !important;
+}
+html.bb-mobile-invoice-page .desktop-card-title{
+  margin:0 0 7px !important;
+  color:#0e438e !important;
+  font-size:14px !important;
+  font-weight:900 !important;
+}
+html.bb-mobile-invoice-page .desktop-product-toolbar{
+  display:none !important;
+}
+html.bb-mobile-invoice-page .bb-product-search-wrap{
+  margin:0 0 7px !important;
+}
+html.bb-mobile-invoice-page #productSearch{
+  min-height:43px !important;
+  padding:8px 35px 8px 10px !important;
+  font-size:14px !important;
+}
+html.bb-mobile-invoice-page .bb-product-search-icon{
+  right:10px !important;
+  top:21px !important;
+}
+html.bb-mobile-invoice-page .bb-product-search-options{
+  max-height:45vh !important;
+}
+html.bb-mobile-invoice-page .bb-product-option{
+  min-height:48px !important;
+}
+html.bb-mobile-invoice-page .product-table-head{
+  grid-template-columns:minmax(0,1fr) 50px 58px 72px !important;
+  gap:3px !important;
+  padding:5px !important;
+  margin-top:4px !important;
+  font-size:9px !important;
+}
+html.bb-mobile-invoice-page .product{
+  grid-template-columns:minmax(0,1fr) 50px 58px 72px !important;
+  gap:3px !important;
+  min-height:38px !important;
+  padding:4px 5px !important;
+}
+html.bb-mobile-invoice-page .product-name{
+  font-size:10px !important;
+}
+html.bb-mobile-invoice-page .product-input-cell input{
+  height:29px !important;
+  min-height:29px !important;
+  padding:3px !important;
+  font-size:10px !important;
+}
+html.bb-mobile-invoice-page .product-total-cell{
+  font-size:10px !important;
+}
+html.bb-mobile-invoice-page .optional-menu{
+  margin:6px 0 0 !important;
+}
+html.bb-mobile-invoice-page .optional-menu-btn{
+  min-height:38px !important;
+  padding:7px 9px !important;
+  font-size:12px !important;
+}
+
+/* Exchange remains the same function and appears only when enabled. */
+html.bb-mobile-invoice-page .convert-box{
+  padding:8px !important;
+}
+html.bb-mobile-invoice-page .convert-box .section-title{
+  margin:0 0 5px !important;
+  font-size:12px !important;
+}
+html.bb-mobile-invoice-page .convert-result{
+  padding:7px !important;
+  font-size:13px !important;
+}
+
+/* Summary and Sale/Payment share one row to shorten the mobile page. */
+html.bb-mobile-invoice-page .bb-mobile-payment-row{
+  display:grid !important;
+  grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr) !important;
+  gap:7px !important;
+  align-items:stretch !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .totals-box,
+html.bb-mobile-invoice-page .bb-mobile-payment-row .transaction-details{
+  min-width:0 !important;
+  padding:8px !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .totals-box{
+  border-top:3px solid #20a357 !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .totals-box::before{
+  content:"Payment Summary";
+  display:block;
+  margin:0 0 6px;
+  color:#0e438e;
+  font-size:11px;
+  font-weight:900;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .transaction-details::before{
+  content:"Sale & Payment";
+  display:block;
+  margin:0 0 6px;
+  color:#0e438e;
+  font-size:11px;
+  font-weight:900;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .total-row{
+  padding:4px 0 !important;
+  font-size:11px !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .grand-total{
+  padding-top:6px !important;
+  font-size:13px !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .transaction-details .grid-2{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+  gap:5px !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .transaction-details label{
+  font-size:9px !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .transaction-details input,
+html.bb-mobile-invoice-page .bb-mobile-payment-row .transaction-details select{
+  min-height:36px !important;
+  padding:5px 6px !important;
+  font-size:10.5px !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .payment-row{
+  display:block !important;
+}
+html.bb-mobile-invoice-page .bb-mobile-payment-row .payment-row input{
+  width:100% !important;
+  max-width:none !important;
+  min-height:34px !important;
+  margin-top:3px !important;
+}
+
+/* Note and banking keep all desktop functions, only compact them. */
+html.bb-mobile-invoice-page .note-card,
+html.bb-mobile-invoice-page .banking-input-card{
+  padding:8px !important;
+}
+html.bb-mobile-invoice-page .note-card::before{
+  content:"Note";
+  display:block;
+  margin:0 0 6px;
+  color:#0e438e;
+  font-size:12px;
+  font-weight:900;
+}
+html.bb-mobile-invoice-page .note-card>label{
+  display:none !important;
+}
+html.bb-mobile-invoice-page .note-card select{
+  margin-bottom:5px !important;
+}
+html.bb-mobile-invoice-page .note-card textarea{
+  min-height:46px !important;
+  max-height:80px !important;
+  resize:vertical !important;
+}
+html.bb-mobile-invoice-page .banking-input-card{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+  gap:6px !important;
+  align-items:end !important;
+}
+html.bb-mobile-invoice-page .banking-input-card::before{
+  content:"Banking Details";
+  grid-column:1/-1;
+  display:block;
+  margin:0;
+  color:#0e438e;
+  font-size:12px;
+  font-weight:900;
+}
+html.bb-mobile-invoice-page .banking-input-card>label{
+  display:none !important;
+}
+html.bb-mobile-invoice-page .banking-input-card select,
+html.bb-mobile-invoice-page .banking-preview{
+  min-height:38px !important;
+  margin:0 !important;
+  padding:7px 8px !important;
+  font-size:10.5px !important;
+}
+
+/* Mobile Quick Actions: Preview + Complete only. Other desktop actions remain untouched. */
+html.bb-mobile-invoice-page .bb-action-card{
+  position:sticky !important;
+  bottom:6px !important;
+  z-index:4200 !important;
+  padding:6px !important;
+  border-color:#b8cde4 !important;
+  box-shadow:0 10px 24px rgba(20,52,89,.16) !important;
+}
+html.bb-mobile-invoice-page .bb-action-title,
+html.bb-mobile-invoice-page .bb-action-card>.actions{
+  display:none !important;
+}
+html.bb-mobile-invoice-page .bottom-action-row{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) !important;
+  gap:6px !important;
+  margin:0 !important;
+}
+html.bb-mobile-invoice-page .bottom-action-row .clear-btn{
+  min-height:46px !important;
+  margin:0 !important;
+  padding:9px 6px !important;
+  border-radius:9px !important;
+  font-size:12px !important;
+  font-weight:900 !important;
+}
+html.bb-mobile-invoice-page .preview-btn{
+  background:#fff !important;
+  color:#1765c1 !important;
+  border:1px solid #4f8fdc !important;
+}
+html.bb-mobile-invoice-page .complete-btn{
+  background:#176fe6 !important;
+  color:#fff !important;
+  border:1px solid #176fe6 !important;
+  box-shadow:none !important;
+}
+
+/* Existing Qty / Price prompts were already strong on phones; keep them prominent. */
+html.bb-mobile-invoice-page .bb-qty-modal,
+html.bb-mobile-invoice-page .bb-price-modal{
+  padding:10px !important;
+}
+html.bb-mobile-invoice-page .bb-qty-dialog,
+html.bb-mobile-invoice-page .bb-price-dialog{
+  width:100% !important;
+  max-width:430px !important;
+}
+
+/* Embed mode lives inside the unified BIG BROTHER mobile app. */
+html.bb-mobile-invoice-page.bb-mobile-embedded body{
+  padding-top:5px !important;
+}
+
+@media (max-width:380px){
+  html.bb-mobile-invoice-page .header-currency{
+    grid-template-columns:69px 117px minmax(0,1fr) !important;
+    gap:4px !important;
+  }
+  html.bb-mobile-invoice-page .header-currency>select{width:69px !important;font-size:12px !important}
+  html.bb-mobile-invoice-page .header-rate{padding:0 4px !important;font-size:9px !important}
+  html.bb-mobile-invoice-page #batchNumber{font-size:10px !important}
+  html.bb-mobile-invoice-page .product-table-head,
+  html.bb-mobile-invoice-page .product{
+    grid-template-columns:minmax(0,1fr) 46px 54px 66px !important;
+  }
+  html.bb-mobile-invoice-page .bb-mobile-payment-row{
+    grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr) !important;
+  }
+}
+
+@media (max-width:340px){
+  html.bb-mobile-invoice-page .invoice-card .invoice-grid,
+  html.bb-mobile-invoice-page .invoice-card .customer-field.grid-2,
+  html.bb-mobile-invoice-page .bb-mobile-payment-row,
+  html.bb-mobile-invoice-page .banking-input-card{
+    grid-template-columns:1fr !important;
+  }
+}
+
+@media print{
+  html.bb-mobile-invoice-page body{padding:0 !important}
+  html.bb-mobile-invoice-page .header-main,
+  html.bb-mobile-invoice-page .bb-mobile-address-toggle,
+  html.bb-mobile-invoice-page .bb-action-card{display:none !important}
+  html.bb-mobile-invoice-page .invoice-card .address-shipping-row[hidden]{display:grid !important}
+}

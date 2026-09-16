@@ -1,5 +1,6 @@
-/* BIG BROTHER — Confirmed Invoice Google Sheets Backup V1
-   Supabase remains authoritative. Google Sheets is audit/continuity backup only. */
+/* BIG BROTHER — Confirmed Invoice Google Sheets Backup V1.1
+   Supabase remains authoritative. Google Sheets is audit/continuity backup only.
+   Backup payload is persisted locally before background send so invoice save stays fast. */
 (function(){
   'use strict';
 
@@ -70,12 +71,22 @@
     try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q.slice(-MAX_QUEUE)))}catch(_){}
   }
 
+  function payloadKey(payload){
+    return clean(payload?.supabaseInvoiceId)||clean(payload?.invoiceNo);
+  }
+
   function enqueue(payload){
-    const key=clean(payload?.supabaseInvoiceId)||clean(payload?.invoiceNo);
+    const key=payloadKey(payload);
     if(!key)return;
     const q=readQueue();
-    if(!q.some(x=>(clean(x?.supabaseInvoiceId)||clean(x?.invoiceNo))===key))q.push(payload);
+    if(!q.some(x=>payloadKey(x)===key))q.push(payload);
     writeQueue(q);
+  }
+
+  function dequeue(payload){
+    const key=payloadKey(payload);
+    if(!key)return;
+    writeQueue(readQueue().filter(x=>payloadKey(x)!==key));
   }
 
   async function send(payload){
@@ -90,26 +101,24 @@
     return true;
   }
 
-  async function backupConfirmedInvoice(invoice){
+  function dispatchConfirmedInvoice(invoice){
     const payload=backupPayload(invoice);
-    try{
-      await send(payload);
-      return true;
-    }catch(error){
-      console.warn('BIG BROTHER invoice backup queued:',error);
-      enqueue(payload);
-      return false;
-    }
+    enqueue(payload);
+    send(payload)
+      .then(()=>dequeue(payload))
+      .catch(error=>console.warn('BIG BROTHER invoice backup queued for retry:',error));
+    return true;
   }
 
   async function retryQueue(){
     const q=readQueue();
     if(!q.length)return;
-    const remaining=[];
     for(const payload of q){
-      try{await send(payload)}catch(_){remaining.push(payload)}
+      try{
+        await send(payload);
+        dequeue(payload);
+      }catch(_){/* keep queued */}
     }
-    writeQueue(remaining);
   }
 
   function install(){
@@ -117,7 +126,7 @@
     if(typeof bundle==='function'&&!bundle.__bbBackupWrapped){
       const wrapped=async function(invoicePayload,paymentPayload){
         const result=await bundle.call(this,invoicePayload,paymentPayload);
-        await backupConfirmedInvoice(invoicePayload);
+        try{dispatchConfirmedInvoice(invoicePayload)}catch(error){console.warn('BIG BROTHER invoice backup:',error)}
         return result;
       };
       wrapped.__bbBackupWrapped=true;
@@ -128,7 +137,7 @@
     if(typeof single==='function'&&!single.__bbBackupWrapped){
       const wrapped=async function(payload){
         const result=await single.call(this,payload);
-        await backupConfirmedInvoice(payload);
+        try{dispatchConfirmedInvoice(payload)}catch(error){console.warn('BIG BROTHER invoice backup:',error)}
         return result;
       };
       wrapped.__bbBackupWrapped=true;
@@ -141,5 +150,5 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
   else install();
 
-  window.BBInvoiceBackupV1={retry:retryQueue,endpoint:ENDPOINT};
+  window.BBInvoiceBackupV1={retry:retryQueue,dispatch:dispatchConfirmedInvoice,endpoint:ENDPOINT};
 })();

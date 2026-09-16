@@ -1,4 +1,4 @@
-/* BIG BROTHER — Confirmed Invoice Google Sheets Backup V1.1
+/* BIG BROTHER — Confirmed Invoice Google Sheets Backup V1.2
    Supabase remains authoritative. Google Sheets is audit/continuity backup only.
    Backup payload is persisted locally before background send so invoice save stays fast. */
 (function(){
@@ -147,8 +147,22 @@
     retryQueue().catch(()=>{});
   }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
-  else install();
+  function loadFastCompletePatch(){
+    if(document.getElementById('bbInvoiceFastCompleteV1'))return;
+    const script=document.createElement('script');
+    script.id='bbInvoiceFastCompleteV1';
+    script.src='invoice-fast-complete-v1.js?v=20260916-1';
+    script.async=false;
+    (document.head||document.documentElement).appendChild(script);
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',install,{once:true});
+    document.addEventListener('DOMContentLoaded',loadFastCompletePatch,{once:true});
+  }else{
+    install();
+    loadFastCompletePatch();
+  }
 
   window.BBInvoiceBackupV1={retry:retryQueue,dispatch:dispatchConfirmedInvoice,endpoint:ENDPOINT};
 })();

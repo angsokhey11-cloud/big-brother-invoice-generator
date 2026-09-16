@@ -298,10 +298,12 @@
          1. Supabase Adapter
          2. Batch Sale Guard
          3. Direct Sale Source Selector
+         4. Confirmed Invoice Backup
 
          Therefore:
          Batch Sale stays Zero-Cost First.
          Direct Sale becomes manual Purchased / Zero-Cost / Mixed.
+         Confirmed Supabase invoices are mirrored to Google Sheets.
          ======================================================= */
 
       const safeAdapter =
@@ -337,6 +339,14 @@
         '<scr'
         +
         'ipt src="direct-sale-source-v1.js?v=20260913-1"></scr'
+        +
+        'ipt>\n'
+
+        +
+
+        '<scr'
+        +
+        'ipt src="invoice-backup-v1.js?v=20260916-1"></scr'
         +
         'ipt>';
 

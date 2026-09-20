@@ -97,7 +97,7 @@
     await assertInvoicePermission();
 
     const [sourceResponse,adapterResponse]=await Promise.all([
-      fetch('legacy-google-v2.4.5.html?v=20260920-iosdecimal1',{cache:'no-store'}),
+      fetch('legacy-google-v2.4.5.html?v=20260920-telegraminvoice1',{cache:'no-store'}),
       fetch('supabase-adapter.js?v=20260920-globalcustomer-1',{cache:'no-store'})
     ]);
 
@@ -162,6 +162,29 @@
       'This will save the invoice to the Sales Data Google Sheet.',
       'This will save the invoice to the BIG BROTHER Database.'
     );
+
+    /* MOBILE ONLY — after the exact invoice is saved, preserve the save
+       result so Customer Telegram routing can work with that invoice_id.
+       Desktop Invoice Generator remains untouched. */
+    const bbInvoiceSaveMarker='    await postSalesInvoiceBundle(payload, paymentPayload);';
+    const bbInvoiceSaveReplacement='    const bbSavedInvoiceResult =\\n      await postSalesInvoiceBundle(payload, paymentPayload);';
+
+    if(!html.includes(bbInvoiceSaveMarker)){
+      throw new Error('Invoice Telegram save-result marker was not found.');
+    }
+    html=html.replace(bbInvoiceSaveMarker,bbInvoiceSaveReplacement);
+
+    const bbInvoiceClearMarker='    clearAllAfterSuccessfulSave();';
+    const bbInvoiceTelegramBeforeClear=
+      '    if (window.BBTelegramInvoiceShare?.afterComplete) {\\n'
+      +'      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\\n'
+      +'    }\\n\\n'
+      +'    clearAllAfterSuccessfulSave();';
+
+    if(!html.includes(bbInvoiceClearMarker)){
+      throw new Error('Invoice Telegram post-save marker was not found.');
+    }
+    html=html.replace(bbInvoiceClearMarker,bbInvoiceTelegramBeforeClear);
     html=html.replaceAll(
       'Google Sheets -> separate Sales Data file',
       'Supabase PostgreSQL -> Sales Database'
@@ -176,6 +199,7 @@
     html=html.slice(0,headClose)
       +'<link rel="stylesheet" href="mobile-invoice.css?v=20260914-1">\n'
       +'<link rel="stylesheet" href="mobile-invoice-preview.css?v=20260914-1">\n'
+      +'<link rel="stylesheet" href="telegram-invoice-share-v1.css?v=20260920-telegraminvoice1">\n'
       +html.slice(headClose);
 
     const safeAdapter=adapterJs.replace(/<\/script/gi,'<\\/script');
@@ -185,7 +209,8 @@
       +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260913-1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="invoice-backup-v1.js?v=20260916-fast-1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="mobile-invoice.js?v=20260920-iosdecimal1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>';
+      +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
+      +'<scr'+'ipt src="telegram-invoice-share-v1.js?v=20260920-telegraminvoice1"></scr'+'ipt>';
 
     const bodyCloseIndex=html.toLowerCase().lastIndexOf('</body>');
     if(bodyCloseIndex<0)throw new Error('Invoice Generator source is missing its closing body tag.');

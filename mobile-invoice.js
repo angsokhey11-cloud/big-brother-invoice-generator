@@ -100,6 +100,89 @@
     });
   }
 
+  function isIOSMobile(){
+    const ua=navigator.userAgent||'';
+    return /iPhone|iPad|iPod/i.test(ua) ||
+      (navigator.platform==='MacIntel' && Number(navigator.maxTouchPoints||0)>1);
+  }
+
+  function isDecimalInvoiceInput(input){
+    if(!input || String(input.tagName||'').toLowerCase()!=='input')return false;
+
+    const mode=String(input.getAttribute('inputmode')||input.inputMode||'').toLowerCase();
+    if(mode==='decimal')return true;
+
+    const stepRaw=String(input.getAttribute('step')||'').trim().toLowerCase();
+    if(stepRaw==='any')return true;
+    if(stepRaw){
+      const step=Number(stepRaw);
+      if(Number.isFinite(step) && step>0 && !Number.isInteger(step))return true;
+    }
+
+    const semantic=[
+      input.id,
+      input.name,
+      input.className,
+      input.getAttribute('aria-label')
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    return /(qty|quantity|price|amount|rate|discount|paid|payment|credit|total|value)/.test(semantic);
+  }
+
+  function patchIOSDecimalInput(input){
+    if(!isIOSMobile() || !isDecimalInvoiceInput(input) || input.dataset.bbIosInvoiceDecimal==='1')return;
+
+    input.dataset.bbIosInvoiceDecimal='1';
+
+    try{input.type='text'}catch(_){}
+    input.setAttribute('inputmode','decimal');
+    input.removeAttribute('pattern');
+    input.setAttribute('autocapitalize','none');
+    input.setAttribute('spellcheck','false');
+  }
+
+  function patchIOSDecimalInputs(root=document){
+    if(!isIOSMobile())return;
+
+    if(root.matches?.('input'))patchIOSDecimalInput(root);
+    root.querySelectorAll?.('input').forEach(patchIOSDecimalInput);
+  }
+
+  function normalizeIOSDecimal(event){
+    const input=event.target;
+    if(!input || input.dataset?.bbIosInvoiceDecimal!=='1')return;
+
+    const raw=String(input.value||'');
+    if(!raw.includes(','))return;
+
+    const start=input.selectionStart;
+    input.value=raw.replace(/,/g,'.');
+
+    if(typeof start==='number'){
+      try{input.setSelectionRange(start,start)}catch(_){}
+    }
+  }
+
+  function installIOSDecimalSupport(){
+    if(!isIOSMobile())return;
+
+    patchIOSDecimalInputs(document);
+
+    document.addEventListener('input',normalizeIOSDecimal,true);
+
+    new MutationObserver(records=>{
+      for(const record of records){
+        for(const node of record.addedNodes||[]){
+          if(node?.nodeType===1)patchIOSDecimalInputs(node);
+        }
+      }
+    }).observe(document.body,{childList:true,subtree:true});
+
+    setTimeout(()=>patchIOSDecimalInputs(document),120);
+    setTimeout(()=>patchIOSDecimalInputs(document),500);
+    setTimeout(()=>patchIOSDecimalInputs(document),1400);
+  }
+
   function improveMobileInputs(){
     const invoiceNo=$('#invoiceNumber');
     if(invoiceNo){
@@ -151,6 +234,7 @@
     reorderMobileSections();
     keepOnlyMobileActions();
     improveMobileInputs();
+    installIOSDecimalSupport();
     addDesktopSwitch();
     preserveAddressVisibilityDuringPrint();
 

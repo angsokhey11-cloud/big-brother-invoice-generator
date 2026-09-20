@@ -1798,6 +1798,69 @@ input:focus {
   margin-bottom: 7px;
 }
 
+.final-ar-summary {
+  margin-top: 14px;
+  border: 1px solid #9fb5cf;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f7fbff;
+  font-size: 12px;
+}
+.final-ar-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 11px;
+  background: #e8f1fb;
+  border-bottom: 1px solid #b8cbe0;
+}
+.final-ar-summary-title {
+  color: #174a91;
+  font-weight: 900;
+  letter-spacing: .25px;
+}
+.final-ar-summary-badge {
+  color: #526a84;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .45px;
+}
+.final-ar-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 7px 11px;
+  border-bottom: 1px solid #dce6f0;
+}
+.final-ar-summary-row:last-of-type {
+  border-bottom: 0;
+}
+.final-ar-summary-row span {
+  color: #526579;
+  font-weight: 700;
+}
+.final-ar-summary-row strong {
+  color: #173f77;
+  text-align: right;
+}
+.final-ar-summary-row.latest {
+  background: #edf7f1;
+}
+.final-ar-summary-row.latest span,
+.final-ar-summary-row.latest strong {
+  color: #17663d;
+  font-weight: 900;
+}
+.final-ar-summary-foot {
+  padding: 7px 11px;
+  background: #fff;
+  color: #6d7c8c;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
 .final-banking {
   border: 1px solid #999;
   margin-top: 12px;
@@ -7266,6 +7329,55 @@ function buildFinalInvoiceHtml(state) {
     Number(state.grandTotal) > 0 &&
     Number(state.outstanding) <= 0.000001;
 
+  const arSummary =
+    state.invoiceHasCredit &&
+    typeof window.BBInvoiceARSummaryForState === "function"
+      ? window.BBInvoiceARSummaryForState(state)
+      : null;
+
+  const formatArTotals = totals => {
+    const source = totals && typeof totals === "object" ? totals : {};
+    const currencies = Object.keys(source)
+      .filter(currency => Number(source[currency]) > 0.000001)
+      .sort();
+
+    if (!currencies.length) return formatMoney(0, state.currency);
+
+    return currencies
+      .map(currency => formatMoney(Number(source[currency]) || 0, currency))
+      .join(" • ");
+  };
+
+  const arSummaryHtml = arSummary ? `
+    <div class="final-ar-summary">
+      <div class="final-ar-summary-head">
+        <div class="final-ar-summary-title">Customer Outstanding Summary</div>
+        <div class="final-ar-summary-badge">${arSummary.mode === "saved" ? "Live Saved A/R" : "Live Projected A/R"}</div>
+      </div>
+      <div class="final-ar-summary-row">
+        <span>Previous Outstanding</span>
+        <strong>${esc(formatArTotals(arSummary.previous_outstanding?.totals))}</strong>
+      </div>
+      <div class="final-ar-summary-row">
+        <span>This Credit Invoice</span>
+        <strong>${esc(formatMoney(Number(arSummary.this_invoice_outstanding) || 0, arSummary.currency || state.currency))}</strong>
+      </div>
+      <div class="final-ar-summary-row latest">
+        <span>${arSummary.mode === "saved" ? "Latest Outstanding" : "Projected Outstanding"}</span>
+        <strong>${esc(formatArTotals(arSummary.latest_outstanding?.totals))}</strong>
+      </div>
+      <div class="final-ar-summary-row">
+        <span>Open Credit Invoices</span>
+        <strong>${Number(arSummary.latest_outstanding?.openInvoiceCount || 0).toLocaleString("en-US")}</strong>
+      </div>
+      <div class="final-ar-summary-foot">
+        ${arSummary.mode === "saved"
+          ? "Updated from BIG BROTHER Accounts Receivable after this invoice was saved."
+          : "Live customer A/R plus this draft credit invoice. Final balance is confirmed when the invoice is completed."}
+      </div>
+    </div>
+  ` : "";
+
   const rows = state.items.length
     ? state.items.map(item => `
       <tr>
@@ -7370,6 +7482,8 @@ function buildFinalInvoiceHtml(state) {
         ${state.banking.bank ? `<div>${esc(state.banking.bank)}</div>` : ""}
         ${state.banking.account ? `<div>${esc(state.banking.account)}</div>` : ""}
       </div>` : ""}
+
+      ${arSummaryHtml}
 
       <div class="final-footer-space"></div>
     </div>

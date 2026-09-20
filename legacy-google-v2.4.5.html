@@ -1593,6 +1593,8 @@ input:focus {
    Clean A4-style layout based on sample invoice.
 ========================================== */
 .final-invoice {
+  position: relative;
+  overflow: hidden;
   width: 794px;
   max-width: 100%;
   margin: 0 auto;
@@ -1604,6 +1606,34 @@ input:focus {
   box-shadow: none;
 }
 .final-invoice * { box-sizing: border-box; }
+.final-invoice > *:not(.final-paid-watermark) {
+  position: relative;
+  z-index: 1;
+}
+.final-digital-label {
+  margin: -4px 0 14px;
+  text-align: center;
+  color: #2867b2;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+}
+.final-paid-watermark {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-28deg);
+  color: rgba(22, 115, 61, .12);
+  font-size: 124px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
 .final-header {
   display: flex;
   justify-content: space-between;
@@ -1754,7 +1784,7 @@ input:focus {
 .final-transaction-label { font-weight: 800; margin-bottom: 4px; }
 
 /* =====================================================
-   FINAL INVOICE V2 — PAYMENT + CUSTOMER/SALE SIGNATURES
+   FINAL INVOICE V3 — DIGITAL DOCUMENT
    ===================================================== */
 .final-payment-box {
   width: 48%;
@@ -1766,46 +1796,6 @@ input:focus {
 }
 .final-payment-box .final-transaction-label {
   margin-bottom: 7px;
-}
-
-.final-signature-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 42px;
-  margin-top: 28px;
-  padding-top: 4px;
-  font-size: 12px;
-}
-.final-signature-column {
-  min-width: 0;
-}
-.final-signature-name-row {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 14px;
-  align-items: end;
-  min-height: 24px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #777;
-}
-.final-signature-label {
-  font-weight: 800;
-  white-space: nowrap;
-}
-.final-signature-value {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.final-signature-line {
-  margin-top: 14px;
-}
-.final-signature-line-title {
-  font-weight: 800;
-  margin-bottom: 7px;
-}
-.final-signature-blank {
-  height: 30px;
-  border-bottom: 1px solid #777;
 }
 
 .final-banking {
@@ -1837,8 +1827,6 @@ input:focus {
   .final-bottom-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .final-transaction { gap: 10px; }
   .final-payment-box { width: 100%; }
-  .final-signature-grid { grid-template-columns: 1fr 1fr; gap: 18px; }
-  .final-signature-name-row { grid-template-columns: 1fr; gap: 3px; }
 }
 
 
@@ -7274,6 +7262,9 @@ function getFinalInvoiceState() {
 function buildFinalInvoiceHtml(state) {
   const esc = escapeHtml;
   const money = v => formatMoney(v, state.currency);
+  const isPaid =
+    Number(state.grandTotal) > 0 &&
+    Number(state.outstanding) <= 0.000001;
 
   const rows = state.items.length
     ? state.items.map(item => `
@@ -7313,6 +7304,8 @@ function buildFinalInvoiceHtml(state) {
 
   return `
     <div class="final-invoice">
+      ${isPaid ? '<div class="final-paid-watermark" aria-hidden="true">PAID</div>' : ''}
+      <div class="final-digital-label">Digital Invoice</div>
       <div class="final-header">
         <div class="final-company">
           <div class="final-company-name">BIG BROTHER</div>
@@ -7377,30 +7370,6 @@ function buildFinalInvoiceHtml(state) {
         ${state.banking.bank ? `<div>${esc(state.banking.bank)}</div>` : ""}
         ${state.banking.account ? `<div>${esc(state.banking.account)}</div>` : ""}
       </div>` : ""}
-
-      <div class="final-signature-grid">
-        <div class="final-signature-column">
-          <div class="final-signature-name-row">
-            <div class="final-signature-label">Customer Name</div>
-            <div class="final-signature-value">${esc(state.customer || "")}</div>
-          </div>
-          <div class="final-signature-line">
-            <div class="final-signature-line-title">Signature</div>
-            <div class="final-signature-blank"></div>
-          </div>
-        </div>
-
-        <div class="final-signature-column">
-          <div class="final-signature-name-row">
-            <div class="final-signature-label">Sale Person</div>
-            <div class="final-signature-value">${esc(state.salesperson || "")}</div>
-          </div>
-          <div class="final-signature-line">
-            <div class="final-signature-line-title">Sale Signature</div>
-            <div class="final-signature-blank"></div>
-          </div>
-        </div>
-      </div>
 
       <div class="final-footer-space"></div>
     </div>

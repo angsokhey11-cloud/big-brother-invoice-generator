@@ -268,7 +268,35 @@
       return null;
     }
 
-    return currentSummary;
+    if(currentSummary.mode!=='projected'){
+      return currentSummary;
+    }
+
+    /*
+     * Existing A/R comes from the live database lookup, but the draft invoice
+     * can still change after that lookup. Re-project with the current renderer
+     * state so QTY/price edits can never leave a stale invoice amount here.
+     */
+    const currency=clean(state.currency).toUpperCase()||currentSummary.currency||'USD';
+    const outstanding=Math.max(0,num(state.outstanding));
+    const previousTotals=cloneTotals(currentSummary.previous_outstanding?.totals);
+    const latestTotals=cloneTotals(previousTotals);
+
+    if(outstanding>0.000001){
+      latestTotals[currency]=num(latestTotals[currency])+outstanding;
+    }
+
+    return {
+      ...currentSummary,
+      currency,
+      this_invoice_outstanding:outstanding,
+      latest_outstanding:{
+        totals:latestTotals,
+        openInvoiceCount:
+          Number(currentSummary.previous_outstanding?.openInvoiceCount||0)+
+          (outstanding>0.000001?1:0)
+      }
+    };
   }
 
   function clear(){

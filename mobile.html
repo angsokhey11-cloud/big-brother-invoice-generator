@@ -97,7 +97,7 @@
     await assertInvoicePermission();
 
     const [sourceResponse,adapterResponse]=await Promise.all([
-      fetch('legacy-google-v2.4.5.html?v=20260913-1',{cache:'no-store'}),
+      fetch('legacy-google-v2.4.5.html?v=20260920-iosdecimal1',{cache:'no-store'}),
       fetch('supabase-adapter.js?v=20260920-globalcustomer-1',{cache:'no-store'})
     ]);
 
@@ -111,6 +111,48 @@
 
     html=window.BBInvoiceDualCurrencyPatch.patchLegacy(html);
     adapterJs=window.BBInvoiceDualCurrencyPatch.patchAdapter(adapterJs);
+
+    /* iOS MOBILE ONLY — keep decimal keyboard inside the original tap.
+       Desktop source is not modified. */
+    const bbIOSInvoice=
+      /iPhone|iPad|iPod/i.test(navigator.userAgent||'') ||
+      (navigator.platform==='MacIntel' && Number(navigator.maxTouchPoints||0)>1);
+
+    if(bbIOSInvoice){
+      html=html.replace(
+`  setTimeout(() => {
+    qtyInput.focus();
+    qtyInput.select();
+  }, 35);`,
+`  void modal.offsetHeight;
+  try{
+    qtyInput.focus({preventScroll:true});
+  }catch(_){
+    qtyInput.focus();
+  }
+  try{
+    qtyInput.select();
+  }catch(_){}
+`
+      );
+
+      html=html.replace(
+`  setTimeout(() => {
+    input.focus();
+    input.select();
+  }, 35);`,
+`  void modal.offsetHeight;
+  try{
+    input.focus({preventScroll:true});
+  }catch(_){
+    input.focus();
+  }
+  try{
+    input.select();
+  }catch(_){}
+`
+      );
+    }
 
     html=html.replace('loadNextInvoiceNumber();','/* Supabase boot owns Invoice No. */');
     html=html.replace('loadInvoiceBootstrapFast();','/* Supabase boot owns Master bootstrap. */');
@@ -142,7 +184,7 @@
       +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'+'ipt>\n'
       +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260913-1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="invoice-backup-v1.js?v=20260916-fast-1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="mobile-invoice.js?v=20260914-1"></scr'+'ipt>\n'
+      +'<scr'+'ipt src="mobile-invoice.js?v=20260920-iosdecimal1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>';
 
     const bodyCloseIndex=html.toLowerCase().lastIndexOf('</body>');

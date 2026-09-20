@@ -98,7 +98,7 @@
 
     const [sourceResponse,adapterResponse]=await Promise.all([
       fetch('legacy-google-v2.4.5.html?v=20260913-1',{cache:'no-store'}),
-      fetch('supabase-adapter.js?v=20260913-1',{cache:'no-store'})
+      fetch('supabase-adapter.js?v=20260920-globalcustomer-1',{cache:'no-store'})
     ]);
 
     if(!sourceResponse.ok)throw new Error('Could not load Invoice Generator source.');

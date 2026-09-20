@@ -289,8 +289,74 @@
     }
   }
 
+  function ensureShareStyles(){
+    if(document.querySelector('link[data-bb-telegram-invoice-share]'))return;
+    const link=document.createElement('link');
+    link.rel='stylesheet';
+    link.href='telegram-invoice-share-v1.css?v=20260920-telegraminvoice3';
+    link.dataset.bbTelegramInvoiceShare='1';
+    document.head.appendChild(link);
+  }
+
+  function installDesktopPostSaveHook(){
+    /*
+     * Mobile has its own explicit post-save hook.
+     * Desktop uses this non-invasive wrapper so the core Invoice Generator
+     * loader/startup source is never rewritten.
+     */
+    if(document.querySelector('link[href*="mobile-invoice.css"]'))return;
+    if(window.__bbTelegramInvoiceDesktopHookInstalled)return;
+
+    const originalSave=window.postSalesInvoiceBundle;
+    const originalClear=window.clearAllAfterSuccessfulSave;
+
+    if(
+      typeof originalSave!=='function' ||
+      typeof originalClear!=='function'
+    ){
+      setTimeout(installDesktopPostSaveHook,60);
+      return;
+    }
+
+    window.__bbTelegramInvoiceDesktopHookInstalled=true;
+
+    let lastCompletedInvoice=null;
+
+    window.postSalesInvoiceBundle=async function(invoicePayload,paymentPayload){
+      const result=await originalSave.apply(this,arguments);
+      lastCompletedInvoice={
+        payload:invoicePayload,
+        result
+      };
+      return result;
+    };
+
+    window.clearAllAfterSuccessfulSave=function(){
+      const args=arguments;
+      const context=this;
+      const completed=lastCompletedInvoice;
+      lastCompletedInvoice=null;
+
+      if(!completed){
+        return originalClear.apply(context,args);
+      }
+
+      Promise
+        .resolve(afterComplete(completed.payload,completed.result))
+        .catch(error=>{
+          console.warn('Telegram invoice post-save hook:',error);
+        })
+        .finally(()=>{
+          originalClear.apply(context,args);
+        });
+    };
+  }
+
   window.BBTelegramInvoiceShare={
     afterComplete,
     eligibility:invoiceId=>requestJson({action:'eligibility',invoice_id:invoiceId})
   };
+
+  ensureShareStyles();
+  installDesktopPostSaveHook();
 })();

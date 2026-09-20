@@ -134,7 +134,7 @@
         await Promise.all([
 
           fetch(
-            'legacy-google-v2.4.5.html?v=20260913-1',
+            'legacy-google-v2.4.5.html?v=20260920-telegraminvoice1',
             {
               cache:'no-store'
             }
@@ -274,6 +274,75 @@
         );
 
 
+      /* =======================================================
+         CUSTOMER TELEGRAM INVOICE
+         After the exact Supabase invoice saves, preserve the
+         returned invoiceId and offer the configured customer
+         Telegram delivery before clearing this invoice.
+         ======================================================= */
+
+      const bbInvoiceSaveMarker =
+        '    await postSalesInvoiceBundle(payload, paymentPayload);';
+
+      const bbInvoiceSaveReplacement =
+        '    const bbSavedInvoiceResult =\\n'
+        +
+        '      await postSalesInvoiceBundle(payload, paymentPayload);';
+
+
+      if (
+        !html.includes(
+          bbInvoiceSaveMarker
+        )
+      ) {
+
+        throw new Error(
+          'Invoice Telegram save-result marker was not found.'
+        );
+
+      }
+
+
+      html =
+        html.replace(
+          bbInvoiceSaveMarker,
+          bbInvoiceSaveReplacement
+        );
+
+
+      const bbInvoiceClearMarker =
+        '    clearAllAfterSuccessfulSave();';
+
+      const bbInvoiceTelegramBeforeClear =
+        '    if (window.BBTelegramInvoiceShare?.afterComplete) {\\n'
+        +
+        '      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\\n'
+        +
+        '    }\\n\\n'
+        +
+        '    clearAllAfterSuccessfulSave();';
+
+
+      if (
+        !html.includes(
+          bbInvoiceClearMarker
+        )
+      ) {
+
+        throw new Error(
+          'Invoice Telegram post-save marker was not found.'
+        );
+
+      }
+
+
+      html =
+        html.replace(
+          bbInvoiceClearMarker,
+          bbInvoiceTelegramBeforeClear
+        );
+
+
 
       /* =======================================================
          TITLE
@@ -286,6 +355,45 @@
 
           '<title>BIG BROTHER — Invoice Generator V3.3 Direct Sale Source</title>'
 
+        );
+
+
+      const headCloseIndex =
+        html
+          .toLowerCase()
+          .indexOf(
+            '</head>'
+          );
+
+
+      if (
+        headCloseIndex
+        <
+        0
+      ) {
+
+        throw new Error(
+          'Invoice Generator source is missing its closing head tag.'
+        );
+
+      }
+
+
+      html =
+
+        html.slice(
+          0,
+          headCloseIndex
+        )
+
+        +
+
+        '<link rel="stylesheet" href="telegram-invoice-share-v1.css?v=20260920-telegraminvoice2">\\n'
+
+        +
+
+        html.slice(
+          headCloseIndex
         );
 
 
@@ -347,6 +455,14 @@
         '<scr'
         +
         'ipt src="invoice-backup-v1.js?v=20260916-fast-1"></scr'
+        +
+        'ipt>\\n'
+
+        +
+
+        '<scr'
+        +
+        'ipt src="telegram-invoice-share-v1.js?v=20260920-telegraminvoice2"></scr'
         +
         'ipt>';
 

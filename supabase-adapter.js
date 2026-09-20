@@ -8,7 +8,12 @@
 
   let bbSession = null;
   let bbSelectedCustomerId = '';
+  let bbSelectedCustomerLocationCode = '';
   let bbBootstrapPromise = null;
+  let bbLocationCustomers = [];
+  let bbGlobalCustomers = [];
+  let bbCustomerSearchTimer = 0;
+  let bbCustomerSearchToken = 0;
 
   function bbReadSession() {
     try {
@@ -115,6 +120,53 @@
       status.textContent = error?.message || 'Could not connect to BIG BROTHER Database.';
       status.style.color = '#b42318';
     }
+  }
+
+  function bbNormalizeCustomer(row, fallbackLocationCode = '') {
+    const locationCode = String(row?.locationCode || fallbackLocationCode || '').trim();
+    const location = locations.find(item => item.locationCode === locationCode);
+
+    return {
+      customerId: String(row?.customerId || '').trim(),
+      name: String(row?.name || '').trim(),
+      phone: String(row?.phone || '').trim(),
+      address: String(row?.address || '').trim(),
+      locationCode,
+      locationName: String(row?.locationName || location?.locationName || locationCode || '').trim(),
+      googleMapsLink: String(row?.googleMapsLink || '').trim(),
+      latitude: row?.latitude ?? null,
+      longitude: row?.longitude ?? null,
+      deliveryLocationNote: String(row?.deliveryLocationNote || '').trim()
+    };
+  }
+
+  function bbMergeCustomerIntoPool(customer) {
+    if (!customer?.customerId) return;
+    const index = customers.findIndex(item => item.customerId === customer.customerId);
+    if (index >= 0) customers[index] = customer;
+    else customers.push(customer);
+  }
+
+  function bbCurrentBatchLocationCode() {
+    return String(
+      currentLocationCode ||
+      document.getElementById('mainLocation')?.value ||
+      ''
+    ).trim();
+  }
+
+  function bbCustomerLocationMismatch(customer) {
+    const batchLocation = bbCurrentBatchLocationCode();
+    const customerLocation = String(customer?.locationCode || '').trim();
+
+    if (!batchLocation || !customerLocation || batchLocation === customerLocation) return '';
+
+    const customerLabel =
+      String(customer?.locationName || customerLocation).trim() ||
+      customerLocation;
+
+    return ' • Customer location: ' + customerLabel + ' (' + customerLocation + ')' +
+      ' • Batch location: ' + batchLocation;
   }
 
   function bbFindSelectedCustomer() {
@@ -243,8 +295,123 @@
   window.loadProducts = function () { return loadInvoiceBootstrapFast(); };
 
   /* -----------------------------
-     Customers by Location
+     Customers by Location + Global Search Fallback
   ----------------------------- */
+  function bbCustomerMatchesQuery(customer, query) {
+    const q = String(query || '').trim().toLowerCase();
+    if (!q) return true;
+
+    return [
+      customer?.name,
+      customer?.customerId,
+      customer?.phone,
+      customer?.address
+    ].some(value => String(value || '').toLowerCase().includes(q));
+  }
+
+  function bbRenderCustomerMatches(query) {
+    const list = document.getElementById('customerOptions');
+    if (!list) return;
+
+    const q = String(query || '').trim().toLowerCase();
+
+    const localMatches = bbLocationCustomers
+      .filter(customer => bbCustomerMatchesQuery(customer, q));
+
+    const localIds = new Set(localMatches.map(customer => customer.customerId));
+
+    const globalMatches = bbGlobalCustomers
+      .filter(customer =>
+        !localIds.has(customer.customerId) &&
+        bbCustomerMatchesQuery(customer, q)
+      );
+
+    const matches = (q ? [...localMatches, ...globalMatches] : localMatches).slice(0, 12);
+
+    list.innerHTML = '';
+
+    matches.forEach(customer => {
+      const option = document.createElement('div');
+      option.className = 'customer-option';
+
+      const name = document.createElement('div');
+      name.className = 'customer-option-name';
+      name.textContent = customer.name;
+
+      const details = document.createElement('div');
+      details.className = 'customer-option-details';
+
+      const locationText = customer.locationCode
+        ? ((customer.locationName || customer.locationCode) + ' [' + customer.locationCode + ']')
+        : '';
+
+      details.textContent = [
+        customer.customerId,
+        customer.phone,
+        locationText,
+        customer.address
+      ].filter(Boolean).join(' • ') || 'No customer details';
+
+      option.appendChild(name);
+      option.appendChild(details);
+
+      option.addEventListener('mousedown', event => {
+        event.preventDefault();
+        window.selectCustomer(customer);
+      });
+
+      list.appendChild(option);
+    });
+
+    list.style.display = matches.length ? 'block' : 'none';
+  }
+
+  async function bbSearchCustomersGlobally(query, token) {
+    try {
+      const data = await bbRpc('bb_sales_search_customers', {
+        p_query: query,
+        p_limit: 12
+      });
+
+      if (token !== bbCustomerSearchToken) return;
+
+      const inputValue = String(document.getElementById('customerName')?.value || '').trim();
+      if (inputValue.toLowerCase() !== String(query || '').trim().toLowerCase()) return;
+
+      bbGlobalCustomers = (Array.isArray(data?.customers) ? data.customers : [])
+        .map(row => bbNormalizeCustomer(row))
+        .filter(row => row.customerId && row.name);
+
+      bbGlobalCustomers.forEach(bbMergeCustomerIntoPool);
+      bbRenderCustomerMatches(query);
+    } catch (error) {
+      if (token !== bbCustomerSearchToken) return;
+      console.warn('BIG BROTHER customer global search:', error);
+    }
+  }
+
+  window.showCustomerOptions = function showCustomerOptionsSupabase() {
+    const input = document.getElementById('customerName');
+    const list = document.getElementById('customerOptions');
+    if (!input || !list) return;
+
+    const query = String(input.value || '').trim();
+    bbRenderCustomerMatches(query);
+
+    clearTimeout(bbCustomerSearchTimer);
+
+    if (query.length < 2) {
+      bbCustomerSearchToken++;
+      bbGlobalCustomers = [];
+      return;
+    }
+
+    const token = ++bbCustomerSearchToken;
+    bbCustomerSearchTimer = setTimeout(() => {
+      bbSearchCustomersGlobally(query, token);
+    }, 300);
+  };
+
   window.loadCustomersByLocation = async function loadCustomersByLocationSupabase(locationCode) {
     const status = document.getElementById('customerStatus');
     const list = document.getElementById('customerOptions');
@@ -252,7 +419,12 @@
     const token = ++locationRequestToken;
 
     if (!code) return;
+
     bbSelectedCustomerId = '';
+    bbSelectedCustomerLocationCode = '';
+    bbGlobalCustomers = [];
+    bbCustomerSearchToken++;
+    clearTimeout(bbCustomerSearchTimer);
 
     if (status) {
       status.textContent = 'Loading customers...';
@@ -270,27 +442,22 @@
 
       if (token !== locationRequestToken) return;
 
-      customers = (Array.isArray(data?.customers) ? data.customers : [])
-        .map(row => ({
-          customerId: String(row.customerId || '').trim(),
-          name: String(row.name || '').trim(),
-          phone: String(row.phone || '').trim(),
-          address: String(row.address || '').trim(),
-          locationCode: String(row.locationCode || code).trim(),
-          googleMapsLink: String(row.googleMapsLink || '').trim(),
-          deliveryLocationNote: String(row.deliveryLocationNote || '').trim()
-        }))
+      bbLocationCustomers = (Array.isArray(data?.customers) ? data.customers : [])
+        .map(row => bbNormalizeCustomer(row, code))
         .filter(row => row.customerId && row.name);
 
+      customers = bbLocationCustomers.slice();
+
       locationCustomersLoaded = true;
-      cacheSet(CUSTOMER_CACHE_PREFIX + encodeURIComponent(code), customers);
+      cacheSet(CUSTOMER_CACHE_PREFIX + encodeURIComponent(code), bbLocationCustomers);
       renderCustomerOptionsBase();
 
       if (status) {
-        status.textContent = customers.length
-          ? customers.length + ' customers loaded for ' + code
-          : 'No customers found for this location.';
-        status.style.color = customers.length ? '#2f855a' : '#b7791f';
+        status.textContent = bbLocationCustomers.length
+          ? bbLocationCustomers.length + ' customers loaded for ' + code +
+            ' • Type 2+ characters to search all customer locations.'
+          : 'No customers found for this location • Type 2+ characters to search all customer locations.';
+        status.style.color = bbLocationCustomers.length ? '#2f855a' : '#b7791f';
       }
     } catch (error) {
       if (token !== locationRequestToken) return;
@@ -302,8 +469,10 @@
   window.fillCustomerInformation = function fillCustomerInformationSupabase() {
     const input = document.getElementById('customerName');
     const typed = String(input?.value || '').trim();
+
     if (!typed) {
       bbSelectedCustomerId = '';
+      bbSelectedCustomerLocationCode = '';
       return;
     }
 
@@ -314,15 +483,20 @@
     const customer = matches.length === 1
       ? matches[0]
       : (bbSelectedCustomerId
-          ? customers.find(item => item.customerId === bbSelectedCustomerId && item.name.toLowerCase() === typed.toLowerCase())
+          ? customers.find(item =>
+              item.customerId === bbSelectedCustomerId &&
+              item.name.toLowerCase() === typed.toLowerCase()
+            )
           : null);
 
     if (!customer) {
       bbSelectedCustomerId = '';
+      bbSelectedCustomerLocationCode = '';
       return;
     }
 
     bbSelectedCustomerId = customer.customerId;
+    bbSelectedCustomerLocationCode = customer.locationCode || '';
     document.getElementById('customerPhone').value = customer.phone || '';
     document.getElementById('customerAddress').value = customer.address || '';
     loadCustomerPrices(customer.name);
@@ -331,13 +505,26 @@
   window.selectCustomer = function selectCustomerSupabase(customer) {
     if (!customer) return;
 
-    bbSelectedCustomerId = String(customer.customerId || '').trim();
-    document.getElementById('customerName').value = customer.name || '';
-    document.getElementById('customerPhone').value = customer.phone || '';
-    document.getElementById('customerAddress').value = customer.address || '';
+    const normalized = bbNormalizeCustomer(customer);
+    bbMergeCustomerIntoPool(normalized);
+
+    bbSelectedCustomerId = normalized.customerId;
+    bbSelectedCustomerLocationCode = normalized.locationCode || '';
+
+    document.getElementById('customerName').value = normalized.name || '';
+    document.getElementById('customerPhone').value = normalized.phone || '';
+    document.getElementById('customerAddress').value = normalized.address || '';
     document.getElementById('customerOptions').style.display = 'none';
 
-    loadCustomerPrices(customer.name);
+    const status = document.getElementById('customerStatus');
+    const mismatch = bbCustomerLocationMismatch(normalized);
+
+    if (status && mismatch) {
+      status.textContent = 'Existing customer selected' + mismatch;
+      status.style.color = '#b7791f';
+    }
+
+    loadCustomerPrices(normalized.name);
 
     setTimeout(() => {
       document.getElementById('productSearch')?.focus();
@@ -397,10 +584,13 @@
 
       if (status) {
         const count = Object.keys(customerPrices).length;
-        status.textContent = count
-          ? 'Customer selected • ' + count + ' special price' + (count === 1 ? '' : 's') + ' loaded'
-          : 'Customer selected • using standard product prices';
-        status.style.color = '#2f855a';
+        const mismatch = bbCustomerLocationMismatch(customer);
+        status.textContent = (
+          count
+            ? 'Customer selected • ' + count + ' special price' + (count === 1 ? '' : 's') + ' loaded'
+            : 'Customer selected • using standard product prices'
+        ) + mismatch;
+        status.style.color = mismatch ? '#b7791f' : '#2f855a';
       }
 
       applyCustomerPricesToProducts();
@@ -470,6 +660,8 @@
   const bbOriginalClearAfterSave = window.clearAllAfterSuccessfulSave;
   window.clearAllAfterSuccessfulSave = function clearAllAfterSuccessfulSaveSupabase() {
     bbSelectedCustomerId = '';
+    bbSelectedCustomerLocationCode = '';
+    bbGlobalCustomers = [];
     bbOriginalClearAfterSave();
     setTimeout(() => {
       loadNextInvoiceNumber().catch(() => {});
@@ -480,6 +672,8 @@
   window.clearAll = function clearAllSupabase() {
     bbOriginalClearAll();
     bbSelectedCustomerId = '';
+    bbSelectedCustomerLocationCode = '';
+    bbGlobalCustomers = [];
     setTimeout(() => {
       loadNextInvoiceNumber().catch(() => {});
     }, 0);

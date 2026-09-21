@@ -395,7 +395,9 @@
     get current(){return currentSummary}
   };
 
-  window.BBInvoiceARSummaryForState=summaryForState;
-
-  installWrappers();
+  /*
+   * A/R summary is no longer rendered inside the customer invoice picture.
+   * Telegram owns the customer outstanding summary as message text instead.
+   */
+  window.BBInvoiceARSummaryForState=function(){return null;};
 })();

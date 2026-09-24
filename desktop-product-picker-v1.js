@@ -9,7 +9,7 @@
 (function(){
   'use strict';
 
-  const BUILD='20260924-desktopproductflow3';
+  const BUILD='20260924-hide-source-no-zero1';
   const PAGE_SIZE=7;
   const EPS=0.000001;
 

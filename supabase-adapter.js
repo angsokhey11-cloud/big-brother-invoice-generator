@@ -732,10 +732,18 @@
      Atomic writes
   ----------------------------- */
   window.postSalesInvoiceBundle = async function postSalesInvoiceBundleSupabase(invoicePayload, paymentPayload) {
-    return bbRpc('bb_sales_save_invoice_bundle', {
-      p_invoice: invoicePayload,
-      p_payment: paymentPayload || null
-    });
+    const splitPayment =
+      String(invoicePayload?.paymentMethod || '').trim() === 'Cash + Bank';
+
+    return bbRpc(
+      splitPayment
+        ? 'bb_sales_save_invoice_split_payment'
+        : 'bb_sales_save_invoice_bundle',
+      {
+        p_invoice: invoicePayload,
+        p_payment: paymentPayload || null
+      }
+    );
   };
 
   window.postSalesInvoice = async function postSalesInvoiceSupabase(payload) {

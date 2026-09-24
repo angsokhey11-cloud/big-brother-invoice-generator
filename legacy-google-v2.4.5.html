@@ -8578,10 +8578,10 @@ async function completeInvoice(event) {
   const confirmed = confirm(
     "Complete this invoice?\n\n" +
     "Invoice No.: " + payload.invoiceNo +
-    (payload.batchNumber
-      ? "\nBatch: " + payload.batchNumber
-      : "") +
-    "\nThis will save the invoice to the Sales Data Google Sheet."
+    "\nCustomer: " + payload.customer +
+    "\nPayment: " + payload.paymentMethod +
+    "\nTotal Amount: " + formatMoney(payload.grandTotal, payload.currency) +
+    "\n\nMake sure you're double check on this."
   );
 
   if (!confirmed) return;

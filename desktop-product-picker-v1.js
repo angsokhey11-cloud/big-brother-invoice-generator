@@ -9,7 +9,7 @@
 (function(){
   'use strict';
 
-  const BUILD='20260924-desktopproductbuttons1';
+  const BUILD='20260924-desktopproductinline1';
   const PAGE_SIZE=7;
   const EPS=0.000001;
 
@@ -215,6 +215,83 @@
     }
   }
 
+  function addProductInline(product){
+    if(!product)return;
+
+    try{
+      if(
+        typeof getPriceForProduct!=='function' ||
+        typeof createProduct!=='function'
+      ){
+        throw new Error('Invoice product line flow is not ready.');
+      }
+
+      const effectiveUsdPrice=
+        Number(getPriceForProduct(product))||0;
+
+      const lineId=
+        'LINE-'+Date.now()+'-'+
+        Math.random().toString(36).slice(2,8);
+
+      if(Array.isArray(window.selectedProducts)){
+        window.selectedProducts.push({
+          id:lineId,
+          productName:product.name,
+          productCode:product.code,
+          usdPrice:effectiveUsdPrice,
+          manualPrice:false,
+          entryType:clean(product.entryType||'EXACT').toUpperCase(),
+          productGroupCode:product.groupCode||'',
+          productGroupName:product.groupName||''
+        });
+      }else if(typeof selectedProducts!=='undefined'&&Array.isArray(selectedProducts)){
+        selectedProducts.push({
+          id:lineId,
+          productName:product.name,
+          productCode:product.code,
+          usdPrice:effectiveUsdPrice,
+          manualPrice:false,
+          entryType:clean(product.entryType||'EXACT').toUpperCase(),
+          productGroupCode:product.groupCode||'',
+          productGroupName:product.groupName||''
+        });
+      }
+
+      createProduct(
+        product.name,
+        effectiveUsdPrice,
+        lineId,
+        '',
+        product
+      );
+
+      if(typeof calculate==='function'){
+        calculate();
+      }
+
+      setTimeout(()=>{
+        const row=
+          Array.from(
+            document.querySelectorAll('#productList .product')
+          ).find(node=>clean(node.dataset.lineId)===lineId);
+
+        const qtyInput=
+          row?.querySelector('.product-qty-input');
+
+        if(qtyInput){
+          qtyInput.focus();
+          qtyInput.select();
+        }
+      },0);
+    }catch(error){
+      console.error('Invoice inline Product add:',error);
+      alert(
+        'Could not add this product.\n\n'+
+        (error?.message||String(error))
+      );
+    }
+  }
+
   function render(){
     const wrap=q('#bbInvoiceDesktopPicker');
     const panel=q('#bbInvoiceDesktopProductPanel');
@@ -275,13 +352,7 @@
       button.addEventListener('click',()=>{
         open=false;
         render();
-        try{
-          if(typeof selectInvoiceProduct==='function'){
-            selectInvoiceProduct(product);
-          }
-        }catch(error){
-          console.error('Invoice Product button:',error);
-        }
+        addProductInline(product);
       });
 
       buttons.appendChild(button);

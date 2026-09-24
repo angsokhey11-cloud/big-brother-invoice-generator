@@ -203,10 +203,97 @@
   }
 
   /* -----------------------------
+     Invoice number sequence
+     - Automatic mode: Supabase supplies only the first number for the page.
+       After that, the current number increments locally (+1).
+     - Manual mode: once the user edits Invoice No., that sequence is saved
+       for this signed-in account and continues +1 across future invoices.
+     - Duplicate display Invoice Nos. are allowed; invoice_id stays unique.
+  ----------------------------- */
+  const BB_INVOICE_SEQUENCE_PREFIX = 'BB_INVOICE_SEQUENCE_V1_';
+
+  function bbInvoiceSequenceKey() {
+    const session = bbReadSession();
+    const account = String(
+      session?.user?.id ||
+      session?.user?.email ||
+      'shared'
+    ).trim();
+    return BB_INVOICE_SEQUENCE_PREFIX + account;
+  }
+
+  function bbReadInvoiceSequence() {
+    try {
+      const value = JSON.parse(
+        localStorage.getItem(bbInvoiceSequenceKey()) || 'null'
+      );
+      if (
+        value &&
+        value.mode === 'manual' &&
+        String(value.invoiceNo || '').trim()
+      ) {
+        return {
+          mode: 'manual',
+          invoiceNo: String(value.invoiceNo || '').trim()
+        };
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function bbWriteManualInvoiceSequence(invoiceNo) {
+    const value = String(invoiceNo || '').trim();
+    if (
+      !value ||
+      value === 'Loading...' ||
+      value === 'Unavailable'
+    ) return;
+
+    try {
+      localStorage.setItem(
+        bbInvoiceSequenceKey(),
+        JSON.stringify({
+          mode: 'manual',
+          invoiceNo: value
+        })
+      );
+    } catch (_) {}
+  }
+
+  function bbManualInvoiceSequenceNo() {
+    return bbReadInvoiceSequence()?.invoiceNo || '';
+  }
+
+  function bbTrackManualInvoiceNumber() {
+    const input = document.getElementById('invoiceNumber');
+    if (!input || input.dataset.bbInvoiceSequenceBound === '1') return;
+
+    input.dataset.bbInvoiceSequenceBound = '1';
+
+    input.addEventListener('input', function () {
+      const value = String(input.value || '').trim();
+      if (
+        value &&
+        value !== 'Loading...' &&
+        value !== 'Unavailable'
+      ) {
+        bbWriteManualInvoiceSequence(value);
+      }
+    });
+  }
+
+  /* -----------------------------
      Invoice number
   ----------------------------- */
   window.loadNextInvoiceNumber = async function loadNextInvoiceNumberSupabase() {
     const input = document.getElementById('invoiceNumber');
+    const manualInvoiceNo = bbManualInvoiceSequenceNo();
+
+    if (manualInvoiceNo) {
+      setInvoiceNumber(manualInvoiceNo);
+      return manualInvoiceNo;
+    }
+
     if (input) input.value = 'Loading...';
 
     try {
@@ -264,7 +351,12 @@
           location.salespersonStaffId = rawLocationMap.get(location.locationCode) || '';
         });
 
-        if (data.invoiceNo) setInvoiceNumber(data.invoiceNo);
+        const manualInvoiceNo = bbManualInvoiceSequenceNo();
+        if (manualInvoiceNo) {
+          setInvoiceNumber(manualInvoiceNo);
+        } else if (data.invoiceNo) {
+          setInvoiceNumber(data.invoiceNo);
+        }
 
         const status = document.getElementById('customerStatus');
         if (status && !currentLocationCode) {
@@ -659,24 +751,43 @@
   ----------------------------- */
   const bbOriginalClearAfterSave = window.clearAllAfterSuccessfulSave;
   window.clearAllAfterSuccessfulSave = function clearAllAfterSuccessfulSaveSupabase() {
+    const manualSequence = bbReadInvoiceSequence();
+
     bbSelectedCustomerId = '';
     bbSelectedCustomerLocationCode = '';
     bbGlobalCustomers = [];
+
+    /*
+     * The legacy clear already increments the number currently on screen.
+     * Do NOT query the database again here.
+     *
+     * Example:
+     *   user enters 1000 -> completes -> next stays 1001
+     *   automatic INV-3462 -> completes -> next stays INV-3463
+     */
     bbOriginalClearAfterSave();
-    setTimeout(() => {
-      loadNextInvoiceNumber().catch(() => {});
-    }, 0);
+
+    if (manualSequence?.mode === 'manual') {
+      bbWriteManualInvoiceSequence(
+        document.getElementById('invoiceNumber')?.value || ''
+      );
+    }
   };
 
   const bbOriginalClearAll = window.clearAll;
   window.clearAll = function clearAllSupabase() {
+    const manualSequence = bbReadInvoiceSequence();
+
     bbOriginalClearAll();
     bbSelectedCustomerId = '';
     bbSelectedCustomerLocationCode = '';
     bbGlobalCustomers = [];
-    setTimeout(() => {
-      loadNextInvoiceNumber().catch(() => {});
-    }, 0);
+
+    if (manualSequence?.mode === 'manual') {
+      bbWriteManualInvoiceSequence(
+        document.getElementById('invoiceNumber')?.value || ''
+      );
+    }
   };
 
   /* Fix GROUP keyboard selection: use the full exact+group search pool. */
@@ -727,5 +838,6 @@
     }
   }
 
+  bbTrackManualInvoiceNumber();
   bbStartSupabaseInvoice();
 })();

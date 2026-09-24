@@ -137,6 +137,7 @@
     const memberCodes=new Set();
 
     (Array.isArray(batch?.groupItems)?batch.groupItems:[])
+      .filter(group=>remainingOf(group)>EPS)
       .forEach(group=>{
         (Array.isArray(group?.members)?group.members:[])
           .forEach(member=>{
@@ -564,17 +565,6 @@
         font-weight:700;
       }
 
-      @media(max-width:1199px){
-        #bbInvoiceDesktopPicker{
-          display:none !important;
-        }
-        .bb-product-search-wrap#productSelector{
-          display:block !important;
-        }
-        .desktop-product-toolbar.bb-fast-product-toolbar{
-          display:block !important;
-        }
-      }
     `;
     document.head.appendChild(style);
   }

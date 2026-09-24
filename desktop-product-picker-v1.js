@@ -9,7 +9,7 @@
 (function(){
   'use strict';
 
-  const BUILD='20260924-desktopproductflow2';
+  const BUILD='20260924-desktopproductflow3';
   const PAGE_SIZE=7;
   const EPS=0.000001;
 
@@ -41,6 +41,7 @@
   let useGroups=false;
   let open=false;
   let refreshing=false;
+  let searchQuery='';
 
   function codeOf(product){
     return clean(product?.code||product?.productCode).toUpperCase();
@@ -157,25 +158,95 @@
     return [...groups,...unmatchedExact].sort(groupCompare);
   }
 
+  function directSaleBalanceMap(){
+    const map=new Map();
+
+    try{
+      const rows=
+        window.BBDirectSaleSourceV1?.balances?.()||[];
+
+      (Array.isArray(rows)?rows:[])
+        .forEach(row=>{
+          const code=clean(row?.productCode).toUpperCase();
+          if(code)map.set(code,row);
+        });
+    }catch(_){}
+
+    return map;
+  }
+
+  function directSaleStock(product){
+    const row=directSaleBalanceMap().get(codeOf(product));
+    return num(row?.totalAvailable);
+  }
+
+  function searchMatches(product){
+    const wanted=clean(searchQuery).toLowerCase();
+    if(!wanted)return true;
+
+    return [
+      nameOf(product),
+      codeOf(product),
+      product?.barcode,
+      product?.productBarcode,
+      product?.category,
+      product?.unit
+    ].some(value=>
+      clean(value).toLowerCase().includes(wanted)
+    );
+  }
+
+  function searchRank(product){
+    const wanted=clean(searchQuery).toLowerCase();
+    if(!wanted)return 2;
+
+    const name=nameOf(product).toLowerCase();
+    const code=codeOf(product).toLowerCase();
+
+    if(name.startsWith(wanted)||code.startsWith(wanted))return 0;
+    if(name.includes(wanted)||code.includes(wanted))return 1;
+    return 2;
+  }
+
+  function applySearch(rows,compare){
+    if(!clean(searchQuery))return rows;
+
+    return rows
+      .filter(searchMatches)
+      .sort((a,b)=>{
+        const ar=searchRank(a);
+        const br=searchRank(b);
+        if(ar!==br)return ar-br;
+        return compare(a,b);
+      });
+  }
+
   function visibleRows(){
     const batch=selectedBatch();
     const pool=rawPool();
 
     if(!batch){
-      return pool
+      const rows=pool
         .filter(row=>!isGroup(row))
         .slice()
         .sort(productCompare);
+
+      return applySearch(rows,productCompare);
     }
 
     if(useGroups){
-      return groupedBatchRows(batch,pool);
+      return applySearch(
+        groupedBatchRows(batch,pool),
+        groupCompare
+      );
     }
 
-    return pool
+    const rows=pool
       .filter(row=>!isGroup(row)&&remainingOf(row)>EPS)
       .slice()
       .sort(productCompare);
+
+    return applySearch(rows,productCompare);
   }
 
   function totalPages(rows){
@@ -301,8 +372,13 @@
     const prev=q('#bbInvoiceDesktopProductPrev');
     const next=q('#bbInvoiceDesktopProductNext');
     const add=q('#bbInvoiceDesktopProductAdd');
+    const search=q('#bbInvoiceDesktopProductSearch');
 
     if(!wrap||!panel||!buttons||!meta||!pageText||!prev||!next||!add)return;
+
+    if(search&&search.value!==searchQuery){
+      search.value=searchQuery;
+    }
 
     const rows=visibleRows();
     const current=normalizedPage(rows);
@@ -349,21 +425,28 @@
       nameSpan.textContent=nameOf(product);
       button.appendChild(nameSpan);
 
+      const qtySpan=document.createElement('span');
+      qtySpan.className='bb-invoice-product-button-stock';
+
       if(batch){
-        const qtySpan=document.createElement('span');
-        qtySpan.className='bb-invoice-product-button-stock';
+        const stock=Math.max(0,remaining);
         qtySpan.textContent=
-          'Stock: '+
-          Math.max(0,remaining)
-            .toLocaleString(undefined,{maximumFractionDigits:3});
-        button.appendChild(qtySpan);
+          'Batch: '+
+          stock.toLocaleString(undefined,{maximumFractionDigits:3});
         button.title=
           'Live Batch Stock: '+
-          Math.max(0,remaining)
-            .toLocaleString(undefined,{maximumFractionDigits:3});
+          stock.toLocaleString(undefined,{maximumFractionDigits:3});
       }else{
-        button.title=codeOf(product);
+        const stock=Math.max(0,directSaleStock(product));
+        qtySpan.textContent=
+          'WH: '+
+          stock.toLocaleString(undefined,{maximumFractionDigits:3});
+        button.title=
+          'Live Warehouse Stock: '+
+          stock.toLocaleString(undefined,{maximumFractionDigits:3});
       }
+
+      button.appendChild(qtySpan);
 
       button.addEventListener('click',()=>{
         open=false;
@@ -373,6 +456,28 @@
 
       buttons.appendChild(button);
     });
+  }
+
+  async function refreshDirectSaleBeforeOpen(){
+    if(selectedBatch()||refreshing)return;
+
+    refreshing=true;
+    render();
+
+    try{
+      const refresh=
+        window.BBDirectSaleSourceV1?.refresh;
+
+      if(typeof refresh==='function'){
+        await refresh();
+      }
+    }catch(error){
+      console.warn('Invoice Direct Sale stock refresh:',error);
+    }finally{
+      refreshing=false;
+      page=0;
+      render();
+    }
   }
 
   async function refreshBatchBeforeOpen(){
@@ -444,11 +549,22 @@
 
     open=true;
     page=0;
+    searchQuery='';
     render();
 
     if(selectedBatch()){
       await refreshBatchBeforeOpen();
+    }else{
+      await refreshDirectSaleBeforeOpen();
     }
+
+    setTimeout(()=>{
+      const search=q('#bbInvoiceDesktopProductSearch');
+      if(search&&open){
+        search.focus();
+        search.select();
+      }
+    },0);
   }
 
   function installStyles(){
@@ -569,6 +685,43 @@
 
       #bbInvoiceDesktopProductPanel[hidden]{
         display:none !important;
+      }
+
+      .bb-invoice-product-search-wrap{
+        margin-bottom:8px;
+      }
+
+      #bbInvoiceDesktopProductSearch{
+        width:100%;
+        min-height:36px;
+        padding:7px 10px 7px 34px;
+        border:1px solid #c9d6e5;
+        border-radius:8px;
+        background:#fff;
+        color:#173f77;
+        font-size:12px;
+        font-weight:700;
+        outline:none;
+      }
+
+      #bbInvoiceDesktopProductSearch:focus{
+        border-color:#6c9bd0;
+        box-shadow:0 0 0 2px rgba(108,155,208,.14);
+      }
+
+      .bb-invoice-product-search-box{
+        position:relative;
+      }
+
+      .bb-invoice-product-search-box::before{
+        content:'⌕';
+        position:absolute;
+        left:11px;
+        top:50%;
+        transform:translateY(-50%);
+        color:#7890aa;
+        font-size:14px;
+        pointer-events:none;
       }
 
       .bb-invoice-product-panel-head{
@@ -699,6 +852,11 @@
         '<button type="button" id="bbInvoiceDesktopProductAdd">+ Add Product</button>'+
       '</div>'+
       '<div id="bbInvoiceDesktopProductPanel" hidden>'+
+        '<div class="bb-invoice-product-search-wrap">'+
+          '<div class="bb-invoice-product-search-box">'+
+            '<input type="search" id="bbInvoiceDesktopProductSearch" autocomplete="off" placeholder="Search product name or code...">'+
+          '</div>'+
+        '</div>'+
         '<div class="bb-invoice-product-panel-head">'+
           '<button type="button" class="bb-invoice-product-page-button" id="bbInvoiceDesktopProductPrev" aria-label="Previous products">‹</button>'+
           '<span class="bb-invoice-product-page" id="bbInvoiceDesktopProductPage">0 / 0</span>'+
@@ -720,6 +878,25 @@
       page+=1;
       render();
     });
+
+    const search=q('#bbInvoiceDesktopProductSearch');
+    if(search){
+      search.addEventListener('input',()=>{
+        searchQuery=search.value||'';
+        page=0;
+        render();
+      });
+
+      search.addEventListener('keydown',event=>{
+        if(event.key==='Enter'){
+          const first=q('#bbInvoiceDesktopProductButtons .bb-invoice-product-name-button');
+          if(first){
+            event.preventDefault();
+            first.click();
+          }
+        }
+      });
+    }
 
     const toggle=q('#bbInvoiceDesktopUseGroups');
     if(toggle){
@@ -787,6 +964,7 @@
     const wrapped=function(){
       const result=original.apply(this,arguments);
       page=0;
+      searchQuery='';
       open=false;
       setTimeout(render,0);
       return result;
@@ -857,7 +1035,8 @@
     window.BBInvoiceDesktopProductPickerV1={
       build:BUILD,
       render,
-      refreshBatch:refreshBatchBeforeOpen
+      refreshBatch:refreshBatchBeforeOpen,
+      refreshWarehouse:refreshDirectSaleBeforeOpen
     };
   }
 

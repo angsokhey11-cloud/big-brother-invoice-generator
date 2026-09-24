@@ -9,7 +9,7 @@
 (function(){
   'use strict';
 
-  const BUILD='20260924-desktopproductinline1';
+  const BUILD='20260924-desktopproductflow2';
   const PAGE_SIZE=7;
   const EPS=0.000001;
 
@@ -340,11 +340,27 @@
       const button=document.createElement('button');
       button.type='button';
       button.className='bb-invoice-product-name-button';
-      button.textContent=nameOf(product);
 
       const remaining=remainingOf(product);
-      if(selectedBatch()&&remaining>EPS){
-        button.title='Remaining: '+remaining.toLocaleString(undefined,{maximumFractionDigits:3});
+      const batch=selectedBatch();
+
+      const nameSpan=document.createElement('span');
+      nameSpan.className='bb-invoice-product-button-name';
+      nameSpan.textContent=nameOf(product);
+      button.appendChild(nameSpan);
+
+      if(batch){
+        const qtySpan=document.createElement('span');
+        qtySpan.className='bb-invoice-product-button-stock';
+        qtySpan.textContent=
+          'Stock: '+
+          Math.max(0,remaining)
+            .toLocaleString(undefined,{maximumFractionDigits:3});
+        button.appendChild(qtySpan);
+        button.title=
+          'Live Batch Stock: '+
+          Math.max(0,remaining)
+            .toLocaleString(undefined,{maximumFractionDigits:3});
       }else{
         button.title=codeOf(product);
       }
@@ -616,6 +632,29 @@
         -webkit-line-clamp:3;
       }
 
+      .bb-invoice-product-name-button{
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:4px;
+      }
+
+      .bb-invoice-product-button-name{
+        display:block;
+        width:100%;
+        overflow:hidden;
+        text-overflow:ellipsis;
+      }
+
+      .bb-invoice-product-button-stock{
+        display:block;
+        width:100%;
+        color:#2f6b46;
+        font-size:10px;
+        font-weight:900;
+        line-height:1.1;
+      }
+
       .bb-invoice-product-name-button:hover,
       .bb-invoice-product-name-button:focus-visible{
         border-color:#6c9bd0;
@@ -703,12 +742,40 @@
       render();
     });
 
+    /*
+     * Desktop keyboard flow:
+     * Product -> QTY -> Enter -> Price -> Enter -> reopen Add Product list.
+     * Capture phase prevents the hidden legacy Search box from taking focus.
+     */
     document.addEventListener('keydown',event=>{
+      if(
+        event.key==='Enter' &&
+        event.target?.classList?.contains('product-price-input')
+      ){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        try{
+          if(typeof calculate==='function'){
+            calculate();
+          }
+        }catch(_){}
+
+        open=false;
+        page=0;
+
+        setTimeout(()=>{
+          void toggleOpen();
+        },0);
+
+        return;
+      }
+
       if(event.key!=='Escape'||!open)return;
       open=false;
       render();
       q('#bbInvoiceDesktopProductAdd')?.focus();
-    });
+    },true);
 
     return true;
   }

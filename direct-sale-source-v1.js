@@ -1617,10 +1617,6 @@
     }
 
 
-    panel.style.display =
-      '';
-
-
     const code =
       rowProductCode(
         row
@@ -1631,6 +1627,55 @@
       getBalance(
         code
       );
+
+
+    /*
+     * SIMPLE DIRECT SALE SOURCE RULE
+     * If there is no current Zero-Cost stock, there is nothing for the
+     * user to choose. Keep the source allocation logic alive in the
+     * background, force Purchased, and hide this whole source panel.
+     *
+     * Shared by Desktop + Mobile because both load this same file.
+     */
+    if (
+      balanceLoaded
+      &&
+      balance.zeroCostAvailable
+      <=
+      EPS
+    ) {
+
+      const source =
+        panel.querySelector(
+          '.bb-ds-source'
+        );
+
+      if (source) {
+        source.value =
+          'PURCHASED';
+      }
+
+      panel.dataset.source =
+        'PURCHASED';
+
+      panel.dataset.userSelected =
+        '0';
+
+      syncSourceControls(
+        row,
+        false
+      );
+
+      panel.style.display =
+        'none';
+
+      return;
+
+    }
+
+
+    panel.style.display =
+      '';
 
 
     panel
@@ -3930,6 +3975,10 @@
 
   }
 
+
+
+  window.BB_DIRECT_SALE_SOURCE_BUILD =
+    '20260924-hide-source-no-zero1';
 
 
   window.BBDirectSaleSourceV1 = {

@@ -134,7 +134,7 @@
         await Promise.all([
 
           fetch(
-            'desktop-source-v20260924-confirm3.html?v=20260924-desktopconfirm4',
+            'desktop-source-v20260924-confirm4.html?v=1',
             {
               cache:'no-store'
             }
@@ -180,7 +180,7 @@
 
       if (
         !html.includes('function bbConfirmInvoiceCompletion(payload)') ||
-        !html.includes('20260924-desktopconfirm3')
+        !html.includes('20260924-desktopconfirm4')
       ) {
         throw new Error(
           'Desktop Invoice Generator confirmation source is stale.'

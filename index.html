@@ -134,14 +134,14 @@
         await Promise.all([
 
           fetch(
-            'desktop-source-v20260924-confirm4.html?v=1',
+            'desktop-source-v20260924-invoiceseq1.html?v=1',
             {
               cache:'no-store'
             }
           ),
 
           fetch(
-            'supabase-adapter.js?v=20260920-globalcustomer-1',
+            'supabase-adapter.js?v=20260924-invoiceseq1',
             {
               cache:'no-store'
             }
@@ -180,7 +180,7 @@
 
       if (
         !html.includes('function bbConfirmInvoiceCompletion(payload)') ||
-        !html.includes('20260924-desktopconfirm4')
+        !html.includes('20260924-invoiceseq1')
       ) {
         throw new Error(
           'Desktop Invoice Generator confirmation source is stale.'
@@ -356,7 +356,7 @@
 
         '<scr'
         +
-        'ipt src="invoice-backup-desktop-v2.js?v=20260924-desktopconfirm4"></scr'
+        'ipt src="invoice-backup-desktop-v2.js?v=20260924-invoiceseq1"></scr'
         +
         'ipt>\n'
 

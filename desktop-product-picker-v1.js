@@ -393,7 +393,7 @@
     prev.disabled=current<=0;
     next.disabled=current>=pages-1 || !rows.length;
 
-    add.textContent=refreshing?'Refreshing Batch…':(open?'Close Products':'+ Add Product');
+    add.textContent=refreshing?'Refreshing Stock…':(open?'Close Products':'+ Add Product');
     add.disabled=refreshing;
 
     panel.hidden=!open;

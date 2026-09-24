@@ -98,7 +98,7 @@
 
     const [sourceResponse,adapterResponse]=await Promise.all([
       fetch('legacy-google-v2.4.5.html?v=20260924-confirmfix2',{cache:'no-store'}),
-      fetch('supabase-adapter.js?v=20260924-invoiceseq1',{cache:'no-store'})
+      fetch('supabase-adapter.js?v=20260924-cashbank1',{cache:'no-store'})
     ]);
 
     if(!sourceResponse.ok)throw new Error('Could not load Invoice Generator source.');
@@ -208,6 +208,7 @@
       +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'+'ipt>\n'
       +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260924-hide-source-no-zero1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="invoice-backup-v1.js?v=20260924-invoiceseq1"></scr'+'ipt>\n'
+      +'<scr'+'ipt src="split-payment-v1.js?v=20260924-cashbank1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="mobile-invoice.js?v=20260920-iosdecimal1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="invoice-ar-summary-v1.js?v=20260921-textonly1"></scr'+'ipt>\n'

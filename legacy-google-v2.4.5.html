@@ -214,6 +214,14 @@ label {
   font-size: 16px;
 }
 
+#subtotal {
+  color: #159454;
+  font-size: 3em;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+
 .discount-row input {
   max-width: 150px;
   text-align: right;
@@ -3683,7 +3691,7 @@ textarea:focus{
       <div class="date-input-wrap bb-easy-date-wrap" onclick="openBBDatePicker('invoiceDate')" role="button" tabindex="0" onkeydown="handleBBDateKey(event,'invoiceDate')" aria-label="Open invoice date picker">
        <span class="bb-easy-date-icon" aria-hidden="true">📅</span>
        <input id="invoiceDateDisplay" placeholder="01-Sep-2026" readonly="" type="text" value=""/>
-       <input aria-hidden="true" id="invoiceDate" onchange="updateInvoiceDate()" tabindex="-1" type="date"/>
+       <input aria-hidden="true" id="invoiceDate" onchange="updateInvoiceDate(true)" tabindex="-1" type="date"/>
       </div>
      </div>
      <div>
@@ -4094,18 +4102,87 @@ function handleBBDateKey(event, inputId) {
 }
 
 /* ==========================================
-   TODAY'S DATE
+   INVOICE DATE
+   Default = today.
+   Once this account manually changes it, keep that date
+   for the next invoices until the account changes it again.
 ========================================== */
 
-function setTodayDate() {
+const BB_INVOICE_DATE_STICKY_PREFIX =
+  "BB_INVOICE_DATE_STICKY_V1_";
+
+function bbInvoiceDateAccountKey() {
+  try {
+    const session =
+      JSON.parse(
+        localStorage.getItem("BB_SUPABASE_DEV_SESSION_V1") || "null"
+      );
+
+    const id =
+      String(
+        session?.user?.id ||
+        session?.user?.email ||
+        "shared"
+      ).trim();
+
+    return BB_INVOICE_DATE_STICKY_PREFIX + id;
+  } catch (_) {
+    return BB_INVOICE_DATE_STICKY_PREFIX + "shared";
+  }
+}
+
+function bbValidInvoiceDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
+
+function bbRememberInvoiceDate(value) {
+  const cleanValue = String(value || "").trim();
+  if (!bbValidInvoiceDate(cleanValue)) return;
+
+  try {
+    localStorage.setItem(
+      bbInvoiceDateAccountKey(),
+      cleanValue
+    );
+  } catch (_) {}
+}
+
+function bbSavedInvoiceDate() {
+  try {
+    const value =
+      localStorage.getItem(
+        bbInvoiceDateAccountKey()
+      ) || "";
+
+    return bbValidInvoiceDate(value)
+      ? value
+      : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function bbTodayIsoDate() {
   const today = new Date();
 
   const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
+  const month =
+    String(today.getMonth() + 1).padStart(2, "0");
+  const day =
+    String(today.getDate()).padStart(2, "0");
 
-  document.getElementById("invoiceDate").value =
-    `${year}-${month}-${day}`;
+  return `${year}-${month}-${day}`;
+}
+
+function setTodayDate() {
+  const picker =
+    document.getElementById("invoiceDate");
+
+  if (!picker) return;
+
+  picker.value =
+    bbSavedInvoiceDate() ||
+    bbTodayIsoDate();
 }
 
 setTodayDate();
@@ -7050,12 +7127,16 @@ function openDatePicker() {
   }
 }
 
-function updateInvoiceDate() {
+function updateInvoiceDate(rememberChoice = false) {
   const picker = document.getElementById("invoiceDate");
   const display = document.getElementById("invoiceDateDisplay");
 
   if (picker && display) {
     display.value = formatInvoiceDate(picker.value);
+  }
+
+  if (rememberChoice && picker?.value) {
+    bbRememberInvoiceDate(picker.value);
   }
 
   // Default Due Date always follows Invoice Date + 4 days.
@@ -7126,13 +7207,11 @@ function syncDueDateWithInvoiceDate() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const picker = document.getElementById("invoiceDate");
+
   if (picker && !picker.value) {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
-    picker.value = `${yyyy}-${mm}-${dd}`;
+    setTodayDate();
   }
+
   updateInvoiceDate();
 });
 
@@ -9067,11 +9146,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (invoicePicker && duePicker) {
     if (!invoicePicker.value) {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, "0");
-      const dd = String(today.getDate()).padStart(2, "0");
-      invoicePicker.value = `${yyyy}-${mm}-${dd}`;
+      setTodayDate();
       updateInvoiceDate();
     }
 

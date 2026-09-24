@@ -126,7 +126,13 @@
     if(typeof bundle==='function'&&!bundle.__bbBackupWrapped){
       const wrapped=async function(invoicePayload,paymentPayload){
         const result=await bundle.call(this,invoicePayload,paymentPayload);
-        try{dispatchConfirmedInvoice(invoicePayload)}catch(error){console.warn('BIG BROTHER invoice backup:',error)}
+        try{
+          const backupInvoice={
+            ...(invoicePayload||{}),
+            invoiceId:String(result?.invoiceId||invoicePayload?.invoiceId||'').trim()
+          };
+          dispatchConfirmedInvoice(backupInvoice);
+        }catch(error){console.warn('BIG BROTHER invoice backup:',error)}
         return result;
       };
       wrapped.__bbBackupWrapped=true;
@@ -137,7 +143,13 @@
     if(typeof single==='function'&&!single.__bbBackupWrapped){
       const wrapped=async function(payload){
         const result=await single.call(this,payload);
-        try{dispatchConfirmedInvoice(payload)}catch(error){console.warn('BIG BROTHER invoice backup:',error)}
+        try{
+          const backupInvoice={
+            ...(payload||{}),
+            invoiceId:String(result?.invoiceId||payload?.invoiceId||'').trim()
+          };
+          dispatchConfirmedInvoice(backupInvoice);
+        }catch(error){console.warn('BIG BROTHER invoice backup:',error)}
         return result;
       };
       wrapped.__bbBackupWrapped=true;

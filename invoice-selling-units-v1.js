@@ -751,6 +751,88 @@ function clearPending(){
   current=null;
 }
 
+function validateBatchSellingUnitRows(){
+  const batch=selectedBatch();
+  if(!batch)return {ok:true};
+
+  const requested=new Map();
+
+  document.querySelectorAll('#productList .product').forEach(row=>{
+    const factor=Math.max(1,num(row.dataset.bbSellingFactor)||1);
+    if(factor<=1)return;
+
+    const qty=num(row.querySelector('.product-qty-input')?.value);
+    if(!(qty>0))return;
+
+    const product=productForRow(row);
+    if(!product)return;
+
+    const entry=clean(product.entryType||row.dataset.entryType||'EXACT').toUpperCase();
+    const code=entry==='GROUP'
+      ? clean(product.groupCode||product.code||row.dataset.productGroupCode)
+      : clean(product.code||row.dataset.productCode);
+
+    if(!code)return;
+
+    const key=entry+'|'+code;
+    const baseQty=qty*factor;
+    const available=num(product.remainingQty ?? product.pendingQty);
+
+    const current=requested.get(key)||{
+      row,
+      name:clean(product.name||row.dataset.product||code),
+      baseUnit:clean(row.dataset.bbBaseUnit||product.unit||'Unit'),
+      requested:0,
+      available
+    };
+
+    current.requested+=baseQty;
+    current.available=available;
+    requested.set(key,current);
+  });
+
+  for(const item of requested.values()){
+    if(item.requested>item.available+EPS){
+      return {
+        ok:false,
+        row:item.row,
+        message:
+          item.name+': '+formatQty(item.requested)+' '+item.baseUnit+
+          ' requested, but only '+formatQty(item.available)+' '+item.baseUnit+
+          ' remain in '+clean(batch.batchId)+'.'
+      };
+    }
+  }
+
+  return {ok:true};
+}
+
+function installCompleteGuard(){
+  const oldComplete=window.completeInvoice;
+  if(typeof oldComplete!=='function'||oldComplete.__bbSellingUnitsWrapped)return;
+
+  const wrapped=function(event){
+    const check=validateBatchSellingUnitRows();
+    if(!check.ok){
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      alert(check.message);
+      if(check.row){
+        check.row.scrollIntoView({behavior:'smooth',block:'center'});
+        setTimeout(()=>{
+          const input=check.row.querySelector('.product-qty-input');
+          try{input?.focus({preventScroll:true})}catch(_){input?.focus()}
+        },120);
+      }
+      return;
+    }
+    return oldComplete.apply(this,arguments);
+  };
+
+  wrapped.__bbSellingUnitsWrapped=true;
+  window.completeInvoice=wrapped;
+}
+
 function installCancelCleanup(){
   document.getElementById('invoiceQtyCancel')?.addEventListener('click',clearPending,true);
   document.getElementById('invoicePriceCancel')?.addEventListener('click',clearPending,true);
@@ -769,13 +851,14 @@ function start(){
   installQtySubmit();
   installFinalizePatch();
   installPayloadPatch();
+  installCompleteGuard();
   installCancelCleanup();
   installDesktopCreatePatch();
   installCustomerPricePatch();
   installDesktopObserver();
   refreshDesktopRows();
 
-  window.BB_INVOICE_SELLING_UNITS_BUILD='20260925-optional-v2';
+  window.BB_INVOICE_SELLING_UNITS_BUILD='20260925-optional-v3';
 }
 
 if(document.readyState==='loading'){

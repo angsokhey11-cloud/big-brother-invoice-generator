@@ -215,6 +215,20 @@
   }
 
 
+  function rowSellingFactor(row) {
+
+    return Math.max(
+      1,
+      num(
+        row?.dataset?.bbSellingFactor
+      )
+      ||
+      1
+    );
+
+  }
+
+
 
   function getBalance(code) {
 
@@ -2438,8 +2452,24 @@
 
 
 
-    if (
+    const sellingFactor =
+      rowSellingFactor(
+        row
+      );
+
+    const purchasedBaseQty =
       purchasedQty
+      *
+      sellingFactor;
+
+    const zeroBaseQty =
+      zeroQty
+      *
+      sellingFactor;
+
+
+    if (
+      purchasedBaseQty
       >
       balance.purchasedAvailable
       +
@@ -2463,7 +2493,7 @@
 
 
     if (
-      zeroQty
+      zeroBaseQty
       >
       balance.zeroCostAvailable
       +
@@ -2508,7 +2538,7 @@
 
             balance.purchasedAvailable
             -
-            purchasedQty
+            purchasedBaseQty
 
           )
 
@@ -2537,7 +2567,7 @@
 
             balance.zeroCostAvailable
             -
-            zeroQty
+            zeroBaseQty
 
           )
 
@@ -3195,6 +3225,12 @@
         );
 
 
+      const sellingFactor =
+        rowSellingFactor(
+          row
+        );
+
+
       allocations.forEach(
         item => {
 
@@ -3208,7 +3244,9 @@
             total.purchased +=
               num(
                 item.qty
-              );
+              )
+              *
+              sellingFactor;
 
           }
 
@@ -3222,7 +3260,9 @@
             total.zero +=
               num(
                 item.qty
-              );
+              )
+              *
+              sellingFactor;
 
           }
 

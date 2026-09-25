@@ -197,7 +197,7 @@
         '    await postSalesInvoiceBundle(payload, paymentPayload);';
 
       const bbInvoiceSaveReplacement=
-        '    const bbSavedInvoiceResult =\\n'
+        '    const bbSavedInvoiceResult =\n'
         +'      await postSalesInvoiceBundle(payload, paymentPayload);';
 
       if(!html.includes(bbInvoiceSaveMarker)){
@@ -213,9 +213,9 @@
         '    clearAllAfterSuccessfulSave();';
 
       const bbInvoiceTelegramBeforeClear=
-        '    if (window.BBTelegramInvoiceShare?.afterComplete) {\\n'
-        +'      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\\n'
-        +'    }\\n\\n'
+        '    if (window.BBTelegramInvoiceShare?.afterComplete) {\n'
+        +'      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\n'
+        +'    }\n\n'
         +'    clearAllAfterSuccessfulSave();';
 
       if(!html.includes(bbInvoiceClearMarker)){

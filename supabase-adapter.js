@@ -169,6 +169,169 @@
       ' • Batch location: ' + batchLocation;
   }
 
+  let bbLastCustomerLocationAlertKey = '';
+  let bbLastCustomerLocationAlertAt = 0;
+
+  function bbLocationLabel(code, fallbackName = '') {
+    const wanted = String(code || '').trim();
+    const match = locations.find(item =>
+      String(item?.locationCode || '').trim() === wanted
+    );
+    const name = String(
+      fallbackName ||
+      match?.locationName ||
+      wanted
+    ).trim();
+
+    if (!wanted) return name || 'Unknown location';
+    if (!name || name === wanted) return wanted;
+    return name + ' [' + wanted + ']';
+  }
+
+  function bbEnsureCustomerLocationAlert() {
+    let overlay = document.getElementById('bbCustomerLocationAlert');
+    if (overlay) return overlay;
+
+    const style = document.createElement('style');
+    style.id = 'bbCustomerLocationAlertStyle';
+    style.textContent = `
+      #bbCustomerLocationAlert{
+        position:fixed;inset:0;z-index:1000000;display:flex;align-items:center;justify-content:center;
+        padding:18px;background:rgba(13,31,52,.48);backdrop-filter:blur(2px);
+      }
+      #bbCustomerLocationAlert[hidden]{display:none!important}
+      #bbCustomerLocationAlert .bb-location-alert-card{
+        width:min(430px,100%);background:#fff;border:1px solid #f0c36b;border-radius:16px;
+        box-shadow:0 22px 60px rgba(16,42,72,.24);overflow:hidden;
+        font-family:Arial,Helvetica,sans-serif;color:#17324d;
+      }
+      #bbCustomerLocationAlert .bb-location-alert-head{
+        display:flex;align-items:center;gap:10px;padding:14px 16px;background:#fff7e8;
+        border-bottom:1px solid #f3d7a0;
+      }
+      #bbCustomerLocationAlert .bb-location-alert-icon{font-size:24px;line-height:1}
+      #bbCustomerLocationAlert .bb-location-alert-head strong{font-size:14px;color:#9a5a00}
+      #bbCustomerLocationAlert .bb-location-alert-body{padding:14px 16px}
+      #bbCustomerLocationAlert .bb-location-alert-note{
+        margin:0 0 12px;font-size:11px;line-height:1.45;color:#6a7280;font-weight:700;
+      }
+      #bbCustomerLocationAlert .bb-location-alert-row{
+        display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;padding:7px 0;
+        border-bottom:1px solid #edf1f5;font-size:11px;
+      }
+      #bbCustomerLocationAlert .bb-location-alert-row:last-child{border-bottom:0}
+      #bbCustomerLocationAlert .bb-location-alert-row span{color:#7a8796;font-weight:800}
+      #bbCustomerLocationAlert .bb-location-alert-row b{color:#173f77;min-width:0;overflow-wrap:anywhere}
+      #bbCustomerLocationAlert .bb-location-alert-actions{
+        display:flex;justify-content:flex-end;padding:0 16px 15px;
+      }
+      #bbCustomerLocationAlert .bb-location-alert-ok{
+        min-height:39px;border:0;border-radius:10px;padding:0 16px;background:#17457a;color:#fff;
+        font-size:11px;font-weight:900;cursor:pointer;
+      }
+      @media(max-width:640px){
+        #bbCustomerLocationAlert{padding:12px;align-items:flex-end}
+        #bbCustomerLocationAlert .bb-location-alert-card{border-radius:16px 16px 12px 12px}
+        #bbCustomerLocationAlert .bb-location-alert-row{grid-template-columns:96px minmax(0,1fr);font-size:10px}
+        #bbCustomerLocationAlert .bb-location-alert-ok{width:100%;min-height:43px}
+      }
+    `;
+    document.head.appendChild(style);
+
+    overlay = document.createElement('div');
+    overlay.id = 'bbCustomerLocationAlert';
+    overlay.hidden = true;
+    overlay.innerHTML =
+      '<div class="bb-location-alert-card" role="alertdialog" aria-modal="true" aria-labelledby="bbLocationAlertTitle">' +
+        '<div class="bb-location-alert-head">' +
+          '<div class="bb-location-alert-icon">⚠️</div>' +
+          '<strong id="bbLocationAlertTitle">Customer location is different from this batch</strong>' +
+        '</div>' +
+        '<div class="bb-location-alert-body">' +
+          '<p class="bb-location-alert-note">Please confirm you selected the correct customer before continuing this invoice.</p>' +
+          '<div class="bb-location-alert-row"><span>Customer</span><b id="bbLocationAlertCustomer">—</b></div>' +
+          '<div class="bb-location-alert-row"><span>Customer location</span><b id="bbLocationAlertCustomerLocation">—</b></div>' +
+          '<div class="bb-location-alert-row"><span>Batch</span><b id="bbLocationAlertBatch">—</b></div>' +
+          '<div class="bb-location-alert-row"><span>Batch location</span><b id="bbLocationAlertBatchLocation">—</b></div>' +
+        '</div>' +
+        '<div class="bb-location-alert-actions">' +
+          '<button type="button" class="bb-location-alert-ok" id="bbLocationAlertOk">OK, Continue</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    const close = () => {
+      overlay.hidden = true;
+      setTimeout(() => {
+        try {
+          document.getElementById('productSearch')?.focus({ preventScroll: true });
+        } catch (_) {
+          document.getElementById('productSearch')?.focus();
+        }
+      }, 40);
+    };
+
+    document.getElementById('bbLocationAlertOk')?.addEventListener('click', close);
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) close();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !overlay.hidden) close();
+    });
+
+    return overlay;
+  }
+
+  function bbShowCustomerLocationAlert(customer) {
+    const batchLocationCode = bbCurrentBatchLocationCode();
+    const customerLocationCode = String(customer?.locationCode || '').trim();
+    const batchId = String(document.getElementById('batchNumber')?.value || '').trim();
+
+    if (
+      !batchId ||
+      !batchLocationCode ||
+      !customerLocationCode ||
+      batchLocationCode === customerLocationCode
+    ) {
+      return false;
+    }
+
+    const key = [
+      batchId,
+      String(customer?.customerId || customer?.name || '').trim(),
+      customerLocationCode,
+      batchLocationCode
+    ].join('|');
+
+    const now = Date.now();
+    if (
+      key === bbLastCustomerLocationAlertKey &&
+      now - bbLastCustomerLocationAlertAt < 1200
+    ) {
+      return true;
+    }
+
+    bbLastCustomerLocationAlertKey = key;
+    bbLastCustomerLocationAlertAt = now;
+
+    const overlay = bbEnsureCustomerLocationAlert();
+    document.getElementById('bbLocationAlertCustomer').textContent =
+      String(customer?.name || 'Selected customer').trim();
+    document.getElementById('bbLocationAlertCustomerLocation').textContent =
+      bbLocationLabel(customerLocationCode, customer?.locationName);
+    document.getElementById('bbLocationAlertBatch').textContent =
+      batchId || '—';
+    document.getElementById('bbLocationAlertBatchLocation').textContent =
+      bbLocationLabel(batchLocationCode);
+
+    overlay.hidden = false;
+    setTimeout(() => {
+      document.getElementById('bbLocationAlertOk')?.focus();
+    }, 30);
+    return true;
+  }
+
   function bbFindSelectedCustomer() {
     const typed = String(document.getElementById('customerName')?.value || '').trim();
     if (!typed) return null;
@@ -591,6 +754,7 @@
     bbSelectedCustomerLocationCode = customer.locationCode || '';
     document.getElementById('customerPhone').value = customer.phone || '';
     document.getElementById('customerAddress').value = customer.address || '';
+    bbShowCustomerLocationAlert(customer);
     loadCustomerPrices(customer.name);
   };
 
@@ -616,11 +780,14 @@
       status.style.color = '#b7791f';
     }
 
+    const locationAlertShown = bbShowCustomerLocationAlert(normalized);
     loadCustomerPrices(normalized.name);
 
-    setTimeout(() => {
-      document.getElementById('productSearch')?.focus();
-    }, 40);
+    if (!locationAlertShown) {
+      setTimeout(() => {
+        document.getElementById('productSearch')?.focus();
+      }, 40);
+    }
   };
 
   window.loadCustomerPrices = async function loadCustomerPricesSupabase(customerName) {

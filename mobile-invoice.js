@@ -186,8 +186,10 @@
   function improveMobileInputs(){
     const invoiceNo=$('#invoiceNumber');
     if(invoiceNo){
-      invoiceNo.readOnly=true;
-      invoiceNo.setAttribute('aria-readonly','true');
+      invoiceNo.readOnly=false;
+      invoiceNo.removeAttribute('readonly');
+      invoiceNo.removeAttribute('aria-readonly');
+      invoiceNo.setAttribute('autocomplete','off');
     }
 
     $('#customerName')?.setAttribute('enterkeyhint','next');

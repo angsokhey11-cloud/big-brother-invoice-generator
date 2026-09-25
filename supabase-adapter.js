@@ -188,80 +188,52 @@
     return name + ' [' + wanted + ']';
   }
 
+
   function bbEnsureCustomerLocationAlert() {
     let overlay = document.getElementById('bbCustomerLocationAlert');
     if (overlay) return overlay;
 
     const style = document.createElement('style');
     style.id = 'bbCustomerLocationAlertStyle';
-    style.textContent = `
-      #bbCustomerLocationAlert{
-        position:fixed;inset:0;z-index:1000000;display:flex;align-items:center;justify-content:center;
-        padding:18px;background:rgba(13,31,52,.48);backdrop-filter:blur(2px);
-      }
-      #bbCustomerLocationAlert[hidden]{display:none!important}
-      #bbCustomerLocationAlert .bb-location-alert-card{
-        width:min(430px,100%);background:#fff;border:1px solid #f0c36b;border-radius:16px;
-        box-shadow:0 22px 60px rgba(16,42,72,.24);overflow:hidden;
-        font-family:Arial,Helvetica,sans-serif;color:#17324d;
-      }
-      #bbCustomerLocationAlert .bb-location-alert-head{
-        display:flex;align-items:center;gap:10px;padding:14px 16px;background:#fff7e8;
-        border-bottom:1px solid #f3d7a0;
-      }
-      #bbCustomerLocationAlert .bb-location-alert-icon{font-size:24px;line-height:1}
-      #bbCustomerLocationAlert .bb-location-alert-head strong{font-size:14px;color:#9a5a00}
-      #bbCustomerLocationAlert .bb-location-alert-body{padding:14px 16px}
-      #bbCustomerLocationAlert .bb-location-alert-note{
-        margin:0 0 12px;font-size:11px;line-height:1.45;color:#6a7280;font-weight:700;
-      }
-      #bbCustomerLocationAlert .bb-location-alert-row{
-        display:grid;grid-template-columns:112px minmax(0,1fr);gap:8px;padding:7px 0;
-        border-bottom:1px solid #edf1f5;font-size:11px;
-      }
-      #bbCustomerLocationAlert .bb-location-alert-row:last-child{border-bottom:0}
-      #bbCustomerLocationAlert .bb-location-alert-row span{color:#7a8796;font-weight:800}
-      #bbCustomerLocationAlert .bb-location-alert-row b{color:#173f77;min-width:0;overflow-wrap:anywhere}
-      #bbCustomerLocationAlert .bb-location-alert-actions{
-        display:flex;justify-content:flex-end;padding:0 16px 15px;
-      }
-      #bbCustomerLocationAlert .bb-location-alert-ok{
-        min-height:39px;border:0;border-radius:10px;padding:0 16px;background:#17457a;color:#fff;
-        font-size:11px;font-weight:900;cursor:pointer;
-      }
-      @media(max-width:640px){
-        #bbCustomerLocationAlert{padding:12px;align-items:flex-end}
-        #bbCustomerLocationAlert .bb-location-alert-card{border-radius:16px 16px 12px 12px}
-        #bbCustomerLocationAlert .bb-location-alert-row{grid-template-columns:96px minmax(0,1fr);font-size:10px}
-        #bbCustomerLocationAlert .bb-location-alert-ok{width:100%;min-height:43px}
-      }
-    `;
+    style.textContent = [
+      '#bbCustomerLocationAlert{position:fixed;inset:0;z-index:1000000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(13,31,52,.50);backdrop-filter:blur(2px)}',
+      '#bbCustomerLocationAlert[hidden]{display:none!important}',
+      '#bbCustomerLocationAlert .bb-location-alert-card{width:min(460px,calc(100vw - 28px));background:#fff;border:1px solid #efc56f;border-radius:17px;box-shadow:0 24px 65px rgba(16,42,72,.28);overflow:hidden;font-family:Arial,"Noto Sans Khmer","Khmer OS System",sans-serif;color:#17324d}',
+      '#bbCustomerLocationAlert .bb-location-alert-head{display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 16px 10px;background:#fff8e9;color:#9a5a00}',
+      '#bbCustomerLocationAlert .bb-location-alert-icon{font-size:25px;line-height:1}',
+      '#bbCustomerLocationAlert .bb-location-alert-head strong{font-size:14px;font-weight:900}',
+      '#bbCustomerLocationAlert .bb-location-alert-body{padding:18px 20px 16px;text-align:center}',
+      '#bbCustomerLocationAlert .bb-location-alert-message{margin:0;font-size:16px;line-height:1.75;color:#263b53;font-weight:800}',
+      '#bbCustomerLocationAlert .bb-location-alert-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:0 16px 16px}',
+      '#bbCustomerLocationAlert .bb-location-alert-btn{min-height:44px;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:900;cursor:pointer}',
+      '#bbCustomerLocationAlert .bb-location-alert-no{border:1px solid #d4dde8;background:#fff;color:#53667b}',
+      '#bbCustomerLocationAlert .bb-location-alert-yes{border:0;background:#17457a;color:#fff}',
+      '#bbCustomerLocationAlert .bb-location-alert-btn small{display:block;margin-top:2px;font-size:8px;font-weight:800;opacity:.78}',
+      '@media(max-width:640px){#bbCustomerLocationAlert{align-items:center!important;justify-content:center!important;padding:14px!important}#bbCustomerLocationAlert .bb-location-alert-card{width:min(420px,100%);border-radius:15px}#bbCustomerLocationAlert .bb-location-alert-body{padding:17px 16px 14px}#bbCustomerLocationAlert .bb-location-alert-message{font-size:15px;line-height:1.8}#bbCustomerLocationAlert .bb-location-alert-actions{grid-template-columns:1fr 1fr;padding:0 12px 13px}#bbCustomerLocationAlert .bb-location-alert-btn{min-height:46px}}'
+    ].join('');
     document.head.appendChild(style);
 
     overlay = document.createElement('div');
     overlay.id = 'bbCustomerLocationAlert';
     overlay.hidden = true;
     overlay.innerHTML =
-      '<div class="bb-location-alert-card" role="alertdialog" aria-modal="true" aria-labelledby="bbLocationAlertTitle">' +
+      '<div class="bb-location-alert-card" role="alertdialog" aria-modal="true" aria-labelledby="bbLocationAlertTitle" aria-describedby="bbLocationAlertMessage">' +
         '<div class="bb-location-alert-head">' +
           '<div class="bb-location-alert-icon">⚠️</div>' +
-          '<strong id="bbLocationAlertTitle">Customer location is different from this batch</strong>' +
+          '<strong id="bbLocationAlertTitle">Location Alert</strong>' +
         '</div>' +
         '<div class="bb-location-alert-body">' +
-          '<p class="bb-location-alert-note">Please confirm you selected the correct customer before continuing this invoice.</p>' +
-          '<div class="bb-location-alert-row"><span>Customer</span><b id="bbLocationAlertCustomer">—</b></div>' +
-          '<div class="bb-location-alert-row"><span>Customer location</span><b id="bbLocationAlertCustomerLocation">—</b></div>' +
-          '<div class="bb-location-alert-row"><span>Batch</span><b id="bbLocationAlertBatch">—</b></div>' +
-          '<div class="bb-location-alert-row"><span>Batch location</span><b id="bbLocationAlertBatchLocation">—</b></div>' +
+          '<p id="bbLocationAlertMessage" class="bb-location-alert-message">អ្នកបានជ្រើសរើសឈ្មោះអតិថិជនដែលខុសពី ទីតាំងស្តុក។ តើអ្នកគិតច្បាស់រឺនៅ?</p>' +
         '</div>' +
         '<div class="bb-location-alert-actions">' +
-          '<button type="button" class="bb-location-alert-ok" id="bbLocationAlertOk">OK, Continue</button>' +
+          '<button type="button" class="bb-location-alert-btn bb-location-alert-no" id="bbLocationAlertNo">No<small>Choose customer again</small></button>' +
+          '<button type="button" class="bb-location-alert-btn bb-location-alert-yes" id="bbLocationAlertYes">Yes<small>Continue invoice</small></button>' +
         '</div>' +
       '</div>';
 
     document.body.appendChild(overlay);
 
-    const close = () => {
+    const continueInvoice = () => {
       overlay.hidden = true;
       setTimeout(() => {
         try {
@@ -272,12 +244,50 @@
       }, 40);
     };
 
-    document.getElementById('bbLocationAlertOk')?.addEventListener('click', close);
-    overlay.addEventListener('click', event => {
-      if (event.target === overlay) close();
-    });
+    const chooseCustomerAgain = () => {
+      overlay.hidden = true;
+      bbLastCustomerLocationAlertKey = '';
+      bbLastCustomerLocationAlertAt = 0;
+      bbSelectedCustomerId = '';
+      bbSelectedCustomerLocationCode = '';
+
+      const name = document.getElementById('customerName');
+      const phone = document.getElementById('customerPhone');
+      const address = document.getElementById('customerAddress');
+      const options = document.getElementById('customerOptions');
+      const status = document.getElementById('customerStatus');
+
+      if (name) name.value = '';
+      if (phone) phone.value = '';
+      if (address) address.value = '';
+      if (options) options.style.display = 'none';
+
+      try {
+        loadCustomerPrices('');
+      } catch (_) {}
+
+      if (status) {
+        status.textContent = 'Choose the customer name again.';
+        status.style.color = '#b7791f';
+      }
+
+      setTimeout(() => {
+        try {
+          name?.focus({ preventScroll: true });
+        } catch (_) {
+          name?.focus();
+        }
+      }, 40);
+    };
+
+    document.getElementById('bbLocationAlertYes')?.addEventListener('click', continueInvoice);
+    document.getElementById('bbLocationAlertNo')?.addEventListener('click', chooseCustomerAgain);
+
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && !overlay.hidden) close();
+      if (event.key === 'Escape' && !overlay.hidden) {
+        event.preventDefault();
+        chooseCustomerAgain();
+      }
     });
 
     return overlay;
@@ -316,19 +326,12 @@
     bbLastCustomerLocationAlertAt = now;
 
     const overlay = bbEnsureCustomerLocationAlert();
-    document.getElementById('bbLocationAlertCustomer').textContent =
-      String(customer?.name || 'Selected customer').trim();
-    document.getElementById('bbLocationAlertCustomerLocation').textContent =
-      bbLocationLabel(customerLocationCode, customer?.locationName);
-    document.getElementById('bbLocationAlertBatch').textContent =
-      batchId || '—';
-    document.getElementById('bbLocationAlertBatchLocation').textContent =
-      bbLocationLabel(batchLocationCode);
-
     overlay.hidden = false;
+
     setTimeout(() => {
-      document.getElementById('bbLocationAlertOk')?.focus();
+      document.getElementById('bbLocationAlertYes')?.focus();
     }, 30);
+
     return true;
   }
 

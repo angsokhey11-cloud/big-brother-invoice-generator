@@ -5,395 +5,138 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#eef3f8">
   <title>BIG BROTHER — Invoice Generator Mobile</title>
+
   <style>
-    html,body{margin:0;min-height:100%;background:#eef3f8;font-family:"Segoe UI",Tahoma,Arial,sans-serif;color:#173b70}
-    .bb-loader{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
-    .bb-loader-card{background:#fff;border:1px solid #d7e2ef;border-radius:16px;padding:22px 28px;box-shadow:0 12px 30px rgba(21,49,83,.08);font-weight:800}
-    .bb-loader-sub{margin-top:7px;font-size:12px;color:#6d7f92;font-weight:600}
+    html,body{
+      margin:0;
+      min-height:100%;
+      background:#eef3f8;
+      font-family:"Segoe UI",Tahoma,Arial,sans-serif;
+      color:#173b70;
+    }
+    .bb-loader{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      text-align:center;
+    }
+    .bb-loader-card{
+      background:#fff;
+      border:1px solid #d7e2ef;
+      border-radius:16px;
+      padding:22px 28px;
+      box-shadow:0 12px 30px rgba(21,49,83,.08);
+      font-weight:800;
+    }
+    .bb-loader-sub{
+      margin-top:7px;
+      font-size:12px;
+      color:#6d7f92;
+      font-weight:600;
+    }
   </style>
+
   <script src="dual-currency-invoice-patch.js?v=20260910-1"></script>
 </head>
+
 <body>
   <div class="bb-loader">
     <div class="bb-loader-card">
       Loading BIG BROTHER Invoice Generator…
-      <div class="bb-loader-sub">Mobile · Secure Supabase</div>
+      <div class="bb-loader-sub">
+        Mobile · Desktop Supabase Core
+      </div>
     </div>
   </div>
 
-<script>
-(async function(){
-  'use strict';
+  <script>
+  (async function(){
+    'use strict';
 
-  const SUPABASE_URL='https://sjfhlaclgmkwwofzstok.supabase.co';
-  const SUPABASE_KEY='sb_publishable_w762jR65CWwlO30fKQsYOw_6L9grx8S';
-  const SESSION_KEY='BB_SUPABASE_DEV_SESSION_V1';
-
-  function readSession(){
-    try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null')}catch(_){return null}
-  }
-
-  function saveSession(value){
     try{
-      if(!value){localStorage.removeItem(SESSION_KEY);return}
-      if(!value.expires_at&&value.expires_in)value.expires_at=Math.floor(Date.now()/1000)+Number(value.expires_in);
-      localStorage.setItem(SESSION_KEY,JSON.stringify(value));
-    }catch(_){}
-  }
+      /*
+       * MOBILE CORE RESET V1
+       * --------------------
+       * Use the exact same Invoice source + Supabase adapter path
+       * as the working Desktop Invoice Generator.
+       *
+       * Mobile differences are added only AFTER the core is prepared:
+       * CSS, mobile controller, preview, keyboard fixes, etc.
+       */
 
-  async function parse(response){
-    const text=await response.text();
-    let data={};
-    try{data=text?JSON.parse(text):{}}catch(_){data={message:text}}
-    if(!response.ok)throw new Error(data.message||data.error_description||data.error||('Request failed ('+response.status+')'));
-    return data;
-  }
-
-  async function ensureSession(){
-    let session=readSession();
-    if(!session?.access_token)throw new Error('Please sign in to BIG BROTHER first.');
-    const now=Math.floor(Date.now()/1000);
-    if(session.expires_at&&Number(session.expires_at)<now+45){
-      if(!session.refresh_token)throw new Error('Your BIG BROTHER session has expired.');
-      const r=await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=refresh_token',{
-        method:'POST',
-        headers:{apikey:SUPABASE_KEY,'Content-Type':'application/json'},
-        body:JSON.stringify({refresh_token:session.refresh_token}),
-        cache:'no-store'
-      });
-      session=await parse(r);
-      saveSession(session);
-    }
-    return session;
-  }
-
-  async function rpc(fn,args={}){
-    const session=await ensureSession();
-    const r=await fetch(SUPABASE_URL+'/rest/v1/rpc/'+fn,{
-      method:'POST',
-      headers:{
-        apikey:SUPABASE_KEY,
-        Authorization:'Bearer '+session.access_token,
-        'Content-Type':'application/json'
-      },
-      body:JSON.stringify(args||{}),
-      cache:'no-store'
-    });
-    return parse(r);
-  }
-
-  async function assertInvoicePermission(){
-    const profile=await rpc('bb_current_access_profile');
-    if(profile?.user?.isAdmin===true)return;
-    const modules=Array.isArray(profile?.modules)?profile.modules:[];
-    const key=v=>String(v||'').trim().toLowerCase();
-    const grant=modules.find(x=>key(x.moduleKey)==='*')||modules.find(x=>key(x.moduleKey)==='route.invoice');
-    if(!grant||grant.canView!==true||grant.canCreate!==true){
-      throw new Error('You do not have permission to create Sales Invoices.');
-    }
-  }
-
-  try{
-    await assertInvoicePermission();
-
-    const [sourceResponse,adapterResponse]=await Promise.all([
-      fetch('legacy-google-v2.4.5.html?v=20260924-confirmfix2',{cache:'no-store'}),
-      fetch('supabase-adapter.js?v=20260925-mobiledb6',{cache:'no-store'})
-    ]);
-
-    if(!sourceResponse.ok)throw new Error('Could not load Invoice Generator source.');
-    if(!adapterResponse.ok)throw new Error('Could not load Invoice Generator Supabase adapter.');
-
-    let html=await sourceResponse.text();
-    let adapterJs=await adapterResponse.text();
-
-    if(!window.BBInvoiceDualCurrencyPatch)throw new Error('Invoice dual-currency patch did not load.');
-
-    html=window.BBInvoiceDualCurrencyPatch.patchLegacy(html);
-    adapterJs=window.BBInvoiceDualCurrencyPatch.patchAdapter(adapterJs);
-
-    /*
-     * MOBILE DATABASE SCOPE FIX V4
-     * Export the bootstrap applier from the legacy script itself.
-     * This preserves direct access to its lexical state:
-     * locations, products, notes, banking, and their render helpers.
-     */
-    const bbLegacyApplyMarker='function applyInvoiceBootstrapFast(data) {';
-    if(!html.includes(bbLegacyApplyMarker)){
-      throw new Error('Mobile legacy bootstrap function marker was not found.');
-    }
-    html=html.replace(
-      bbLegacyApplyMarker,
-      'window.applyInvoiceBootstrapFast = function applyInvoiceBootstrapFast(data) {'
-    );
-
-    /*
-     * MOBILE BOOTSTRAP BRIDGE V3
-     * Some mobile document.write builds do not expose the legacy
-     * applyInvoiceBootstrapFast() function to the later adapter script.
-     * Install an equivalent window function before the adapter executes.
-     */
-    const bbMobileBootstrapBridge=`
-  if (typeof window.applyInvoiceBootstrapFast !== 'function') {
-    window.applyInvoiceBootstrapFast = function bbApplyInvoiceBootstrapFastMobile(data) {
-      if (!data || data.success !== true) return false;
-
-      if (Array.isArray(data.locations)) {
-        locations = data.locations
-          .map(row => ({
-            locationCode:String(row.locationCode || row.code || '').trim(),
-            locationName:String(row.locationName || row.name || '').trim(),
-            salespersonName:String(row.salespersonName || row.salesperson || '').trim(),
-            salespersonStaffId:String(row.salespersonStaffId || '').trim(),
-            active:
-              row.active === true ||
-              String(row.active).toLowerCase() === 'true'
-          }))
-          .filter(x =>
-            x.locationCode &&
-            x.locationName &&
-            x.active !== false
-          );
-
-        if (locations.length) {
-          locationDatabaseLoaded = true;
-          cacheSet(LOCATION_CACHE_KEY, locations);
-          populateLocationSelect();
-        }
-      }
-
-      if (Array.isArray(data.notes)) {
-        const select = document.getElementById('noteTemplate');
-
-        noteTemplates = data.notes
-          .map(row => ({
-            name:String(row.name || '').trim(),
-            note:String(row.note || row.text || '').trim(),
-            active:
-              row.active === true ||
-              String(row.active).toLowerCase() === 'true'
-          }))
-          .filter(item => item.name && item.note && item.active);
-
-        noteDatabaseLoaded = true;
-
-        if (select) {
-          select.innerHTML = '<option value="">Select saved note</option>';
-
-          noteTemplates.forEach((item,index) => {
-            const option = document.createElement('option');
-            option.value = String(index);
-            option.textContent = item.name;
-            select.appendChild(option);
-          });
-
-          select.disabled = false;
-        }
-      }
-
-      if (Array.isArray(data.banking)) {
-        const select = document.getElementById('bankingDetails');
-
-        bankingDetails = data.banking
-          .map(row => ({
-            name:String(row.name || '').trim(),
-            bank:String(row.bank || '').trim(),
-            account:String(row.account || '').trim(),
-            active:
-              row.active === true ||
-              String(row.active).toLowerCase() === 'true'
-          }))
-          .filter(item =>
-            (item.name || item.bank || item.account) &&
-            item.active
-          );
-
-        bankingDatabaseLoaded = true;
-
-        if (select) {
-          select.innerHTML = '<option value="">Select banking detail</option>';
-
-          bankingDetails.forEach((item,index) => {
-            const option = document.createElement('option');
-            option.value = String(index);
-            option.textContent = item.name || item.bank || item.account;
-            select.appendChild(option);
-          });
-
-          select.disabled = false;
-
-          if (typeof updateBankingPreview === 'function') {
-            updateBankingPreview();
-          }
-        }
-      }
-
-      if (Array.isArray(data.products)) {
-        const searchInput = document.getElementById('productSearch');
-
-        products = data.products
-          .map(row => ({
-            code:String(row.code || '').trim(),
-            name:String(row.name || '').trim(),
-            category:String(row.category || '').trim(),
-            unit:String(row.unit || '').trim(),
-            barcode:String(row.productBarcode || row.barcode || '').trim(),
-            productBarcode:String(row.productBarcode || row.barcode || '').trim(),
-            usdPrice:Number(row.priceUSD ?? row.usdPrice) || 0,
-            khrPrice:Number(row.priceKHR ?? row.khrPrice) || 0,
-            active:
-              row.active === true ||
-              String(row.active).toLowerCase() === 'true'
-          }))
-          .filter(product => product.name && product.active);
-
-        productDatabaseLoaded = true;
-
-        if (searchInput) {
-          searchInput.disabled = false;
-          searchInput.placeholder = 'Search product name, code or barcode...';
-        }
-
-        if (
-          typeof getSelectedSimpleBatch === 'function' &&
-          getSelectedSimpleBatch() &&
-          typeof renderInvoiceProductOptions === 'function'
-        ) {
-          setTimeout(() => renderInvoiceProductOptions(), 0);
-        }
-      }
-
-      return true;
-    };
-  }
-`;
-
-    adapterJs =
-      bbMobileBootstrapBridge +
-      '\n' +
-      adapterJs;
-
-    adapterJs = adapterJs.replace(
-      'if (!applyInvoiceBootstrapFast(data)) {',
-      'if (!window.applyInvoiceBootstrapFast(data)) {'
-    );
-
-    /*
-     * Never depend on cross-script bare global resolution on Mobile.
-     * The Supabase adapter owns these window functions.
-     */
-    adapterJs=adapterJs.replaceAll(
-      'return loadInvoiceBootstrapFast();',
-      'return window.loadInvoiceBootstrapFast();'
-    );
-    adapterJs=adapterJs.replaceAll(
-      'await loadInvoiceBootstrapFast();',
-      'await window.loadInvoiceBootstrapFast();'
-    );
-    adapterJs=adapterJs.replaceAll(
-      'loadInvoiceBootstrapFast(),',
-      'window.loadInvoiceBootstrapFast(),'
-    );
-    adapterJs=adapterJs.replaceAll(
-      'await loadNextInvoiceNumber();',
-      'await window.loadNextInvoiceNumber();'
-    );
-
-    /*
-     * MOBILE DATABASE STARTUP HARDENING V2
-     * Core Invoice bootstrap is authoritative.
-     * Batch refresh is optional and must never make Mobile look disconnected
-     * or disable Complete when Supabase Invoice data is already healthy.
-     */
-    const bbMobileBootOld=`
-  async function bbStartSupabaseInvoice() {
-    try {
-      await bbEnsureSession();
-      await Promise.all([
-        window.loadInvoiceBootstrapFast(),
-        loadSimpleBatchPicker()
+      const [sourceResponse,adapterResponse]=await Promise.all([
+        fetch(
+          'desktop-source-v20260924-invoiceseq1.html?v=20260924-invoiceseq1',
+          {cache:'no-store'}
+        ),
+        fetch(
+          'supabase-adapter.js?v=20260925-mobile-desktopcore1',
+          {cache:'no-store'}
+        )
       ]);
 
-      if (
-        document.getElementById('invoiceNumber')?.value === 'Loading...' ||
-        document.getElementById('invoiceNumber')?.value === 'Unavailable'
-      ) {
-        await window.loadNextInvoiceNumber();
-      }
-    } catch (error) {
-      bbShowDatabaseError(error);
-      const button = document.querySelector('.complete-btn');
-      if (button) {
-        button.disabled = true;
-        button.title = error?.message || 'Sign in required';
-      }
-    }
-  }
-`;
-
-    const bbMobileBootNew=`
-  async function bbStartSupabaseInvoice() {
-    const button = document.querySelector('.complete-btn');
-
-    try {
-      await bbEnsureSession();
-
-      /* Core invoice data must succeed first. */
-      await window.loadInvoiceBootstrapFast();
-
-      if (
-        document.getElementById('invoiceNumber')?.value === 'Loading...' ||
-        document.getElementById('invoiceNumber')?.value === 'Unavailable'
-      ) {
-        await window.loadNextInvoiceNumber();
+      if(!sourceResponse.ok){
+        throw new Error('Could not load Invoice Generator source.');
       }
 
-      /* A previous secondary-load error must not leave Complete disabled. */
-      if (button) {
-        button.disabled = false;
-        button.title = '';
-      }
-    } catch (error) {
-      bbShowDatabaseError(error);
-
-      if (button) {
-        button.disabled = true;
-        button.title = error?.message || 'Sign in required';
+      if(!adapterResponse.ok){
+        throw new Error('Could not load Invoice Generator Supabase adapter.');
       }
 
-      return;
-    }
+      let html=await sourceResponse.text();
+      let adapterJs=await adapterResponse.text();
 
-    /*
-     * Batch is a secondary convenience source.
-     * If it cannot refresh, Direct Sale and normal Invoice creation remain live.
-     */
-    try {
-      if (typeof window.loadSimpleBatchPicker === 'function') {
-        await window.loadSimpleBatchPicker();
-      } else {
-        console.warn('BIG BROTHER Mobile Invoice: Batch picker function is unavailable.');
+      /*
+       * Same stale-source guard used by Desktop.
+       */
+      if(
+        !html.includes('function bbConfirmInvoiceCompletion(payload)') ||
+        !html.includes('20260924-invoiceseq1')
+      ){
+        throw new Error('Invoice Generator core source is stale.');
       }
-    } catch (error) {
-      console.warn('BIG BROTHER Mobile Invoice Batch refresh:', error);
-    }
-  }
-`;
 
-    if(!adapterJs.includes(bbMobileBootOld)){
-      throw new Error('Mobile Supabase startup patch marker was not found.');
-    }
+      if(!window.BBInvoiceDualCurrencyPatch){
+        throw new Error('Invoice dual-currency patch did not load.');
+      }
 
-    adapterJs=adapterJs.replace(bbMobileBootOld,bbMobileBootNew);
+      /*
+       * EXACT DESKTOP CORE PATCHING.
+       */
+      html=window.BBInvoiceDualCurrencyPatch.patchLegacy(html);
+      adapterJs=window.BBInvoiceDualCurrencyPatch.patchAdapter(adapterJs);
 
-    /* iOS MOBILE ONLY — keep decimal keyboard inside the original tap.
-       Desktop source is not modified. */
-    const bbIOSInvoice=
-      /iPhone|iPad|iPod/i.test(navigator.userAgent||'') ||
-      (navigator.platform==='MacIntel' && Number(navigator.maxTouchPoints||0)>1);
-
-    if(bbIOSInvoice){
+      /*
+       * Supabase owns startup, exactly like Desktop.
+       * Disable only the legacy Google startup calls.
+       */
       html=html.replace(
+        'loadNextInvoiceNumber();',
+        '/* Supabase boot owns Invoice No. */'
+      );
+
+      html=html.replace(
+        'loadInvoiceBootstrapFast();',
+        '/* Supabase boot owns Master bootstrap. */'
+      );
+
+      html=html.replace(
+        'loadSimpleBatchPicker();',
+        '/* Supabase boot owns Batch picker. */'
+      );
+
+      /*
+       * MOBILE ONLY — keep iOS number keyboard/focus behavior.
+       * Core data/bootstrap logic is not modified here.
+       */
+      const bbIOSInvoice=
+        /iPhone|iPad|iPod/i.test(navigator.userAgent||'') ||
+        (navigator.platform==='MacIntel' && Number(navigator.maxTouchPoints||0)>1);
+
+      if(bbIOSInvoice){
+        html=html.replace(
 `  setTimeout(() => {
     qtyInput.focus();
     qtyInput.select();
@@ -408,9 +151,9 @@
     qtyInput.select();
   }catch(_){}
 `
-      );
+        );
 
-      html=html.replace(
+        html=html.replace(
 `  setTimeout(() => {
     input.focus();
     input.select();
@@ -425,92 +168,150 @@
     input.select();
   }catch(_){}
 `
-      );
-    }
+        );
+      }
 
-    /*
-     * Export Batch loader too so the secondary startup path is deterministic.
-     */
-    const bbLegacyBatchMarker='async function loadSimpleBatchPicker(';
-    if(html.includes(bbLegacyBatchMarker)){
+      /*
+       * Current database wording.
+       */
+      html=html.replaceAll(
+        'This will save the invoice to the Sales Data Google Sheet.',
+        'This will save the invoice to the BIG BROTHER Database.'
+      );
+
+      html=html.replaceAll(
+        'Google Sheets -> separate Sales Data file',
+        'Supabase PostgreSQL -> Sales Database'
+      );
+
       html=html.replace(
-        bbLegacyBatchMarker,
-        'window.loadSimpleBatchPicker = async function loadSimpleBatchPicker('
+        '<title>BIG BROTHER — Invoice Generator V2.4.5 Fast Master Bootstrap</title>',
+        '<title>BIG BROTHER — Invoice Generator Mobile</title>'
       );
+
+      /*
+       * MOBILE TELEGRAM FLOW
+       * Preserve the exact saved invoice result for Telegram routing.
+       */
+      const bbInvoiceSaveMarker=
+        '    await postSalesInvoiceBundle(payload, paymentPayload);';
+
+      const bbInvoiceSaveReplacement=
+        '    const bbSavedInvoiceResult =\\n'
+        +'      await postSalesInvoiceBundle(payload, paymentPayload);';
+
+      if(!html.includes(bbInvoiceSaveMarker)){
+        throw new Error('Mobile Invoice save-result marker was not found.');
+      }
+
+      html=html.replace(
+        bbInvoiceSaveMarker,
+        bbInvoiceSaveReplacement
+      );
+
+      const bbInvoiceClearMarker=
+        '    clearAllAfterSuccessfulSave();';
+
+      const bbInvoiceTelegramBeforeClear=
+        '    if (window.BBTelegramInvoiceShare?.afterComplete) {\\n'
+        +'      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\\n'
+        +'    }\\n\\n'
+        +'    clearAllAfterSuccessfulSave();';
+
+      if(!html.includes(bbInvoiceClearMarker)){
+        throw new Error('Mobile Invoice Telegram post-save marker was not found.');
+      }
+
+      html=html.replace(
+        bbInvoiceClearMarker,
+        bbInvoiceTelegramBeforeClear
+      );
+
+      /*
+       * Mobile CSS only.
+       */
+      const headClose=
+        html.toLowerCase().indexOf('</head>');
+
+      if(headClose<0){
+        throw new Error('Invoice Generator source is missing </head>.');
+      }
+
+      html=
+        html.slice(0,headClose)
+        +'<link rel="stylesheet" href="mobile-invoice.css?v=20260914-1">\n'
+        +'<link rel="stylesheet" href="mobile-invoice-preview.css?v=20260914-1">\n'
+        +'<link rel="stylesheet" href="telegram-invoice-share-v1.css?v=20260920-digitalinvoice1">\n'
+        +html.slice(headClose);
+
+      /*
+       * SAME CORE ORDER AS DESKTOP:
+       *   1. Supabase adapter
+       *   2. Batch guard
+       *   3. Direct Sale stock source
+       *   4. Google Sheet mirror
+       *   5. Cash + Bank
+       *
+       * Then Mobile-only controllers.
+       *
+       * Desktop Product Picker is intentionally NOT loaded here.
+       */
+      const safeAdapter=
+        adapterJs.replace(/<\/script/gi,'<\\/script');
+
+      const featureScripts=
+        '<scr'+'ipt>'+safeAdapter+'</scr'+'ipt>\n'
+        +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260924-hide-source-no-zero1"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="invoice-backup-v1.js?v=20260924-invoiceseq1"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="split-payment-v1.js?v=20260925-mobile-desktopcore1"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="mobile-invoice.js?v=20260920-iosdecimal1"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="invoice-ar-summary-v1.js?v=20260921-textonly1"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="telegram-invoice-share-v1.js?v=20260920-arrealtime2"></scr'+'ipt>';
+
+      const bodyCloseIndex=
+        html.toLowerCase().lastIndexOf('</body>');
+
+      if(bodyCloseIndex<0){
+        throw new Error('Invoice Generator source is missing its closing body tag.');
+      }
+
+      html=
+        html.slice(0,bodyCloseIndex)
+        +featureScripts
+        +'\n'
+        +html.slice(bodyCloseIndex);
+
+      document.open();
+      document.write(html);
+      document.close();
+
+    }catch(error){
+      console.error('Invoice Generator mobile loader failed:',error);
+
+      const safeMessage=
+        String(error?.message||error)
+          .replace(
+            /[&<>"']/g,
+            c=>({
+              '&':'&amp;',
+              '<':'&lt;',
+              '>':'&gt;',
+              '"':'&quot;',
+              "'":'&#039;'
+            }[c])
+          );
+
+      document.body.innerHTML=
+        '<div class="bb-loader">'
+        +'<div class="bb-loader-card">'
+        +'Could not open Invoice Generator'
+        +'<div class="bb-loader-sub">'+safeMessage+'</div>'
+        +'</div>'
+        +'</div>';
     }
-
-        html=html.replace('loadNextInvoiceNumber();','/* Supabase boot owns Invoice No. */');
-    html=html.replace('loadInvoiceBootstrapFast();','/* Supabase boot owns Master bootstrap. */');
-    html=html.replace('loadSimpleBatchPicker();','/* Supabase boot owns Batch picker. */');
-
-    html=html.replaceAll(
-      'This will save the invoice to the Sales Data Google Sheet.',
-      'This will save the invoice to the BIG BROTHER Database.'
-    );
-
-    /* MOBILE ONLY — after the exact invoice is saved, preserve the save
-       result so Customer Telegram routing can work with that invoice_id.
-       Desktop Invoice Generator remains untouched. */
-    const bbInvoiceSaveMarker='    await postSalesInvoiceBundle(payload, paymentPayload);';
-    const bbInvoiceSaveReplacement='    const bbSavedInvoiceResult =\\n      await postSalesInvoiceBundle(payload, paymentPayload);';
-
-    if(!html.includes(bbInvoiceSaveMarker)){
-      throw new Error('Invoice Telegram save-result marker was not found.');
-    }
-    html=html.replace(bbInvoiceSaveMarker,bbInvoiceSaveReplacement);
-
-    const bbInvoiceClearMarker='    clearAllAfterSuccessfulSave();';
-    const bbInvoiceTelegramBeforeClear=
-      '    if (window.BBTelegramInvoiceShare?.afterComplete) {\\n'
-      +'      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\\n'
-      +'    }\\n\\n'
-      +'    clearAllAfterSuccessfulSave();';
-
-    if(!html.includes(bbInvoiceClearMarker)){
-      throw new Error('Invoice Telegram post-save marker was not found.');
-    }
-    html=html.replace(bbInvoiceClearMarker,bbInvoiceTelegramBeforeClear);
-    html=html.replaceAll(
-      'Google Sheets -> separate Sales Data file',
-      'Supabase PostgreSQL -> Sales Database'
-    );
-    html=html.replace(
-      '<title>BIG BROTHER — Invoice Generator V2.4.5 Fast Master Bootstrap</title>',
-      '<title>BIG BROTHER — Invoice Generator Mobile</title>'
-    );
-
-    const headClose=html.toLowerCase().indexOf('</head>');
-    if(headClose<0)throw new Error('Invoice Generator source is missing </head>.');
-    html=html.slice(0,headClose)
-      +'<link rel="stylesheet" href="mobile-invoice.css?v=20260914-1">\n'
-      +'<link rel="stylesheet" href="mobile-invoice-preview.css?v=20260914-1">\n'
-      +'<link rel="stylesheet" href="telegram-invoice-share-v1.css?v=20260920-digitalinvoice1">\n'
-      +html.slice(headClose);
-
-    const safeAdapter=adapterJs.replace(/<\/script/gi,'<\\/script');
-    const featureScripts=
-      '<scr'+'ipt>'+safeAdapter+'</scr'+'ipt>\n'
-      +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260924-hide-source-no-zero1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="invoice-backup-v1.js?v=20260924-invoiceseq1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="split-payment-v1.js?v=20260925-mobiledb6"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="mobile-invoice.js?v=20260920-iosdecimal1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="invoice-ar-summary-v1.js?v=20260921-textonly1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="telegram-invoice-share-v1.js?v=20260920-arrealtime2"></scr'+'ipt>';
-
-    const bodyCloseIndex=html.toLowerCase().lastIndexOf('</body>');
-    if(bodyCloseIndex<0)throw new Error('Invoice Generator source is missing its closing body tag.');
-    html=html.slice(0,bodyCloseIndex)+featureScripts+'\n'+html.slice(bodyCloseIndex);
-
-    document.open();
-    document.write(html);
-    document.close();
-  }catch(error){
-    console.error('Invoice Generator mobile loader failed:',error);
-    document.body.innerHTML='<div class="bb-loader"><div class="bb-loader-card">Could not open Invoice Generator<div class="bb-loader-sub">'+String(error?.message||error).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))+'</div></div></div>';
-  }
-})();
-</script>
+  })();
+  </script>
 </body>
 </html>

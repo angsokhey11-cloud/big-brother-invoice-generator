@@ -98,7 +98,7 @@
 
     const [sourceResponse,adapterResponse]=await Promise.all([
       fetch('legacy-google-v2.4.5.html?v=20260924-confirmfix2',{cache:'no-store'}),
-      fetch('supabase-adapter.js?v=20260924-cashbank1',{cache:'no-store'})
+      fetch('supabase-adapter.js?v=20260925-mobiledb2',{cache:'no-store'})
     ]);
 
     if(!sourceResponse.ok)throw new Error('Could not load Invoice Generator source.');
@@ -111,6 +111,93 @@
 
     html=window.BBInvoiceDualCurrencyPatch.patchLegacy(html);
     adapterJs=window.BBInvoiceDualCurrencyPatch.patchAdapter(adapterJs);
+
+    /*
+     * MOBILE DATABASE STARTUP HARDENING V2
+     * Core Invoice bootstrap is authoritative.
+     * Batch refresh is optional and must never make Mobile look disconnected
+     * or disable Complete when Supabase Invoice data is already healthy.
+     */
+    const bbMobileBootOld=`
+  async function bbStartSupabaseInvoice() {
+    try {
+      await bbEnsureSession();
+      await Promise.all([
+        loadInvoiceBootstrapFast(),
+        loadSimpleBatchPicker()
+      ]);
+
+      if (
+        document.getElementById('invoiceNumber')?.value === 'Loading...' ||
+        document.getElementById('invoiceNumber')?.value === 'Unavailable'
+      ) {
+        await loadNextInvoiceNumber();
+      }
+    } catch (error) {
+      bbShowDatabaseError(error);
+      const button = document.querySelector('.complete-btn');
+      if (button) {
+        button.disabled = true;
+        button.title = error?.message || 'Sign in required';
+      }
+    }
+  }
+`;
+
+    const bbMobileBootNew=`
+  async function bbStartSupabaseInvoice() {
+    const button = document.querySelector('.complete-btn');
+
+    try {
+      await bbEnsureSession();
+
+      /* Core invoice data must succeed first. */
+      await loadInvoiceBootstrapFast();
+
+      if (
+        document.getElementById('invoiceNumber')?.value === 'Loading...' ||
+        document.getElementById('invoiceNumber')?.value === 'Unavailable'
+      ) {
+        await loadNextInvoiceNumber();
+      }
+
+      /* A previous secondary-load error must not leave Complete disabled. */
+      if (button) {
+        button.disabled = false;
+        button.title = '';
+      }
+    } catch (error) {
+      bbShowDatabaseError(error);
+
+      if (button) {
+        button.disabled = true;
+        button.title = error?.message || 'Sign in required';
+      }
+
+      return;
+    }
+
+    /*
+     * Batch is a secondary convenience source.
+     * If it cannot refresh, Direct Sale and normal Invoice creation remain live.
+     */
+    try {
+      if (typeof loadSimpleBatchPicker === 'function') {
+        await loadSimpleBatchPicker();
+      } else {
+        console.warn('BIG BROTHER Mobile Invoice: Batch picker function is unavailable.');
+      }
+    } catch (error) {
+      console.warn('BIG BROTHER Mobile Invoice Batch refresh:', error);
+    }
+  }
+`;
+
+    if(!adapterJs.includes(bbMobileBootOld)){
+      throw new Error('Mobile Supabase startup patch marker was not found.');
+    }
+
+    adapterJs=adapterJs.replace(bbMobileBootOld,bbMobileBootNew);
 
     /* iOS MOBILE ONLY — keep decimal keyboard inside the original tap.
        Desktop source is not modified. */
@@ -208,7 +295,7 @@
       +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'+'ipt>\n'
       +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260924-hide-source-no-zero1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="invoice-backup-v1.js?v=20260924-invoiceseq1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="split-payment-v1.js?v=20260924-cashbank1"></scr'+'ipt>\n'
+      +'<scr'+'ipt src="split-payment-v1.js?v=20260925-mobiledb2"></scr'+'ipt>\n'
       +'<scr'+'ipt src="mobile-invoice.js?v=20260920-iosdecimal1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="invoice-ar-summary-v1.js?v=20260921-textonly1"></scr'+'ipt>\n'

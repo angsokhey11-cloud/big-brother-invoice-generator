@@ -98,7 +98,7 @@
 
     const [sourceResponse,adapterResponse]=await Promise.all([
       fetch('legacy-google-v2.4.5.html?v=20260924-confirmfix2',{cache:'no-store'}),
-      fetch('supabase-adapter.js?v=20260925-mobiledb3',{cache:'no-store'})
+      fetch('supabase-adapter.js?v=20260925-mobiledb4',{cache:'no-store'})
     ]);
 
     if(!sourceResponse.ok)throw new Error('Could not load Invoice Generator source.');
@@ -111,6 +111,21 @@
 
     html=window.BBInvoiceDualCurrencyPatch.patchLegacy(html);
     adapterJs=window.BBInvoiceDualCurrencyPatch.patchAdapter(adapterJs);
+
+    /*
+     * MOBILE DATABASE SCOPE FIX V4
+     * Export the bootstrap applier from the legacy script itself.
+     * This preserves direct access to its lexical state:
+     * locations, products, notes, banking, and their render helpers.
+     */
+    const bbLegacyApplyMarker='function applyInvoiceBootstrapFast(data) {';
+    if(!html.includes(bbLegacyApplyMarker)){
+      throw new Error('Mobile legacy bootstrap function marker was not found.');
+    }
+    html=html.replace(
+      bbLegacyApplyMarker,
+      'window.applyInvoiceBootstrapFast = function applyInvoiceBootstrapFast(data) {'
+    );
 
     /*
      * MOBILE BOOTSTRAP BRIDGE V3
@@ -264,6 +279,23 @@
     );
 
     /*
+     * Never depend on cross-script bare global resolution on Mobile.
+     * The Supabase adapter owns these window functions.
+     */
+    adapterJs=adapterJs.replaceAll(
+      'return loadInvoiceBootstrapFast();',
+      'return window.loadInvoiceBootstrapFast();'
+    );
+    adapterJs=adapterJs.replaceAll(
+      'await loadInvoiceBootstrapFast();',
+      'await window.loadInvoiceBootstrapFast();'
+    );
+    adapterJs=adapterJs.replaceAll(
+      'await loadNextInvoiceNumber();',
+      'await window.loadNextInvoiceNumber();'
+    );
+
+    /*
      * MOBILE DATABASE STARTUP HARDENING V2
      * Core Invoice bootstrap is authoritative.
      * Batch refresh is optional and must never make Mobile look disconnected
@@ -333,8 +365,8 @@
      * If it cannot refresh, Direct Sale and normal Invoice creation remain live.
      */
     try {
-      if (typeof loadSimpleBatchPicker === 'function') {
-        await loadSimpleBatchPicker();
+      if (typeof window.loadSimpleBatchPicker === 'function') {
+        await window.loadSimpleBatchPicker();
       } else {
         console.warn('BIG BROTHER Mobile Invoice: Batch picker function is unavailable.');
       }
@@ -392,7 +424,18 @@
       );
     }
 
-    html=html.replace('loadNextInvoiceNumber();','/* Supabase boot owns Invoice No. */');
+    /*
+     * Export Batch loader too so the secondary startup path is deterministic.
+     */
+    const bbLegacyBatchMarker='async function loadSimpleBatchPicker(';
+    if(html.includes(bbLegacyBatchMarker)){
+      html=html.replace(
+        bbLegacyBatchMarker,
+        'window.loadSimpleBatchPicker = async function loadSimpleBatchPicker('
+      );
+    }
+
+        html=html.replace('loadNextInvoiceNumber();','/* Supabase boot owns Invoice No. */');
     html=html.replace('loadInvoiceBootstrapFast();','/* Supabase boot owns Master bootstrap. */');
     html=html.replace('loadSimpleBatchPicker();','/* Supabase boot owns Batch picker. */');
 
@@ -446,7 +489,7 @@
       +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'+'ipt>\n'
       +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260924-hide-source-no-zero1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="invoice-backup-v1.js?v=20260924-invoiceseq1"></scr'+'ipt>\n'
-      +'<scr'+'ipt src="split-payment-v1.js?v=20260925-mobiledb3"></scr'+'ipt>\n'
+      +'<scr'+'ipt src="split-payment-v1.js?v=20260925-mobiledb4"></scr'+'ipt>\n'
       +'<scr'+'ipt src="mobile-invoice.js?v=20260920-iosdecimal1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
       +'<scr'+'ipt src="invoice-ar-summary-v1.js?v=20260921-textonly1"></scr'+'ipt>\n'

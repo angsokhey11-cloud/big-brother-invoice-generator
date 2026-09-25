@@ -509,6 +509,24 @@
           ])
         );
 
+        window.BB_INVOICE_SELLING_UNITS =
+          Array.isArray(data.sellingUnits)
+            ? data.sellingUnits.map(row => ({
+                sellingUnitId: Number(row.sellingUnitId || 0),
+                targetType: String(row.targetType || '').trim().toUpperCase(),
+                targetCode: String(row.targetCode || '').trim(),
+                sellingUnitName: String(row.sellingUnitName || '').trim(),
+                baseUnitName: String(row.baseUnitName || '').trim(),
+                baseQty: Number(row.baseQty || 0),
+                sortOrder: Number(row.sortOrder || 10)
+              })).filter(row =>
+                row.targetType &&
+                row.targetCode &&
+                row.sellingUnitName &&
+                row.baseQty > 0
+              )
+            : [];
+
         if (!applyInvoiceBootstrapFast(data)) {
           throw new Error('Could not apply invoice database data.');
         }

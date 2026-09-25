@@ -41,7 +41,7 @@ html.bb-mobile-invoice-page .header-main h1{
 html.bb-mobile-invoice-page .header-currency{
   width:100% !important;
   display:grid !important;
-  grid-template-columns:76px 132px minmax(0,1fr) !important;
+  grid-template-columns:90px 132px minmax(0,1fr) !important;
   gap:6px !important;
   align-items:end !important;
   margin:0 !important;
@@ -50,7 +50,7 @@ html.bb-mobile-invoice-page .header-currency{
   background:transparent !important;
 }
 html.bb-mobile-invoice-page .header-currency>select{
-  width:76px !important;
+  width:90px !important;
   min-width:0 !important;
   height:40px !important;
   min-height:40px !important;
@@ -479,10 +479,10 @@ html.bb-mobile-invoice-page.bb-mobile-embedded body{
 
 @media (max-width:380px){
   html.bb-mobile-invoice-page .header-currency{
-    grid-template-columns:69px 117px minmax(0,1fr) !important;
+    grid-template-columns:82px 117px minmax(0,1fr) !important;
     gap:4px !important;
   }
-  html.bb-mobile-invoice-page .header-currency>select{width:69px !important;font-size:12px !important}
+  html.bb-mobile-invoice-page .header-currency>select{width:82px !important;font-size:12px !important}
   html.bb-mobile-invoice-page .header-rate{padding:0 4px !important;font-size:9px !important}
   html.bb-mobile-invoice-page #batchNumber{font-size:10px !important}
   html.bb-mobile-invoice-page .product-table-head,

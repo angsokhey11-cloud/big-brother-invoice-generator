@@ -120,10 +120,15 @@ function ensureStyles(){
     '#bbInvoiceSellingUnitBox .bb-su-chip small{display:block;margin-top:1px;font-size:8px;font-weight:800;opacity:.78}',
     '#bbInvoiceSellingUnitBox .bb-su-preview{display:none;margin-top:8px;padding:7px 9px;border-radius:8px;background:#eef7ff;color:#17457a;font-size:10px;font-weight:900;line-height:1.35}',
     '#bbInvoiceSellingUnitBox .bb-su-preview.open{display:block}',
-    '.bb-row-selling-units{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:3px}',
-    '.bb-row-selling-unit-btn{min-height:25px;border:1px solid #cad8e8;border-radius:7px;padding:3px 7px;background:#fff;color:#46617d;font-size:9px;font-weight:900;cursor:pointer}',
+    '#bbInvoiceDesktopPicker ~ .product-table-head{grid-template-columns:minmax(260px,1fr) 122px 110px 125px!important}',
+    '#bbInvoiceDesktopPicker ~ .product-table-head + #productList .product{grid-template-columns:minmax(260px,1fr) 122px 110px 125px!important}',
+    '.product-qty-unit-cell.bb-has-selling-units{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:4px!important;align-items:center!important}',
+    '.product-qty-unit-cell.bb-has-selling-units .product-qty-input{width:100%!important;min-width:64px!important}',
+    '.product-qty-unit-cell.bb-has-selling-units .product-unit-label{display:none!important}',
+    '.bb-row-selling-units{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;width:100%;margin:0}',
+    '.bb-row-selling-unit-btn{min-width:0;min-height:24px;border:1px solid #cad8e8;border-radius:7px;padding:3px 4px;background:#fff;color:#46617d;font-size:8px;font-weight:900;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '.bb-row-selling-unit-btn.active{border-color:#245fae;background:#245fae;color:#fff}',
-    '.bb-row-selling-unit-note{width:100%;margin-top:2px;color:#245fae;font-size:8px;font-weight:900;line-height:1.2}',
+    '.bb-row-selling-unit-note{grid-column:1/-1;width:100%;margin-top:1px;color:#245fae;font-size:8px;font-weight:900;line-height:1.2;text-align:center}',
     '@media(max-width:600px){#bbInvoiceSellingUnitBox{margin:0 12px 10px;padding:9px}#bbInvoiceSellingUnitBox .bb-su-chip{flex:1;min-width:92px}}'
   ].join('');
   document.head.appendChild(s);
@@ -564,6 +569,8 @@ function ensureDesktopRowOptions(row,product){
 
   const cell=row.querySelector('.product-qty-unit-cell');
   if(!cell)return;
+
+  cell.classList.add('bb-has-selling-units');
 
   let wrap=cell.querySelector('.bb-row-selling-units');
   if(!wrap){

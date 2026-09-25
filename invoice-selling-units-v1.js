@@ -30,7 +30,7 @@ function allUnits(){
 }
 
 function unitsFor(product){
-  if(!product || !selectedBatch())return [];
+  if(!product)return [];
 
   const entry=clean(product.entryType||'EXACT').toUpperCase();
   const targetType=entry==='GROUP'?'GROUP':'PRODUCT';
@@ -56,6 +56,56 @@ function baseUnitFor(product,unit){
   return clean(unit?.baseUnitName||product?.unit||'Unit')||'Unit';
 }
 
+function availableBaseQty(product){
+  const batch=selectedBatch();
+  if(batch){
+    return num(product?.remainingQty ?? product?.pendingQty);
+  }
+
+  const code=clean(product?.code||product?.productCode);
+  if(!code)return 0;
+
+  try{
+    const balances=window.BBDirectSaleSourceV1?.balances?.();
+    const row=Array.isArray(balances)
+      ? balances.find(item=>clean(item?.productCode)===code)
+      : null;
+    return num(row?.totalAvailable);
+  }catch(_){
+    return 0;
+  }
+}
+
+function productForRow(row){
+  if(!row)return null;
+  const code=clean(row.dataset.productCode);
+  const entry=clean(row.dataset.entryType||'EXACT').toUpperCase();
+  const groupCode=clean(row.dataset.productGroupCode);
+
+  try{
+    if(typeof getInvoiceSearchPool==='function'){
+      const pool=getInvoiceSearchPool();
+      const found=(Array.isArray(pool)?pool:[]).find(item=>{
+        const itemEntry=clean(item?.entryType||'EXACT').toUpperCase();
+        if(entry==='GROUP'){
+          return itemEntry==='GROUP' &&
+            clean(item?.groupCode||item?.code)===groupCode;
+        }
+        return itemEntry!=='GROUP' && clean(item?.code)===code;
+      });
+      if(found)return found;
+    }
+  }catch(_){}
+
+  return {
+    code:entry==='GROUP'?groupCode:code,
+    groupCode:entry==='GROUP'?groupCode:'',
+    entryType:entry,
+    unit:clean(row.dataset.bbBaseUnit||row.dataset.unit||'Unit'),
+    name:clean(row.dataset.product)
+  };
+}
+
 function ensureStyles(){
   if(document.getElementById('bbInvoiceSellingUnitStyle'))return;
   const s=document.createElement('style');
@@ -70,6 +120,10 @@ function ensureStyles(){
     '#bbInvoiceSellingUnitBox .bb-su-chip small{display:block;margin-top:1px;font-size:8px;font-weight:800;opacity:.78}',
     '#bbInvoiceSellingUnitBox .bb-su-preview{display:none;margin-top:8px;padding:7px 9px;border-radius:8px;background:#eef7ff;color:#17457a;font-size:10px;font-weight:900;line-height:1.35}',
     '#bbInvoiceSellingUnitBox .bb-su-preview.open{display:block}',
+    '.bb-row-selling-units{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:3px}',
+    '.bb-row-selling-unit-btn{min-height:25px;border:1px solid #cad8e8;border-radius:7px;padding:3px 7px;background:#fff;color:#46617d;font-size:9px;font-weight:900;cursor:pointer}',
+    '.bb-row-selling-unit-btn.active{border-color:#245fae;background:#245fae;color:#fff}',
+    '.bb-row-selling-unit-note{width:100%;margin-top:2px;color:#245fae;font-size:8px;font-weight:900;line-height:1.2}',
     '@media(max-width:600px){#bbInvoiceSellingUnitBox{margin:0 12px 10px;padding:9px}#bbInvoiceSellingUnitBox .bb-su-chip{flex:1;min-width:92px}}'
   ].join('');
   document.head.appendChild(s);
@@ -109,7 +163,7 @@ function renderOptions(){
   const product=current?.product;
   const units=current?.units||[];
 
-  if(!product || !units.length || !selectedBatch()){
+  if(!product || !units.length){
     box.classList.remove('open');
     box.style.display='none';
     return;
@@ -195,10 +249,10 @@ function refreshPreview(){
     text+=' · '+formatMoney(displayPrice,currency)+' / '+selling;
   }
 
-  const remaining=num(current.product?.remainingQty ?? current.product?.pendingQty);
+  const remaining=availableBaseQty(current.product);
   if(remaining>EPS){
     const full=Math.floor((remaining+EPS)/factor);
-    text+=' · Batch can sell '+formatQty(full)+' '+selling;
+    text+=' · '+(selectedBatch()?'Batch':'Warehouse')+' can sell '+formatQty(full)+' '+selling;
     const remainder=Math.max(0,remaining-(full*factor));
     if(remainder>EPS)text+=' + '+formatQty(remainder)+' '+base;
   }
@@ -238,11 +292,12 @@ function validateAltQty(qty,unit){
   if(!(factor>1))return 'Selling Unit conversion is invalid.';
 
   const baseQty=qty*factor;
-  const remaining=num(current?.product?.remainingQty ?? current?.product?.pendingQty);
+  const remaining=availableBaseQty(current?.product);
 
   if(remaining>EPS && baseQty>remaining+EPS){
     return 'Only '+formatQty(remaining)+' '+baseUnitFor(current.product,unit)+
-      ' remaining in this Batch. '+formatQty(qty)+' '+clean(unit.sellingUnitName)+
+      ' remaining in '+(selectedBatch()?'this Batch':'Warehouse')+'. '+
+      formatQty(qty)+' '+clean(unit.sellingUnitName)+
       ' needs '+formatQty(baseQty)+' '+baseUnitFor(current.product,unit)+'.';
   }
 
@@ -395,6 +450,232 @@ function installFinalizePatch(){
   window.finalizeInvoiceProductAdd=wrapped;
 }
 
+
+function selectedItemForRow(row){
+  try{
+    const list=Array.isArray(window.selectedProducts)
+      ? window.selectedProducts
+      : (typeof selectedProducts!=='undefined'&&Array.isArray(selectedProducts)?selectedProducts:[]);
+    return list.find(item=>clean(item?.id)===clean(row?.dataset?.lineId))||null;
+  }catch(_){
+    return null;
+  }
+}
+
+function updateRowSellingUnitUi(row){
+  const wrap=row?.querySelector('.bb-row-selling-units');
+  if(!wrap)return;
+
+  const factor=num(row.dataset.bbSellingFactor)||1;
+  const activeName=clean(row.dataset.bbSellingUnitName);
+  wrap.querySelectorAll('.bb-row-selling-unit-btn').forEach(btn=>{
+    const name=clean(btn.dataset.unitName);
+    btn.classList.toggle('active',
+      (factor<=1 && !name) ||
+      (factor>1 && name===activeName)
+    );
+  });
+
+  const note=wrap.querySelector('.bb-row-selling-unit-note');
+  if(note){
+    note.textContent=factor>1
+      ? '1 '+activeName+' = '+formatQty(factor)+' '+clean(row.dataset.bbBaseUnit||'Unit')
+      : '';
+  }
+
+  const unitLabel=row.querySelector('.product-unit-label');
+  if(unitLabel){
+    unitLabel.textContent=factor>1
+      ? activeName
+      : clean(row.dataset.bbBaseUnit||row.dataset.unit||'Unit');
+  }
+}
+
+function switchRowSellingUnit(row,unit){
+  if(!row)return;
+
+  const oldFactor=Math.max(1,num(row.dataset.bbSellingFactor)||1);
+  const currentUsd=num(row.dataset.usdPrice);
+  const baseUsd=oldFactor>0?currentUsd/oldFactor:currentUsd;
+
+  const baseUnit=clean(
+    row.dataset.bbBaseUnit ||
+    unit?.baseUnitName ||
+    row.dataset.unit ||
+    'Unit'
+  )||'Unit';
+
+  const newFactor=unit?Math.max(1,num(unit.baseQty)):1;
+  const newName=unit?clean(unit.sellingUnitName):'';
+  const nextUsd=baseUsd*newFactor;
+
+  row.dataset.bbBaseUnit=baseUnit;
+  row.dataset.usdPrice=String(nextUsd);
+
+  if(unit && newFactor>1){
+    row.dataset.bbSellingUnitName=newName;
+    row.dataset.bbSellingFactor=String(newFactor);
+    row.dataset.unit=newName;
+  }else{
+    delete row.dataset.bbSellingUnitName;
+    delete row.dataset.bbSellingFactor;
+    delete row.dataset.bbSellingQty;
+    delete row.dataset.bbBaseQty;
+    row.dataset.unit=baseUnit;
+  }
+
+  const priceInput=row.querySelector('.product-price-input');
+  if(priceInput){
+    const currency=typeof getCurrency==='function'?getCurrency():'USD';
+    const display=typeof usdToSelected==='function'
+      ? usdToSelected(nextUsd,currency)
+      : nextUsd;
+    priceInput.value=currency==='KHR'
+      ? String(Math.round(display))
+      : String(Number(display.toFixed(2)));
+    priceInput.step=currency==='KHR'?'1':'0.01';
+  }
+
+  const item=selectedItemForRow(row);
+  if(item){
+    item.usdPrice=nextUsd;
+    if(unit && newFactor>1){
+      item.sellingUnit=newName;
+      item.sellingUnitBaseQty=newFactor;
+      item.baseUnit=baseUnit;
+    }else{
+      delete item.sellingUnit;
+      delete item.sellingUnitBaseQty;
+      delete item.baseUnit;
+      delete item.sellingQty;
+      delete item.baseQty;
+    }
+  }
+
+  updateRowSellingUnitUi(row);
+  try{calculate()}catch(_){}
+}
+
+function ensureDesktopRowOptions(row,product){
+  if(!row || !document.getElementById('bbInvoiceDesktopPicker'))return;
+
+  const units=unitsFor(product||productForRow(row));
+  if(!units.length)return;
+
+  const cell=row.querySelector('.product-qty-unit-cell');
+  if(!cell)return;
+
+  let wrap=cell.querySelector('.bb-row-selling-units');
+  if(!wrap){
+    wrap=document.createElement('div');
+    wrap.className='bb-row-selling-units';
+    cell.appendChild(wrap);
+  }
+
+  const baseUnit=baseUnitFor(product||productForRow(row),units[0]);
+  row.dataset.bbBaseUnit=clean(row.dataset.bbBaseUnit||baseUnit)||'Unit';
+
+  wrap.innerHTML=
+    '<button type="button" class="bb-row-selling-unit-btn" data-unit-name="">'+
+      escapeHtml(baseUnit)+
+    '</button>'+
+    units.map((unit,index)=>
+      '<button type="button" class="bb-row-selling-unit-btn" data-unit-index="'+index+'" data-unit-name="'+escapeHtml(clean(unit.sellingUnitName))+'">'+
+        escapeHtml(clean(unit.sellingUnitName))+
+      '</button>'
+    ).join('')+
+    '<div class="bb-row-selling-unit-note"></div>';
+
+  wrap.querySelector('[data-unit-name=""]')?.addEventListener('click',()=>{
+    switchRowSellingUnit(row,null);
+  });
+
+  wrap.querySelectorAll('[data-unit-index]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const unit=units[Number(btn.dataset.unitIndex)];
+      if(unit)switchRowSellingUnit(row,unit);
+    });
+  });
+
+  updateRowSellingUnitUi(row);
+}
+
+function refreshDesktopRows(){
+  if(!document.getElementById('bbInvoiceDesktopPicker'))return;
+  document.querySelectorAll('#productList .product').forEach(row=>{
+    ensureDesktopRowOptions(row,productForRow(row));
+  });
+}
+
+function installDesktopCreatePatch(){
+  const oldCreate=window.createProduct;
+  if(typeof oldCreate!=='function'||oldCreate.__bbSellingUnitsDesktopWrapped)return;
+
+  const wrapped=function(){
+    const product=arguments[4]||null;
+    const result=oldCreate.apply(this,arguments);
+    const lineId=clean(arguments[2]);
+    const row=[...document.querySelectorAll('#productList .product')]
+      .find(node=>clean(node.dataset.lineId)===lineId) ||
+      document.querySelector('#productList .product:last-child');
+    if(row)ensureDesktopRowOptions(row,product||productForRow(row));
+    return result;
+  };
+  wrapped.__bbSellingUnitsDesktopWrapped=true;
+  window.createProduct=wrapped;
+}
+
+function installCustomerPricePatch(){
+  const oldApply=window.applyCustomerPricesToProducts;
+  if(typeof oldApply!=='function'||oldApply.__bbSellingUnitsWrapped)return;
+
+  const wrapped=function(){
+    const active=[...document.querySelectorAll('#productList .product')]
+      .filter(row=>(num(row.dataset.bbSellingFactor)||1)>1)
+      .map(row=>({
+        row,
+        factor:num(row.dataset.bbSellingFactor)||1
+      }));
+
+    const result=oldApply.apply(this,arguments);
+
+    active.forEach(({row,factor})=>{
+      const item=selectedItemForRow(row);
+      if(item?.manualPrice)return;
+
+      const baseUsd=num(row.dataset.usdPrice);
+      const nextUsd=baseUsd*factor;
+      row.dataset.usdPrice=String(nextUsd);
+      item.usdPrice=nextUsd;
+
+      const input=row.querySelector('.product-price-input');
+      if(input){
+        const currency=typeof getCurrency==='function'?getCurrency():'USD';
+        const display=typeof usdToSelected==='function'
+          ? usdToSelected(nextUsd,currency)
+          : nextUsd;
+        input.value=currency==='KHR'
+          ? String(Math.round(display))
+          : String(Number(display.toFixed(2)));
+      }
+    });
+
+    try{calculate()}catch(_){}
+    return result;
+  };
+
+  wrapped.__bbSellingUnitsWrapped=true;
+  window.applyCustomerPricesToProducts=wrapped;
+}
+
+function installDesktopObserver(){
+  const list=document.getElementById('productList');
+  if(!list||list.dataset.bbSellingUnitsObserved==='1')return;
+  list.dataset.bbSellingUnitsObserved='1';
+  new MutationObserver(()=>refreshDesktopRows())
+    .observe(list,{childList:true,subtree:false});
+}
+
 function findRow(lineId){
   const wanted=clean(lineId);
   return [...document.querySelectorAll('#productList .product')]
@@ -477,8 +758,12 @@ function start(){
   installFinalizePatch();
   installPayloadPatch();
   installCancelCleanup();
+  installDesktopCreatePatch();
+  installCustomerPricePatch();
+  installDesktopObserver();
+  refreshDesktopRows();
 
-  window.BB_INVOICE_SELLING_UNITS_BUILD='20260925-optional-v1';
+  window.BB_INVOICE_SELLING_UNITS_BUILD='20260925-optional-v2';
 }
 
 if(document.readyState==='loading'){

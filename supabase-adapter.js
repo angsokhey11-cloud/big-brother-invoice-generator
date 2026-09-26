@@ -881,6 +881,54 @@
   };
 
   /* -----------------------------
+     Fresh selling units for newly-added products/groups
+  ----------------------------- */
+  window.loadInvoiceSellingUnitsForTarget = async function loadInvoiceSellingUnitsForTarget(productCode = '', groupCode = '') {
+    const pCode = String(productCode || '').trim();
+    const gCode = String(groupCode || '').trim();
+
+    const data = await bbRpc('bb_sales_product_selling_units', {
+      p_product_code: pCode || null,
+      p_group_code: gCode || null
+    });
+
+    const fresh = (Array.isArray(data?.units) ? data.units : []).map(row => ({
+      sellingUnitId: Number(row.sellingUnitId || 0),
+      targetType: String(row.targetType || '').trim().toUpperCase(),
+      targetCode: String(row.targetCode || '').trim(),
+      sellingUnitName: String(row.sellingUnitName || '').trim(),
+      baseUnitName: String(row.baseUnitName || '').trim(),
+      baseQty: Number(row.baseQty || 0),
+      sortOrder: Number(row.sortOrder || 10)
+    })).filter(row =>
+      row.targetType &&
+      row.targetCode &&
+      row.sellingUnitName &&
+      row.baseQty > 0
+    );
+
+    const existing = Array.isArray(window.BB_INVOICE_SELLING_UNITS)
+      ? window.BB_INVOICE_SELLING_UNITS
+      : [];
+
+    const requested = new Set(
+      fresh.map(row => row.targetType + '|' + row.targetCode)
+    );
+
+    if (pCode) requested.add('PRODUCT|' + pCode);
+    if (gCode) requested.add('GROUP|' + gCode);
+
+    window.BB_INVOICE_SELLING_UNITS = existing
+      .filter(row => !requested.has(
+        String(row.targetType || '').trim().toUpperCase() + '|' +
+        String(row.targetCode || '').trim()
+      ))
+      .concat(fresh);
+
+    return fresh;
+  };
+
+  /* -----------------------------
      Batch picker
   ----------------------------- */
   window.requestSimpleBatchList = async function requestSimpleBatchListSupabase() {

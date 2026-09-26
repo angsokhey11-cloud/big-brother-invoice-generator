@@ -943,7 +943,21 @@
     if (!requested || requested === 'Loading...' || requested === 'Unavailable') {
       throw new Error('Invoice number is not ready yet.');
     }
-    return bbRpc('bb_sales_check_invoice_no', { p_invoice_no: requested });
+
+    const customer = bbFindSelectedCustomer();
+    const customerId = String(
+      customer?.customerId ||
+      bbSelectedCustomerId ||
+      ''
+    ).trim();
+
+    return bbRpc(
+      'bb_sales_check_invoice_customer',
+      {
+        p_invoice_no: requested,
+        p_customer_id: customerId || null
+      }
+    );
   };
 
   window.checkPaymentTransactionIdAvailable = async function checkPaymentTransactionIdAvailableSupabase(transactionId) {

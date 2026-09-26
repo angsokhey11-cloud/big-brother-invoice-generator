@@ -266,6 +266,19 @@ function refreshPreview(){
   preview.classList.add('open');
 }
 
+async function refreshUnitsForProduct(product){
+  if(!product || typeof window.loadInvoiceSellingUnitsForTarget!=='function'){
+    return unitsFor(product);
+  }
+
+  const entry=clean(product.entryType||'EXACT').toUpperCase();
+  const productCode=entry==='GROUP'?'':clean(product.code||product.productCode);
+  const groupCode=entry==='GROUP'?clean(product.groupCode||product.code):'';
+
+  await window.loadInvoiceSellingUnitsForTarget(productCode,groupCode);
+  return unitsFor(product);
+}
+
 function setupPrompt(product,effectiveUsdPrice){
   pendingMeta=null;
   current={
@@ -276,6 +289,18 @@ function setupPrompt(product,effectiveUsdPrice){
   };
   renderOptions();
   refreshPreview();
+
+  if(!current.units.length){
+    const expected=current;
+    refreshUnitsForProduct(product).then(fresh=>{
+      if(current!==expected)return;
+      current.units=Array.isArray(fresh)?fresh:[];
+      renderOptions();
+      refreshPreview();
+    }).catch(error=>{
+      console.warn('BIG BROTHER selling unit refresh:',error);
+    });
+  }
 }
 
 function installOpenPromptPatch(){
@@ -564,8 +589,23 @@ function switchRowSellingUnit(row,unit){
 function ensureDesktopRowOptions(row,product){
   if(!row || !document.getElementById('bbInvoiceDesktopPicker'))return;
 
-  const units=unitsFor(product||productForRow(row));
-  if(!units.length)return;
+  const resolvedProduct=product||productForRow(row);
+  const units=unitsFor(resolvedProduct);
+  if(!units.length){
+    if(row.dataset.bbSellingUnitLookup!=='1'){
+      row.dataset.bbSellingUnitLookup='1';
+      refreshUnitsForProduct(resolvedProduct).then(fresh=>{
+        if(Array.isArray(fresh)&&fresh.length){
+          delete row.dataset.bbSellingUnitLookup;
+          ensureDesktopRowOptions(row,resolvedProduct);
+        }
+      }).catch(error=>{
+        delete row.dataset.bbSellingUnitLookup;
+        console.warn('BIG BROTHER desktop selling unit refresh:',error);
+      });
+    }
+    return;
+  }
 
   const cell=row.querySelector('.product-qty-unit-cell');
   if(!cell)return;
@@ -858,7 +898,7 @@ function start(){
   installDesktopObserver();
   refreshDesktopRows();
 
-  window.BB_INVOICE_SELLING_UNITS_BUILD='20260925-optional-v3';
+  window.BB_INVOICE_SELLING_UNITS_BUILD='20260926-live-v4';
 }
 
 if(document.readyState==='loading'){

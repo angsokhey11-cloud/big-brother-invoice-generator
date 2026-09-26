@@ -8880,8 +8880,8 @@ async function completeInvoice(event) {
 
     if (numberCheck.exists) {
       alert(
-        "Invoice No. " + payload.invoiceNo + " already exists in Sales Database.\n\n" +
-        "Please check the hand-written invoice number.\n" +
+        "Invoice No. " + payload.invoiceNo + " already exists for this Customer.\n\n" +
+        "The same Invoice No. can be used for another Customer, but not twice for the same Customer.\n" +
         "Your invoice information is still here."
       );
       return;

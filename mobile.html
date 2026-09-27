@@ -183,6 +183,33 @@
       );
 
       /*
+       * MOBILE COMPLETE FLOW V2
+       * Force one confirmation owner in the generated mobile document.
+       * Feature wrappers may still validate stock/selling units, but every
+       * final save must pass this styled confirmation exactly once.
+       */
+      const bbMobileCompleteFlow =
+        '<scr'+'ipt>(function(){'+
+        'function install(){'+
+        'var current=window.completeInvoice;'+
+        'if(typeof current!=="function"||current.__bbMobileConfirmV2)return;'+
+        'window.completeInvoice=async function(event){'+
+        'if(event){event.preventDefault();event.stopPropagation();}'+
+        'var payload=typeof window.buildSalesInvoicePayload==="function"?window.buildSalesInvoicePayload():null;'+
+        'if(!payload)return current.apply(this,arguments);'+
+        'var ok=await window.bbConfirmInvoiceCompletion(payload);'+
+        'if(!ok)return;'+
+        'var confirmFn=window.bbConfirmInvoiceCompletion;'+
+        'window.bbConfirmInvoiceCompletion=function(){return Promise.resolve(true);};'+
+        'try{return await current.call(this,event||null);}finally{window.bbConfirmInvoiceCompletion=confirmFn;}'+
+        '};'+
+        'window.completeInvoice.__bbMobileConfirmV2=true;'+
+        '}'+
+        'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){setTimeout(install,50);},{once:true});}else{setTimeout(install,50);}'+
+        'setTimeout(install,500);setTimeout(install,1500);'+
+        '})();</scr'+'ipt>';
+
+      /*
        * Current database wording.
        * IMPORTANT: do not rewrite the old native Complete confirmation.
        * The current Desktop core uses bbConfirmInvoiceCompletion(payload).
@@ -279,6 +306,7 @@
         +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="invoice-ar-summary-v1.js?v=20260921-textonly1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="telegram-invoice-share-v1.js?v=20260920-arrealtime2"></scr'+'ipt>\n'
+        +bbMobileCompleteFlow
         ;
 
       const bodyCloseIndex=

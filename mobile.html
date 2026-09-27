@@ -172,6 +172,17 @@
       }
 
       /*
+       * REMOVE THE LEGACY NATIVE COMPLETE CONFIRMATION.
+       * The preserved Desktop HTML still contains an older inline onclick
+       * confirm(...) on the Complete button. The current completeInvoice()
+       * already owns the styled bbConfirmInvoiceCompletion(payload) flow.
+       */
+      html=html.replace(
+        /onclick="if\(!confirm\('Complete this invoice\?[\\s\\S]*?\)\) return; completeInvoice\(event\);"/g,
+        'onclick="completeInvoice(event);"'
+      );
+
+      /*
        * Current database wording.
        * IMPORTANT: do not rewrite the old native Complete confirmation.
        * The current Desktop core uses bbConfirmInvoiceCompletion(payload).

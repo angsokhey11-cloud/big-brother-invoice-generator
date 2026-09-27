@@ -173,12 +173,9 @@
 
       /*
        * Current database wording.
+       * IMPORTANT: do not rewrite the old native Complete confirmation.
+       * The current Desktop core uses bbConfirmInvoiceCompletion(payload).
        */
-      html=html.replaceAll(
-        'This will save the invoice to the Sales Data Google Sheet.',
-        'This will save the invoice to the BIG BROTHER Database.'
-      );
-
       html=html.replaceAll(
         'Google Sheets -> separate Sales Data file',
         'Supabase PostgreSQL -> Sales Database'
@@ -188,27 +185,6 @@
         '<title>BIG BROTHER — Invoice Generator V2.4.5 Fast Master Bootstrap</title>',
         '<title>BIG BROTHER — Invoice Generator Mobile</title>'
       );
-
-      /*
-       * MOBILE COMPLETE CONFIRMATION — force the current styled Desktop flow.
-       * Some installed mobile shells can retain the old native confirm handler.
-       * Rebind the visible Complete button after all feature scripts load.
-       */
-      const bbMobileConfirmPatch =
-        '<scr'+'ipt>(function(){'+
-        'function bind(){'+
-        'var btn=document.querySelector(".bottom-action-row .complete-btn");'+
-        'if(!btn||btn.dataset.bbMobileConfirmBound==="1")return;'+
-        'btn.dataset.bbMobileConfirmBound="1";'+
-        'btn.removeAttribute("onclick");'+
-        'btn.addEventListener("click",function(event){'+
-        'event.preventDefault();event.stopPropagation();'+
-        'return window.completeInvoice.call(this,event);'+
-        '});'+
-        '}'+
-        'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",function(){setTimeout(bind,0);},{once:true});}else{setTimeout(bind,0);}'+
-        'setTimeout(bind,300);setTimeout(bind,1000);'+
-        '})();</scr'+'ipt>';
 
       /*
        * MOBILE TELEGRAM FLOW
@@ -292,7 +268,7 @@
         +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="invoice-ar-summary-v1.js?v=20260921-textonly1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="telegram-invoice-share-v1.js?v=20260920-arrealtime2"></scr'+'ipt>\n'
-        +bbMobileConfirmPatch;
+        ;
 
       const bodyCloseIndex=
         html.toLowerCase().lastIndexOf('</body>');

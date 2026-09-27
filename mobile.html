@@ -172,22 +172,6 @@
       }
 
       /*
-       * MOBILE LEGACY CONFIRM GUARD.
-       * If any older injected handler still calls window.confirm() for
-       * invoice completion, silently allow only that obsolete prompt.
-       * completeInvoice() then shows the current styled confirmation card.
-       */
-      const bbMobileLegacyConfirmGuard =
-        '<scr'+'ipt>(function(){'+
-        'var nativeConfirm=window.confirm.bind(window);'+
-        'window.confirm=function(message){'+
-        'var text=String(message||"");'+
-        'if(text.indexOf("Complete this invoice?")===0)return true;'+
-        'return nativeConfirm(message);'+
-        '};'+
-        '})();</scr'+'ipt>';
-
-      /*
        * REMOVE THE LEGACY NATIVE COMPLETE CONFIRMATION.
        * The preserved Desktop HTML still contains an older inline onclick
        * confirm(...) on the Complete button. The current completeInvoice()
@@ -284,8 +268,7 @@
         adapterJs.replace(/<\/script/gi,'<\\/script');
 
       const featureScripts=
-        bbMobileLegacyConfirmGuard+'\n'
-        +'<scr'+'ipt>'+safeAdapter+'</scr'+'ipt>\n'
+        '<scr'+'ipt>'+safeAdapter+'</scr'+'ipt>\n'
         +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260910-2"></scr'+'ipt>\n'
         +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260925-sellingunits1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="invoice-backup-v1.js?v=20260924-invoiceseq1"></scr'+'ipt>\n'

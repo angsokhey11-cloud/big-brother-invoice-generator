@@ -2644,9 +2644,7 @@
 
 
           if (
-            !rowIsExact(
-              row
-            )
+            !rowTracksStock(row)
           ) {
 
             return;
@@ -3004,9 +3002,7 @@
 
 
       if (
-        !rowIsExact(
-          row
-        )
+        !rowTracksStock(row)
       ) {
 
         continue;

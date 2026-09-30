@@ -68,7 +68,7 @@
 
       const [sourceResponse,adapterResponse]=await Promise.all([
         fetch(
-          'desktop-source-v20260924-invoiceseq1.html?v=20260930-service1',
+          'desktop-source-v20260924-invoiceseq1.html?v=20260930-service2',
           {cache:'no-store'}
         ),
         fetch(
@@ -296,8 +296,8 @@
 
       const featureScripts=
         '<scr'+'ipt>'+safeAdapter+'</scr'+'ipt>\n'
-        +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260930-service1"></scr'+'ipt>\n'
-        +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260930-service1"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="batch-v2-invoice-guard.js?v=20260930-service2"></scr'+'ipt>\n'
+        +'<scr'+'ipt src="direct-sale-source-v1.js?v=20260930-service2"></scr'+'ipt>\n'
         +'<scr'+'ipt src="invoice-backup-v1.js?v=20260924-invoiceseq1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="split-payment-v1.js?v=20260925-mobile-desktopcore1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="mobile-invoice.js?v=20260925-editinvoice1"></scr'+'ipt>\n'

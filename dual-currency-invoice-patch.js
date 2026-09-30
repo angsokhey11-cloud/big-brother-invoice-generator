@@ -108,7 +108,7 @@ function getPriceForProduct(product) {
     const priceInput = row.querySelector(".product-price-input");
     if(priceInput) {
       priceInput.value = usdToSelected(canonical, currency);
-      priceInput.step = currency === "KHR" ? "1" : "0.01";
+      priceInput.step = currency === "KHR" ? "1" : "0.0001";
     }
   });
 
@@ -180,7 +180,7 @@ function getPriceForProduct(product) {
     if(priceInput) {
       const canonical = Number(row.dataset.usdPrice) || 0;
       priceInput.value = usdToSelected(canonical, currency);
-      priceInput.step = currency === "KHR" ? "1" : "0.01";
+      priceInput.step = currency === "KHR" ? "1" : "0.0001";
     }
   });
 

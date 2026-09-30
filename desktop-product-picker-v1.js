@@ -9,7 +9,7 @@
 (function(){
   'use strict';
 
-  const BUILD='20260924-hide-source-no-zero1';
+  const BUILD='20260930-service1';
   const PAGE_SIZE=7;
   const EPS=0.000001;
 
@@ -53,6 +53,12 @@
 
   function isGroup(product){
     return clean(product?.entryType).toUpperCase()==='GROUP';
+  }
+
+  function isService(product){
+    return clean(product?.itemType).toUpperCase()==='SERVICE' ||
+      product?.trackStock===false ||
+      clean(product?.trackStock).toLowerCase()==='false';
   }
 
   function remainingOf(product){
@@ -155,7 +161,8 @@
       !memberCodes.has(codeOf(row))
     );
 
-    return [...groups,...unmatchedExact].sort(groupCompare);
+    const services=pool.filter(row=>!isGroup(row)&&isService(row));
+    return [...groups,...unmatchedExact,...services].sort(groupCompare);
   }
 
   function directSaleBalanceMap(){
@@ -242,7 +249,7 @@
     }
 
     const rows=pool
-      .filter(row=>!isGroup(row)&&remainingOf(row)>EPS)
+      .filter(row=>!isGroup(row)&&(isService(row)||remainingOf(row)>EPS))
       .slice()
       .sort(productCompare);
 
@@ -263,9 +270,9 @@
   function pickerContextText(rows){
     const batch=selectedBatch();
     if(batch){
-      return clean(batch.batchId)+' · Remaining products only · '+rows.length+' item'+(rows.length===1?'':'s');
+      return clean(batch.batchId)+' · Remaining products + services · '+rows.length+' item'+(rows.length===1?'':'s');
     }
-    return 'Direct Sale · All Products · '+rows.length+' item'+(rows.length===1?'':'s');
+    return 'Direct Sale · Products + Services · '+rows.length+' item'+(rows.length===1?'':'s');
   }
 
   function syncToggle(){
@@ -428,7 +435,10 @@
       const qtySpan=document.createElement('span');
       qtySpan.className='bb-invoice-product-button-stock';
 
-      if(batch){
+      if(isService(product)){
+        qtySpan.textContent='SERVICE';
+        button.title='Service · No stock deduction';
+      }else if(batch){
         const stock=Math.max(0,remaining);
         qtySpan.textContent=
           'Batch: '+

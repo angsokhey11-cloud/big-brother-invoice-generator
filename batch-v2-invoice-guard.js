@@ -1,4 +1,4 @@
-/* BIG BROTHER — Invoice Generator Batch V2 availability layer V1.1 */
+/* BIG BROTHER — Invoice Generator Batch V2 availability layer V1.2 Service */
 (function(){
 'use strict';
 const EPS=0.000001;
@@ -9,6 +9,16 @@ function batch(){
   try{return typeof getSelectedSimpleBatch==='function'?getSelectedSimpleBatch():null}catch(_){return null}
 }
 function remaining(row){return num(row?.remainingQty!==undefined?row.remainingQty:row?.pendingQty)}
+function isService(row){
+  return clean(row?.itemType).toUpperCase()==='SERVICE' || row?.trackStock===false || clean(row?.trackStock).toLowerCase()==='false';
+}
+function serviceRows(){
+  try{
+    return (Array.isArray(products)?products:[])
+      .filter(p=>p?.active!==false&&isService(p))
+      .map(p=>({...p,entryType:'EXACT',remainingQty:0}));
+  }catch(_){return []}
+}
 function masterProduct(code){
   try{return (Array.isArray(products)?products:[]).find(p=>clean(p.code)===clean(code))||null}catch(_){return null}
 }
@@ -57,7 +67,7 @@ window.getInvoiceSearchPool=function(){
       batchId:clean(b.batchId)
     };
   });
-  return [...groupRows(b),...exact];
+  return [...groupRows(b),...exact,...serviceRows()];
 };
 window.findInvoiceSearchProductByCode=function(code){
   const wanted=clean(code);
@@ -86,11 +96,16 @@ if(typeof oldQtyPrompt==='function'){
     const b=batch();
     const m=document.getElementById('invoiceQtyMessage');
     if(b&&m&&product){
-      const limit=remaining(product);
-      m.textContent=limit>EPS
-        ? 'Batch Available: '+formatQty(limit)+' in '+clean(b.batchId)+'.'
-        : 'This item has no stock remaining in '+clean(b.batchId)+'.';
-      m.style.color=limit>EPS?'#2f855a':'#c53030';
+      if(isService(product)){
+        m.textContent='Service item · No Batch stock deduction.';
+        m.style.color='#2f855a';
+      }else{
+        const limit=remaining(product);
+        m.textContent=limit>EPS
+          ? 'Batch Available: '+formatQty(limit)+' in '+clean(b.batchId)+'.'
+          : 'This item has no stock remaining in '+clean(b.batchId)+'.';
+        m.style.color=limit>EPS?'#2f855a':'#c53030';
+      }
     }
     return out;
   };
@@ -104,6 +119,11 @@ if(qtyForm){
     if(!b)return;
     const p=pendingProduct();
     if(!p)return;
+    if(isService(p)){
+      const m=document.getElementById('invoiceQtyMessage');
+      if(m){m.textContent='Service item · No Batch stock deduction.';m.style.color='#2f855a';}
+      return;
+    }
     const q=num(document.getElementById('invoiceQtyInput')?.value);
     const limit=remaining(p);
     const m=document.getElementById('invoiceQtyMessage');

@@ -5951,6 +5951,12 @@ function applyInvoiceBootstrapFast(data) {
         barcode:String(row.productBarcode||row.barcode||"").trim(),
         productBarcode:String(row.productBarcode||row.barcode||"").trim(),
         usdPrice:Number(row.priceUSD ?? row.usdPrice)||0,
+        itemType:String(row.itemType||"PRODUCT").trim().toUpperCase(),
+        trackStock:
+          row.trackStock===false ||
+          String(row.trackStock).toLowerCase()==="false"
+            ? false
+            : true,
         active:
           row.active===true ||
           String(row.active).toLowerCase()==="true"
@@ -6257,7 +6263,11 @@ function renderInvoiceProductOptions() {
               product.code,
               isGroup
                 ? "Product Group"
-                : (product.barcode || product.productBarcode)
+                : (
+                    String(product.itemType || "PRODUCT").toUpperCase()==="SERVICE"
+                      ? "Service"
+                      : (product.barcode || product.productBarcode)
+                  )
             ]
               .filter(Boolean)
               .map(escapeHtml)
@@ -6667,6 +6677,14 @@ function createProduct(
     productRecord.barcode ||
     "";
   div.dataset.unit = productRecord.unit || "";
+  div.dataset.itemType =
+    String(productRecord.itemType || "PRODUCT")
+      .toUpperCase();
+  div.dataset.trackStock =
+    productRecord.trackStock === false ||
+    String(productRecord.trackStock).toLowerCase() === "false"
+      ? "false"
+      : "true";
   div.dataset.entryType =
     String(productRecord.entryType || "EXACT")
       .toUpperCase();

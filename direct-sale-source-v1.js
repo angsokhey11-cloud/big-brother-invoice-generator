@@ -202,6 +202,33 @@
 
   }
 
+  function rowTracksStock(row) {
+    if (!rowTracksStock(row)) return false;
+
+    const itemType =
+      clean(row?.dataset?.itemType || 'PRODUCT')
+        .toUpperCase();
+
+    const trackStock =
+      clean(row?.dataset?.trackStock || 'true')
+        .toLowerCase();
+
+    return itemType !== 'SERVICE' && trackStock !== 'false';
+  }
+
+  function promptTracksStock() {
+    const product = currentPromptProduct;
+    if (!product) return true;
+
+    const itemType =
+      clean(product.itemType || 'PRODUCT')
+        .toUpperCase();
+
+    return itemType !== 'SERVICE' &&
+      product.trackStock !== false &&
+      clean(product.trackStock).toLowerCase() !== 'false';
+  }
+
 
 
   function rowQtyInput(row) {
@@ -1149,7 +1176,7 @@
     if (
       !row
       ||
-      !rowIsExact(row)
+      !rowTracksStock(row)
     ) {
 
       return null;
@@ -2692,6 +2719,19 @@
 
     }
 
+    if (!promptTracksStock()) {
+      const serviceMessage =
+        document.getElementById('invoiceQtyMessage');
+
+      if (serviceMessage) {
+        serviceMessage.textContent =
+          'Service item · No Warehouse stock deduction.';
+        serviceMessage.style.color = '#2f855a';
+      }
+
+      return;
+    }
+
 
     const message =
       document.getElementById(
@@ -3806,6 +3846,19 @@
 
         }
 
+        if (!promptTracksStock()) {
+          const serviceMessage =
+            document.getElementById('invoiceQtyMessage');
+
+          if (serviceMessage) {
+            serviceMessage.textContent =
+              'Service item · No Warehouse stock deduction.';
+            serviceMessage.style.color = '#2f855a';
+          }
+
+          return;
+        }
+
 
         const message =
           document.getElementById(
@@ -4018,7 +4071,7 @@
 
 
   window.BB_DIRECT_SALE_SOURCE_BUILD =
-    '20260924-hide-source-no-zero1';
+    '20260930-service1';
 
 
   window.BBDirectSaleSourceV1 = {

@@ -38,7 +38,7 @@
     }
   </style>
 
-  <script src="dual-currency-invoice-patch.js?v=20260910-1"></script>
+  <script src="dual-currency-invoice-patch.js?v=20260930-price4"></script>
 </head>
 
 <body>
@@ -68,7 +68,7 @@
 
       const [sourceResponse,adapterResponse]=await Promise.all([
         fetch(
-          'desktop-source-v20260924-invoiceseq1.html?v=20260930-service2',
+          'desktop-source-v20260924-invoiceseq1.html?v=20260930-price4',
           {cache:'no-store'}
         ),
         fetch(

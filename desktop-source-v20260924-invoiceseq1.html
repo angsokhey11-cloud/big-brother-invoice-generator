@@ -4034,7 +4034,7 @@ textarea:focus{
           id="invoicePriceInput"
           type="number"
           min="0"
-          step="0.01"
+          step="0.0001"
           inputmode="decimal"
           value="0"
           required
@@ -5784,6 +5784,17 @@ function selectedToUsd(value, currency) {
   return value;
 }
 
+function formatUnitPrice(value, currency) {
+  if (currency === "USD") {
+    return "$" + Number(value).toLocaleString("en-US", {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4
+    });
+  }
+
+  return "៛" + Math.round(Number(value)).toLocaleString("en-US");
+}
+
 function formatMoney(value, currency) {
   if (currency === "USD") {
     return "$" + Number(value).toLocaleString("en-US", {
@@ -6429,10 +6440,10 @@ function openInvoicePricePrompt(product, qty, effectiveUsdPrice) {
     [product.code, product.unit, "Qty: " + qty].filter(Boolean).join(" • ");
   document.getElementById("invoicePriceCurrencySymbol").textContent =
     currency === "KHR" ? "៛" : "$";
-  input.step = currency === "KHR" ? "1" : "0.01";
+  input.step = currency === "KHR" ? "1" : "0.0001";
   input.value = currency === "KHR"
     ? String(Math.round(displayPrice))
-    : String(Number(displayPrice.toFixed(2)));
+    : Number(displayPrice).toFixed(4);
 
   const message = document.getElementById("invoicePriceMessage");
   if (message) message.textContent = "";
@@ -6732,8 +6743,8 @@ function createProduct(
         class="product-price-input"
         type="number"
         min="0"
-        value="${displayPrice}"
-        step="${currency === "KHR" ? "1" : "0.01"}"
+        value="${currency === "KHR" ? String(Math.round(displayPrice)) : Number(displayPrice).toFixed(4)}"
+        step="${currency === "KHR" ? "1" : "0.0001"}"
         inputmode="decimal"
         aria-label="Price for ${escapeHtml(name)}"
         oninput="priceChanged(this)"
@@ -7485,7 +7496,7 @@ function buildFinalInvoiceHtml(state) {
           ${item.productNote ? `<span class="final-product-note">Note: ${esc(item.productNote)}</span>` : ""}
         </td>
         <td><div class="final-qty-unit">${Number(item.qty).toLocaleString("en-US", {maximumFractionDigits: 2})}${item.unit ? `<span class="final-unit-small">/${esc(item.unit)}</span>` : ""}</div></td>
-        <td>${money(item.price)}</td>
+        <td>${formatUnitPrice(item.price, state.currency)}</td>
         <td>${money(item.total)}</td>
       </tr>
     `).join("")

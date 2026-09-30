@@ -203,7 +203,7 @@
   }
 
   function rowTracksStock(row) {
-    if (!rowTracksStock(row)) return false;
+    if (!rowIsExact(row)) return false;
 
     const itemType =
       clean(row?.dataset?.itemType || 'PRODUCT')

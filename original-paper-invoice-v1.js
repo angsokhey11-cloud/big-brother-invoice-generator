@@ -4,7 +4,7 @@
 const HOST='https://sjfhlaclgmkwwofzstok.supabase.co';
 const API_KEY='sb_publishable_w762jR65CWwlO30fKQsYOw_6L9grx8S';
 const SESSION='BB_SUPABASE_DEV_SESSION_V1';
-let selected=null,previewUrl='',uploading=false;
+let selected=null,previewUrl='',uploading=false,retryId='';
 function session(){try{return JSON.parse(localStorage.getItem(SESSION)||'null')}catch{return null}}
 async function bearer(){
  let s=session();if(!s?.access_token)throw Error('Sign in again before attaching an original.');
@@ -35,9 +35,10 @@ function init(){
  box.innerHTML='<strong style="font-size:14px">📎 Original Paper Invoice (Optional)</strong>'+
  '<p style="font-size:12px;margin:5px 0 10px">Paste a copied image (Ctrl+V), select a file, or take a photo on mobile. The upload starts only after the invoice saves.</p>'+
  '<input id="bbOriginalFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:block;max-width:100%;width:100%;font-size:13px">'+
- '<div id="bbOriginalPreview" style="margin-top:7px"></div><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
+ '<div id="bbOriginalPreview" style="margin-top:7px"></div><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
  anchor.parentNode.insertBefore(box,anchor);
  $('bbOriginalFile').addEventListener('change',e=>choose(e.target.files?.[0]));
+ $('bbOriginalRetry').addEventListener('click',async()=>{if(!retryId||!selected)return;try{await afterComplete({invoiceId:retryId},{invoiceId:retryId});}catch(e){setMessage('Retry failed: '+e.message,true)}});
  document.addEventListener('paste',e=>{
   if(e.target?.closest?.('input,textarea,[contenteditable="true"]'))return;
   const file=[...(e.clipboardData?.files||[])].find(f=>f.type.startsWith('image/'));
@@ -53,7 +54,8 @@ async function afterComplete(payload,serverResult){
  if(!selected||uploading)return {skipped:true};
  const id=String(serverResult?.invoiceId||serverResult?.invoice_id||payload?.invoiceId||'').trim();
  if(!id)throw Error('Invoice saved, but its internal invoice ID was unavailable for attachment.');
- const file=selected;uploading=true;setMessage('Saving original invoice securely…');
+ const file=selected;retryId=id;uploading=true;setMessage('Saving original invoice securely…');
+ if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
  const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'}[file.type];
  const path=id+'/'+crypto.randomUUID()+'.'+ext;
  try{
@@ -65,10 +67,11 @@ async function afterComplete(payload,serverResult){
    await fetch(HOST+'/storage/v1/object/bb-real-invoices/'+path,{method:'DELETE',headers:{apikey:API_KEY,Authorization:'Bearer '+t}}).catch(()=>{});
    throw e;
   }
-  choose(null);if($('bbOriginalFile'))$('bbOriginalFile').value='';
+  choose(null);retryId='';if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
+  if($('bbOriginalFile'))$('bbOriginalFile').value='';
   setMessage('✓ Original uploaded. This invoice will not appear in Pending Scan.');
   return {success:true};
- }finally{uploading=false}
+ }catch(e){setMessage('Invoice saved; original upload failed. '+e.message,true);if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=false;throw e;}finally{uploading=false}
 }
 window.BBOriginalInvoice={afterComplete,init};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

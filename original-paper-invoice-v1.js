@@ -26,6 +26,37 @@ function choose(file){
  selected=file;setMessage('Ready: '+file.name);
  if(file.type.startsWith('image/')&&preview){previewUrl=URL.createObjectURL(file);const img=document.createElement('img');img.src=previewUrl;img.alt='Original invoice preview';img.style.cssText='max-width:100%;max-height:120px;object-fit:contain;border-radius:7px';preview.append(img)}
 }
+function pastedImage(data){
+ const files=[...(data?.files||[])];
+ if(data?.items)for(const item of data.items){
+  if(item.kind==='file'){const file=item.getAsFile?.();if(file)files.push(file)}
+ }
+ return files.find(file=>['image/jpeg','image/png','image/webp'].includes(file.type))||null;
+}
+function chooseClipboard(file){
+ const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[file.type];
+ if(!ext)return setMessage('Clipboard does not contain a supported image.',true);
+ choose(new File([file],'clipboard-invoice.'+ext,{type:file.type}));
+ if($('bbOriginalPasteFallback'))$('bbOriginalPasteFallback').hidden=true;
+ if($('bbOriginalPasteArea'))$('bbOriginalPasteArea').textContent='Paste your invoice image here';
+}
+async function pasteButton(){
+ const button=$('bbOriginalPaste');
+ button.disabled=true;
+ try{
+  if(!navigator.clipboard?.read)throw Error('Clipboard read is unavailable.');
+  const items=await navigator.clipboard.read();
+  for(const item of items){
+   const type=['image/png','image/jpeg','image/webp'].find(t=>item.types.includes(t));
+   if(type){chooseClipboard(await item.getType(type));return}
+  }
+  setMessage('No copied photo found. Copy an invoice image or screenshot first.',true);
+ }catch(error){
+  $('bbOriginalPasteFallback').hidden=false;
+  setMessage('Browser clipboard access is unavailable or blocked. Tap the paste area and press Ctrl+V / ⌘V.',true);
+  $('bbOriginalPasteArea').focus();
+ }finally{button.disabled=false}
+}
 function init(){
  if($('bbOriginalInvoice'))return;
  const anchor=document.querySelector('.bottom-action-row');
@@ -33,16 +64,26 @@ function init(){
  const box=document.createElement('section');box.id='bbOriginalInvoice';box.className='no-print';
  box.style.cssText='margin:14px 0;padding:12px;border:1px solid #bdd6ec;background:#f5faff;border-radius:12px;color:#214d72;max-width:100%;min-width:0';
  box.innerHTML='<strong style="font-size:14px">📎 Original Paper Invoice (Optional)</strong>'+
- '<p style="font-size:12px;margin:5px 0 10px">Paste a copied image (Ctrl+V), select a file, or take a photo on mobile. The upload starts only after the invoice saves.</p>'+
+ '<p style="font-size:12px;margin:5px 0 10px">Select a file or paste a copied invoice image. The original uploads only after the invoice saves.</p>'+
  '<input id="bbOriginalFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" style="display:block;max-width:100%;width:100%;font-size:13px">'+
+ '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px">'+
+ '<button id="bbOriginalPaste" type="button" style="padding:9px 13px;background:#e2eefb;border:1px solid #b9d3ed;border-radius:9px;color:#195a92;font-weight:800;cursor:pointer">📋 Paste from Clipboard</button>'+
+ '<span style="font-size:12px;color:#557391">Or press Ctrl+V / ⌘V</span></div>'+
+ '<div id="bbOriginalPasteFallback" hidden style="margin-top:9px">'+
+ '<label for="bbOriginalPasteArea" style="display:block;font-size:12px;margin-bottom:5px">Tap this area and press Ctrl+V / ⌘V</label>'+
+ '<div id="bbOriginalPasteArea" contenteditable="true" role="textbox" aria-label="Paste original invoice photo" style="min-height:55px;padding:10px;background:white;border:1px dashed #86a9ca;border-radius:9px;font-size:12px;color:#526c82">Paste your invoice image here</div></div>'+
  '<div id="bbOriginalPreview" style="margin-top:7px"></div><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
  anchor.parentNode.insertBefore(box,anchor);
  $('bbOriginalFile').addEventListener('change',e=>choose(e.target.files?.[0]));
+ $('bbOriginalPaste').addEventListener('click',pasteButton);
  $('bbOriginalRetry').addEventListener('click',async()=>{if(!retryId||!selected)return;try{await afterComplete({invoiceId:retryId},{invoiceId:retryId});}catch(e){setMessage('Retry failed: '+e.message,true)}});
  document.addEventListener('paste',e=>{
-  if(e.target?.closest?.('input,textarea,[contenteditable="true"]'))return;
-  const file=[...(e.clipboardData?.files||[])].find(f=>f.type.startsWith('image/'));
-  if(file){e.preventDefault();choose(file)}
+  const area=$('bbOriginalPasteArea');
+  const insideFallback=area&&(e.target===area||area.contains(e.target));
+  if(!insideFallback&&e.target?.closest?.('input,textarea,[contenteditable="true"]'))return;
+  const file=pastedImage(e.clipboardData);
+  if(file){e.preventDefault();chooseClipboard(file);return}
+  if(insideFallback){e.preventDefault();setMessage('Copy an invoice image or screenshot first, then paste.',true)}
  });
 }
 async function post(path,body,headers={}){

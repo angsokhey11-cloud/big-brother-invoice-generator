@@ -316,6 +316,16 @@
          Confirmed Supabase invoices are mirrored to Google Sheets.
          ======================================================= */
 
+      // Original is uploaded only AFTER the invoice has saved successfully.
+      const originalSaveMarker='    await postSalesInvoiceBundle(payload, paymentPayload);';
+      if(!html.includes(originalSaveMarker))throw Error('Desktop invoice save hook missing.');
+      html=html.replace(originalSaveMarker,
+        '    const bbRealSaved = await postSalesInvoiceBundle(payload, paymentPayload);\n'
+        +'    if(window.BBOriginalInvoice?.afterComplete){\n'
+        +'      try{await window.BBOriginalInvoice.afterComplete(payload,bbRealSaved)}\n'
+        +'      catch(error){console.error("Original upload:",error);alert("The invoice WAS SAVED, but its original image was NOT uploaded. Use Retry upload before leaving this page.\n"+(error?.message||error))}\n'
+        +'    }\n');
+
       const safeAdapter =
 
         adapterJs.replace(
@@ -405,6 +415,12 @@
         '<scr'
         +
         'ipt src="telegram-invoice-share-v1.js?v=20260920-arrealtime2"></scr'
+        +
+        'ipt>\n'
+        +
+        '<scr'
+        +
+        'ipt src="original-paper-invoice-v1.js?v=20261001-original1"></scr'
         +
         'ipt>';
 

@@ -4,7 +4,7 @@
 const HOST='https://sjfhlaclgmkwwofzstok.supabase.co';
 const API_KEY='sb_publishable_w762jR65CWwlO30fKQsYOw_6L9grx8S';
 const SESSION='BB_SUPABASE_DEV_SESSION_V1';
-let selected=null,previewUrl='',uploading=false,retryId='',scanResult=null,scanCounter=0,overrideAllowed=false,verifiedNumber='';
+let selected=null,previewUrl='',uploading=false,retryId='',scanResult=null,scanCounter=0,overrideAllowed=false,verifiedNumber='',retryNumber='';
 function session(){try{return JSON.parse(localStorage.getItem(SESSION)||'null')}catch{return null}}
 async function bearer(){
  let s=session();if(!s?.access_token)throw Error('Sign in again before attaching an original.');
@@ -32,11 +32,11 @@ async function verifyOverridePermission(){
  try{
   const result=await post('/rest/v1/rpc/bb_real_invoice_override_allowed','{}',{'Content-Type':'application/json'});
   overrideAllowed=result===true;
-  if($('bbOriginalOverride'))$('bbOriginalOverride').hidden=!overrideAllowed;
+  if($('bbOriginalOverride'))$('bbOriginalOverride').hidden=!overrideAllowed||scanResult?.status==='match';
  }catch(error){overrideAllowed=false}
 }
 async function checkNumber(expected){
- const file=selected,sequence=++scanCounter,number=String(expected||$('invoiceNumber')?.value||'').trim();
+ const file=selected,sequence=++scanCounter,number=String(expected||(retryId?retryNumber:'')||$('invoiceNumber')?.value||'').trim();
  if(!file)return null;
  if(!number||number==='Loading...'){
   scanResult=null;setMessage('Set the system Invoice Number first, then verify the paper invoice.',true);return null;
@@ -47,6 +47,7 @@ async function checkNumber(expected){
  const check=await (window.BBInvoiceOCR?.verify(file,number)||Promise.resolve({status:'unclear',message:'OCR scanner did not load.'}));
  if(sequence!==scanCounter||file!==selected)return null;
  scanResult=check;
+ if($('bbOriginalOverride'))$('bbOriginalOverride').hidden=!overrideAllowed||check.status==='match';
  if(status){
   status.textContent=check.message;
   status.style.color=check.status==='match'?'#166e3f':check.status==='mismatch'?'#b52b27':'#875915';
@@ -57,7 +58,7 @@ async function checkNumber(expected){
 function removeSelection(){
  if(uploading)return setMessage('Wait until the current upload finishes.',true);
  choose(null);
- retryId='';
+ retryId='';retryNumber='';
  if($('bbOriginalFile'))$('bbOriginalFile').value='';
  if($('bbOriginalPasteFallback'))$('bbOriginalPasteFallback').hidden=true;
  if($('bbOriginalPasteArea'))$('bbOriginalPasteArea').textContent='Paste your invoice image here';
@@ -138,19 +139,19 @@ async function afterComplete(payload,serverResult){
  if(!selected||uploading)return {skipped:true};
  const id=String(serverResult?.invoiceId||serverResult?.invoice_id||payload?.invoiceId||'').trim();
  if(!id)throw Error('Invoice saved, but its internal invoice ID was unavailable for attachment.');
- const expected=String(payload?.invoiceNo||$('invoiceNumber')?.value||'').trim();
+ const expected=String(payload?.invoiceNo||retryNumber||$('invoiceNumber')?.value||'').trim();
  // Verify again at save time; the system invoice number may have changed
  // after the photo was pasted or selected.
  if(verifiedNumber!==expected||!scanResult)await checkNumber(expected);
  const result=scanResult,reason=String($('bbOriginalOverrideReason')?.value||'').trim();
  if(!result||result.status!=='match'){
   if(!overrideAllowed||reason.length<8){
-   retryId=id;
+   retryId=id;retryNumber=expected;
    if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=false;
    throw Error('Paper original was not uploaded: invoice-number verification failed. Replace the picture, or request administrator inspection with a reason.');
   }
  }
- const file=selected;retryId=id;uploading=true;setMessage('Saving verified original invoice securely…');
+ const file=selected;retryId=id;retryNumber=expected;uploading=true;setMessage('Saving verified original invoice securely…');
  if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
  const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'}[file.type];
  const path=id+'/'+crypto.randomUUID()+'.'+ext;
@@ -163,7 +164,7 @@ async function afterComplete(payload,serverResult){
    await fetch(HOST+'/storage/v1/object/bb-real-invoices/'+path,{method:'DELETE',headers:{apikey:API_KEY,Authorization:'Bearer '+t}}).catch(()=>{});
    throw e;
   }
-  choose(null);retryId='';if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
+  choose(null);retryId='';retryNumber='';if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
   if($('bbOriginalFile'))$('bbOriginalFile').value='';
   setMessage('✓ Original uploaded. This invoice will not appear in Pending Scan.');
   return {success:true};

@@ -4,7 +4,7 @@
 const HOST='https://sjfhlaclgmkwwofzstok.supabase.co';
 const API_KEY='sb_publishable_w762jR65CWwlO30fKQsYOw_6L9grx8S';
 const SESSION='BB_SUPABASE_DEV_SESSION_V1';
-let selected=null,previewUrl='',uploading=false,retryId='';
+let selected=null,previewUrl='',uploading=false,retryId='',scanResult=null,scanCounter=0,overrideAllowed=false,verifiedNumber='';
 function session(){try{return JSON.parse(localStorage.getItem(SESSION)||'null')}catch{return null}}
 async function bearer(){
  let s=session();if(!s?.access_token)throw Error('Sign in again before attaching an original.');
@@ -18,14 +18,41 @@ async function bearer(){
 function $(id){return document.getElementById(id)}
 function setMessage(msg,error=false){const el=$('bbOriginalStatus');if(el){el.textContent=msg;el.style.color=error?'#ad362a':'#245a87'}}
 function choose(file){
+ scanCounter++;scanResult=null;verifiedNumber='';
  if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl='';selected=null;
  const preview=$('bbOriginalPreview');if(preview)preview.replaceChildren();
  if($('bbOriginalRemove'))$('bbOriginalRemove').hidden=!file;
  if(!file){setMessage('Optional — attach the original paper invoice.');return}
  if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)){setMessage('Choose JPG, PNG, WebP or PDF.',true);return}
  if(file.size>12*1024*1024){setMessage('The original must be 12 MB or smaller.',true);return}
- selected=file;setMessage('Ready: '+file.name);
+ selected=file;setMessage('Scanning invoice number…');void checkNumber();
  if(file.type.startsWith('image/')&&preview){previewUrl=URL.createObjectURL(file);const img=document.createElement('img');img.src=previewUrl;img.alt='Original invoice preview';img.style.cssText='max-width:100%;max-height:120px;object-fit:contain;border-radius:7px';preview.append(img)}
+}
+async function verifyOverridePermission(){
+ try{
+  const result=await post('/rest/v1/rpc/bb_real_invoice_override_allowed','{}',{'Content-Type':'application/json'});
+  overrideAllowed=result===true;
+  if($('bbOriginalOverride'))$('bbOriginalOverride').hidden=!overrideAllowed;
+ }catch(error){overrideAllowed=false}
+}
+async function checkNumber(expected){
+ const file=selected,sequence=++scanCounter,number=String(expected||$('invoiceNumber')?.value||'').trim();
+ if(!file)return null;
+ if(!number||number==='Loading...'){
+  scanResult=null;setMessage('Set the system Invoice Number first, then verify the paper invoice.',true);return null;
+ }
+ verifiedNumber=number;
+ const status=$('bbOriginalVerification');
+ if(status){status.hidden=false;status.textContent='Scanning paper invoice number against '+number+'…';status.style.color='#805d17'}
+ const check=await (window.BBInvoiceOCR?.verify(file,number)||Promise.resolve({status:'unclear',message:'OCR scanner did not load.'}));
+ if(sequence!==scanCounter||file!==selected)return null;
+ scanResult=check;
+ if(status){
+  status.textContent=check.message;
+  status.style.color=check.status==='match'?'#166e3f':check.status==='mismatch'?'#b52b27':'#875915';
+ }
+ setMessage(check.status==='match'?'✓ Original invoice number verified.':check.message,check.status!=='match');
+ return check;
 }
 function removeSelection(){
  if(uploading)return setMessage('Wait until the current upload finishes.',true);
@@ -35,6 +62,8 @@ function removeSelection(){
  if($('bbOriginalPasteFallback'))$('bbOriginalPasteFallback').hidden=true;
  if($('bbOriginalPasteArea'))$('bbOriginalPasteArea').textContent='Paste your invoice image here';
  if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
+ if($('bbOriginalVerification'))$('bbOriginalVerification').hidden=true;
+ if($('bbOriginalOverrideReason'))$('bbOriginalOverrideReason').value='';
  setMessage('Original removed. Paste or choose the correct invoice.');
 }
 function pastedImage(data){
@@ -83,11 +112,13 @@ function init(){
  '<div id="bbOriginalPasteFallback" hidden style="margin-top:9px">'+
  '<label for="bbOriginalPasteArea" style="display:block;font-size:12px;margin-bottom:5px">Tap this area and press Ctrl+V / ⌘V</label>'+
  '<div id="bbOriginalPasteArea" contenteditable="true" role="textbox" aria-label="Paste original invoice photo" style="min-height:55px;padding:10px;background:white;border:1px dashed #86a9ca;border-radius:9px;font-size:12px;color:#526c82">Paste your invoice image here</div></div>'+
- '<div id="bbOriginalPreview" style="margin-top:7px"></div><button id="bbOriginalRemove" type="button" hidden style="margin:7px 0;padding:7px 12px;background:#fff0f0;border:1px solid #e3a5a5;border-radius:8px;color:#a52b2b;font-weight:800;cursor:pointer">✕ Remove wrong image</button><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
+ '<div id="bbOriginalPreview" style="margin-top:7px"></div><div id="bbOriginalVerification" role="status" hidden style="font-size:12px;font-weight:800;line-height:1.45;margin-top:7px;padding:8px;background:#fff;border:1px solid #d4dfec;border-radius:8px"></div><div id="bbOriginalOverride" hidden style="margin-top:8px"><label for="bbOriginalOverrideReason" style="display:block;font-weight:800;font-size:12px">Administrator review reason (required only for unclear or mismatched scans)</label><textarea id="bbOriginalOverrideReason" style="width:100%;min-height:60px;resize:vertical;border:1px solid #b2c8e2;border-radius:8px;padding:8px;font:12px Arial" placeholder="I inspected the actual paper invoice, its customer and invoice number because…"></textarea></div><button id="bbOriginalRemove" type="button" hidden style="margin:7px 0;padding:7px 12px;background:#fff0f0;border:1px solid #e3a5a5;border-radius:8px;color:#a52b2b;font-weight:800;cursor:pointer">✕ Remove wrong image</button><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
  anchor.parentNode.insertBefore(box,anchor);
  $('bbOriginalFile').addEventListener('change',e=>choose(e.target.files?.[0]));
  $('bbOriginalRemove').addEventListener('click',removeSelection);
  $('bbOriginalPaste').addEventListener('click',pasteButton);
+ void verifyOverridePermission();
+ $('invoiceNumber')?.addEventListener('input',()=>{if(selected)void checkNumber()});
  $('bbOriginalRetry').addEventListener('click',async()=>{if(!retryId||!selected)return;try{await afterComplete({invoiceId:retryId},{invoiceId:retryId});}catch(e){setMessage('Retry failed: '+e.message,true)}});
  document.addEventListener('paste',e=>{
   const area=$('bbOriginalPasteArea');
@@ -107,14 +138,26 @@ async function afterComplete(payload,serverResult){
  if(!selected||uploading)return {skipped:true};
  const id=String(serverResult?.invoiceId||serverResult?.invoice_id||payload?.invoiceId||'').trim();
  if(!id)throw Error('Invoice saved, but its internal invoice ID was unavailable for attachment.');
- const file=selected;retryId=id;uploading=true;setMessage('Saving original invoice securely…');
+ const expected=String(payload?.invoiceNo||$('invoiceNumber')?.value||'').trim();
+ // Verify again at save time; the system invoice number may have changed
+ // after the photo was pasted or selected.
+ if(verifiedNumber!==expected||!scanResult)await checkNumber(expected);
+ const result=scanResult,reason=String($('bbOriginalOverrideReason')?.value||'').trim();
+ if(!result||result.status!=='match'){
+  if(!overrideAllowed||reason.length<8){
+   retryId=id;
+   if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=false;
+   throw Error('Paper original was not uploaded: invoice-number verification failed. Replace the picture, or request administrator inspection with a reason.');
+  }
+ }
+ const file=selected;retryId=id;uploading=true;setMessage('Saving verified original invoice securely…');
  if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
  const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'}[file.type];
  const path=id+'/'+crypto.randomUUID()+'.'+ext;
  try{
   await post('/storage/v1/object/bb-real-invoices/'+path,file,{'Content-Type':file.type,'x-upsert':'false'});
   try{
-   await post('/rest/v1/rpc/bb_real_invoice_register',JSON.stringify({p_invoice_id:id,p_storage_path:path,p_mime:file.type,p_source:'generator'}),{'Content-Type':'application/json'});
+   await post('/rest/v1/rpc/bb_real_invoice_register_verified',JSON.stringify({p_invoice_id:id,p_storage_path:path,p_mime:file.type,p_source:'generator',p_scanned_number:result.scanned||'',p_verification_status:result.status,p_override_reason:result.status==='match'?null:reason}),{'Content-Type':'application/json'});
   }catch(e){
    const t=await bearer();
    await fetch(HOST+'/storage/v1/object/bb-real-invoices/'+path,{method:'DELETE',headers:{apikey:API_KEY,Authorization:'Bearer '+t}}).catch(()=>{});

@@ -20,11 +20,22 @@ function setMessage(msg,error=false){const el=$('bbOriginalStatus');if(el){el.te
 function choose(file){
  if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl='';selected=null;
  const preview=$('bbOriginalPreview');if(preview)preview.replaceChildren();
+ if($('bbOriginalRemove'))$('bbOriginalRemove').hidden=!file;
  if(!file){setMessage('Optional — attach the original paper invoice.');return}
  if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)){setMessage('Choose JPG, PNG, WebP or PDF.',true);return}
  if(file.size>12*1024*1024){setMessage('The original must be 12 MB or smaller.',true);return}
  selected=file;setMessage('Ready: '+file.name);
  if(file.type.startsWith('image/')&&preview){previewUrl=URL.createObjectURL(file);const img=document.createElement('img');img.src=previewUrl;img.alt='Original invoice preview';img.style.cssText='max-width:100%;max-height:120px;object-fit:contain;border-radius:7px';preview.append(img)}
+}
+function removeSelection(){
+ if(uploading)return setMessage('Wait until the current upload finishes.',true);
+ choose(null);
+ retryId='';
+ if($('bbOriginalFile'))$('bbOriginalFile').value='';
+ if($('bbOriginalPasteFallback'))$('bbOriginalPasteFallback').hidden=true;
+ if($('bbOriginalPasteArea'))$('bbOriginalPasteArea').textContent='Paste your invoice image here';
+ if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
+ setMessage('Original removed. Paste or choose the correct invoice.');
 }
 function pastedImage(data){
  const files=[...(data?.files||[])];
@@ -72,9 +83,10 @@ function init(){
  '<div id="bbOriginalPasteFallback" hidden style="margin-top:9px">'+
  '<label for="bbOriginalPasteArea" style="display:block;font-size:12px;margin-bottom:5px">Tap this area and press Ctrl+V / ⌘V</label>'+
  '<div id="bbOriginalPasteArea" contenteditable="true" role="textbox" aria-label="Paste original invoice photo" style="min-height:55px;padding:10px;background:white;border:1px dashed #86a9ca;border-radius:9px;font-size:12px;color:#526c82">Paste your invoice image here</div></div>'+
- '<div id="bbOriginalPreview" style="margin-top:7px"></div><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
+ '<div id="bbOriginalPreview" style="margin-top:7px"></div><button id="bbOriginalRemove" type="button" hidden style="margin:7px 0;padding:7px 12px;background:#fff0f0;border:1px solid #e3a5a5;border-radius:8px;color:#a52b2b;font-weight:800;cursor:pointer">✕ Remove wrong image</button><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
  anchor.parentNode.insertBefore(box,anchor);
  $('bbOriginalFile').addEventListener('change',e=>choose(e.target.files?.[0]));
+ $('bbOriginalRemove').addEventListener('click',removeSelection);
  $('bbOriginalPaste').addEventListener('click',pasteButton);
  $('bbOriginalRetry').addEventListener('click',async()=>{if(!retryId||!selected)return;try{await afterComplete({invoiceId:retryId},{invoiceId:retryId});}catch(e){setMessage('Retry failed: '+e.message,true)}});
  document.addEventListener('paste',e=>{

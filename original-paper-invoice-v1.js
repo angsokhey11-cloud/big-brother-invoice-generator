@@ -213,6 +213,28 @@ async function post(path,body,headers={}){
  if(!r.ok){const data=await r.json().catch(()=>({}));throw Error(data.message||data.error||'Attachment upload failed')}
  return r.json();
 }
+async function beforeComplete(payload){
+ if(!selected)return {ready:true};
+ if(uploading)throw Error('Original image upload is still processing. Wait before completing another invoice.');
+ const expected=String(payload?.invoiceNo||$('invoiceNumber')?.value||'').trim();
+ if(!expected||expected==='Loading...'||expected==='Unavailable'){
+  throw Error('Set the system invoice number before verifying the attached paper image.');
+ }
+ if(verifiedNumber!==expected||!scanResult)await checkNumber(expected);
+ const reason=String($('bbOriginalOverrideReason')?.value||'').trim();
+ if(scanResult?.status==='match')return {ready:true,method:'ocr'};
+ if(overrideAllowed&&reason.length>=8)return {ready:true,method:'admin-review'};
+ if($('bbOriginalSelectArea')&&!$('bbOriginalSelectArea').hidden){
+  $('bbOriginalSelectArea').scrollIntoView({behavior:'smooth',block:'center'});
+ }
+ const status=scanResult?.message||'The scanner could not verify the selected paper image.';
+ const explanation='Invoice NOT SAVED. The attached paper photo is unverified. '+
+  'Select Invoice Number Area and scan only the printed number. '+
+  'If OCR still misreads a correct number, request authorized administrator review. '+
+  'Alternatively remove the photo to save the invoice without an attachment and upload it later from Pending Scan.';
+ setMessage(explanation,true);
+ throw Error(explanation+'\n\nScanner: '+status);
+}
 async function afterComplete(payload,serverResult){
  if(!selected||uploading)return {skipped:true};
  const id=String(serverResult?.invoiceId||serverResult?.invoice_id||payload?.invoiceId||'').trim();
@@ -248,6 +270,6 @@ async function afterComplete(payload,serverResult){
   return {success:true};
  }catch(e){setMessage('Invoice saved; original upload failed. '+e.message,true);if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=false;throw e;}finally{uploading=false}
 }
-window.BBOriginalInvoice={afterComplete,init};
+window.BBOriginalInvoice={beforeComplete,afterComplete,init};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

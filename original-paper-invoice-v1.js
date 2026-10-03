@@ -76,8 +76,8 @@ async function openAreaSelector(){
  panel.hidden=false;selectingArea=true;
  if($('bbOriginalAreaInfo'))$('bbOriginalAreaInfo').textContent='The default box targets the printed number. Drag a new box if your photo is positioned differently.';
  let origin=null,rect={
-  x:canvas.width*.70,y:canvas.height*.025,
-  w:canvas.width*.23,h:canvas.height*.075
+  x:canvas.width*.70,y:canvas.height*.095,
+  w:canvas.width*.25,h:canvas.height*.065
  };
  const draw=()=>{
   ctx.putImageData(source,0,0);
@@ -112,8 +112,13 @@ async function openAreaSelector(){
   const original=await createImageBitmap(file);
   if(file!==selected){original.close();return}
   const sx=original.width/canvas.width,sy=original.height/canvas.height;
-  crop.width=Math.max(1,Math.round(rect.w*sx));crop.height=Math.max(1,Math.round(rect.h*sy));
-  crop.getContext('2d').drawImage(original,rect.x*sx,rect.y*sy,
+  // Use EXACTLY the 2x high-resolution crop prepared by Real Invoice Scanner.
+  crop.width=Math.max(1,Math.round(rect.w*sx*2));
+  crop.height=Math.max(1,Math.round(rect.h*sy*2));
+  const cropContext=crop.getContext('2d');
+  cropContext.imageSmoothingEnabled=true;
+  cropContext.imageSmoothingQuality='high';
+  cropContext.drawImage(original,rect.x*sx,rect.y*sy,
    rect.w*sx,rect.h*sy,0,0,crop.width,crop.height);
   original.close();
   scanCrop=await new Promise(resolve=>crop.toBlob(resolve,'image/png'));

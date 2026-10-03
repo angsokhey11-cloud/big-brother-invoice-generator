@@ -46,10 +46,12 @@
       data = { message: text };
     }
     if (!response.ok) {
-      throw new Error(
+      const error=new Error(
         data.message || data.error_description || data.error ||
         ('Database request failed (' + response.status + ')')
       );
+      error.httpStatus=response.status;
+      throw error;
     }
     return data;
   }
@@ -1060,7 +1062,10 @@
         splitPayment?'bb_sales_save_invoice_split_payment':'bb_sales_save_invoice_bundle',
         {p_invoice:invoicePayload,p_payment:paymentPayload||null}
       );
-      bbWritePendingInvoice(null);
+      // Keep the saved ID until the whole invoice-completion flow clears the form.
+      // If a later image/Telegram step fails, a second Complete cannot resave it.
+      pending.confirmedSaved=true;
+      bbWritePendingInvoice(pending);
       return result;
     }catch(error){
       // A network error can happen AFTER a committed invoice. Verify before
@@ -1077,8 +1082,13 @@
         throw new Error(bbUncertainInvoiceMessage(pending,false)+
           ' Original error: '+(error?.message||error));
       }
-      // Rejected saves retain the ID for the same draft; a corrected draft
-      // must first resolve the prior attempt rather than silently start over.
+      // A definite server-side rejection rolls back the DB transaction.
+      // Allow staff to correct validation errors; uncertain network results
+      // remain locked to their original ID until database verification.
+      if(error.httpStatus>=400&&error.httpStatus<500&&
+         error.httpStatus!==408&&error.httpStatus!==429){
+        bbWritePendingInvoice(null);
+      }
       throw error;
     }
   };
@@ -1111,6 +1121,9 @@
      *   automatic INV-3462 -> completes -> next stays INV-3463
      */
     bbOriginalClearAfterSave();
+    // Clear the recovery guard only after completion clears the saved form.
+    // Manual Clear never removes an uncertain attempt.
+    if(bbReadPendingInvoice()?.confirmedSaved)bbWritePendingInvoice(null);
 
     if (manualSequence?.mode === 'manual') {
       bbWriteManualInvoiceSequence(

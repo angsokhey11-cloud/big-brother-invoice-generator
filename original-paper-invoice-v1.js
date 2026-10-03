@@ -4,7 +4,7 @@
 const HOST='https://sjfhlaclgmkwwofzstok.supabase.co';
 const API_KEY='sb_publishable_w762jR65CWwlO30fKQsYOw_6L9grx8S';
 const SESSION='BB_SUPABASE_DEV_SESSION_V1';
-let selected=null,previewUrl='',uploading=false,retryId='',scanResult=null,scanCounter=0,overrideAllowed=false,verifiedNumber='',retryNumber='';
+let selected=null,previewUrl='',uploading=false,retryId='',scanResult=null,scanCounter=0,overrideAllowed=false,verifiedNumber='',retryNumber='',scanCrop=null,selectingArea=false;
 function session(){try{return JSON.parse(localStorage.getItem(SESSION)||'null')}catch{return null}}
 async function bearer(){
  let s=session();if(!s?.access_token)throw Error('Sign in again before attaching an original.');
@@ -18,7 +18,10 @@ async function bearer(){
 function $(id){return document.getElementById(id)}
 function setMessage(msg,error=false){const el=$('bbOriginalStatus');if(el){el.textContent=msg;el.style.color=error?'#ad362a':'#245a87'}}
 function choose(file){
- scanCounter++;scanResult=null;verifiedNumber='';
+ scanCounter++;scanResult=null;verifiedNumber='';scanCrop=null;selectingArea=false;
+ if($('bbOriginalCropPanel'))$('bbOriginalCropPanel').hidden=true;
+ if($('bbOriginalSelectArea'))$('bbOriginalSelectArea').hidden=!file||!file.type.startsWith('image/');
+ if($('bbOriginalScanWhole'))$('bbOriginalScanWhole').hidden=true;
  if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl='';selected=null;
  const preview=$('bbOriginalPreview');if(preview)preview.replaceChildren();
  if($('bbOriginalRemove'))$('bbOriginalRemove').hidden=!file;
@@ -44,7 +47,7 @@ async function checkNumber(expected){
  verifiedNumber=number;
  const status=$('bbOriginalVerification');
  if(status){status.hidden=false;status.textContent='Scanning paper invoice number against '+number+'…';status.style.color='#805d17'}
- const check=await (window.BBInvoiceOCR?.verify(file,number)||Promise.resolve({status:'unclear',message:'OCR scanner did not load.'}));
+ const check=await (window.BBInvoiceOCR?.verify(scanCrop||file,number,scanCrop?{numberOnly:true}:{})||Promise.resolve({status:'unclear',message:'OCR scanner did not load.'}));
  if(sequence!==scanCounter||file!==selected)return null;
  scanResult=check;
  if($('bbOriginalOverride'))$('bbOriginalOverride').hidden=!overrideAllowed||check.status==='match';
@@ -54,6 +57,76 @@ async function checkNumber(expected){
  }
  setMessage(check.status==='match'?'✓ Original invoice number verified.':check.message,check.status!=='match');
  return check;
+}
+// Select a crop for OCR only. Never replace the full-resolution original upload.
+async function openAreaSelector(){
+ if(!selected||!selected.type.startsWith('image/')||uploading)return;
+ const panel=$('bbOriginalCropPanel'),canvas=$('bbOriginalCropCanvas');
+ if(!panel||!canvas)return;
+ const file=selected;
+ const bitmap=await createImageBitmap(file);
+ if(file!==selected){bitmap.close();return}
+ const maxWidth=750,scale=Math.min(1,maxWidth/bitmap.width);
+ canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+ canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+ const ctx=canvas.getContext('2d');
+ ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+ bitmap.close();
+ const source=ctx.getImageData(0,0,canvas.width,canvas.height);
+ panel.hidden=false;selectingArea=true;
+ if($('bbOriginalAreaInfo'))$('bbOriginalAreaInfo').textContent='Drag a box tightly around ONLY the printed invoice number.';
+ let origin=null,rect=null;
+ const draw=()=>{
+  ctx.putImageData(source,0,0);
+  if(!rect)return;
+  ctx.fillStyle='rgba(22,99,190,.15)';ctx.fillRect(rect.x,rect.y,rect.w,rect.h);
+  ctx.strokeStyle='#1766c0';ctx.lineWidth=2;ctx.strokeRect(rect.x,rect.y,rect.w,rect.h);
+ };
+ const point=e=>{
+  const bounds=canvas.getBoundingClientRect();
+  return {x:Math.max(0,Math.min(canvas.width,(e.clientX-bounds.left)*canvas.width/bounds.width)),
+   y:Math.max(0,Math.min(canvas.height,(e.clientY-bounds.top)*canvas.height/bounds.height))};
+ };
+ canvas.onpointerdown=e=>{
+  e.preventDefault();origin=point(e);rect=null;canvas.setPointerCapture(e.pointerId);
+ };
+ canvas.onpointermove=e=>{
+  if(!origin)return;
+  const p=point(e);rect={x:Math.min(origin.x,p.x),y:Math.min(origin.y,p.y),
+   w:Math.abs(origin.x-p.x),h:Math.abs(origin.y-p.y)};draw();
+ };
+ canvas.onpointerup=e=>{
+  if(!origin)return;canvas.onpointermove(e);origin=null;
+  if(rect?.w<12||rect?.h<8){rect=null;draw()}
+ };
+ canvas.onpointercancel=()=>{origin=null};
+ const apply=$('bbOriginalAreaApply'),cancel=$('bbOriginalAreaCancel');
+ apply.onclick=async()=>{
+  if(!rect){$('bbOriginalAreaInfo').textContent='Select a clear box around the number first.';return}
+  const crop=document.createElement('canvas');
+  // Upscale the displayed selection for OCR. Pixel dimensions are preserved from the photo
+  // when possible; do not modify the original selected file.
+  const original=await createImageBitmap(file);
+  if(file!==selected){original.close();return}
+  const sx=original.width/canvas.width,sy=original.height/canvas.height;
+  crop.width=Math.max(1,Math.round(rect.w*sx));crop.height=Math.max(1,Math.round(rect.h*sy));
+  crop.getContext('2d').drawImage(original,rect.x*sx,rect.y*sy,
+   rect.w*sx,rect.h*sy,0,0,crop.width,crop.height);
+  original.close();
+  scanCrop=await new Promise(resolve=>crop.toBlob(resolve,'image/png'));
+  if(!scanCrop){$('bbOriginalAreaInfo').textContent='Could not prepare selected area. Please retry.';return}
+  panel.hidden=true;selectingArea=false;
+  if($('bbOriginalScanWhole'))$('bbOriginalScanWhole').hidden=false;
+  setMessage('Scanning selected number area…');
+  await checkNumber();
+ };
+ cancel.onclick=()=>{panel.hidden=true;selectingArea=false;};
+}
+function restoreFullImageScan(){
+ scanCrop=null;scanCounter++;
+ if($('bbOriginalScanWhole'))$('bbOriginalScanWhole').hidden=true;
+ if($('bbOriginalCropPanel'))$('bbOriginalCropPanel').hidden=true;
+ if(selected){setMessage('Scanning full original again…');void checkNumber()}
 }
 function removeSelection(){
  if(uploading)return setMessage('Wait until the current upload finishes.',true);
@@ -113,11 +186,16 @@ function init(){
  '<div id="bbOriginalPasteFallback" hidden style="margin-top:9px">'+
  '<label for="bbOriginalPasteArea" style="display:block;font-size:12px;margin-bottom:5px">Tap this area and press Ctrl+V / ⌘V</label>'+
  '<div id="bbOriginalPasteArea" contenteditable="true" role="textbox" aria-label="Paste original invoice photo" style="min-height:55px;padding:10px;background:white;border:1px dashed #86a9ca;border-radius:9px;font-size:12px;color:#526c82">Paste your invoice image here</div></div>'+
- '<div id="bbOriginalPreview" style="margin-top:7px"></div><div id="bbOriginalVerification" role="status" hidden style="font-size:12px;font-weight:800;line-height:1.45;margin-top:7px;padding:8px;background:#fff;border:1px solid #d4dfec;border-radius:8px"></div><div id="bbOriginalOverride" hidden style="margin-top:8px"><label for="bbOriginalOverrideReason" style="display:block;font-weight:800;font-size:12px">Administrator review reason (required only for unclear or mismatched scans)</label><textarea id="bbOriginalOverrideReason" style="width:100%;min-height:60px;resize:vertical;border:1px solid #b2c8e2;border-radius:8px;padding:8px;font:12px Arial" placeholder="I inspected the actual paper invoice, its customer and invoice number because…"></textarea></div><button id="bbOriginalRemove" type="button" hidden style="margin:7px 0;padding:7px 12px;background:#fff0f0;border:1px solid #e3a5a5;border-radius:8px;color:#a52b2b;font-weight:800;cursor:pointer">✕ Remove wrong image</button><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
+ '<div id="bbOriginalPreview" style="margin-top:7px"></div>'+
+ '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button id="bbOriginalSelectArea" type="button" hidden style="padding:8px 10px;border-radius:8px;border:1px solid #95b9de;background:#e5f0ff;color:#205887;font-size:12px;font-weight:800">▣ Select Invoice Number Area</button><button id="bbOriginalScanWhole" type="button" hidden style="padding:8px 10px;border-radius:8px;border:1px solid #b4c6d6;background:white;color:#315776;font-size:12px">Scan Full Image Instead</button></div>'+
+ '<div id="bbOriginalCropPanel" hidden style="margin-top:8px;padding:8px;border:1px solid #a9c5df;border-radius:8px;background:white"><div id="bbOriginalAreaInfo" style="font-size:12px;margin-bottom:7px">Drag around only the printed invoice number.</div><canvas id="bbOriginalCropCanvas" style="max-width:100%;width:100%;height:auto;touch-action:none;border:1px solid #b5c9df;border-radius:5px;display:block"></canvas><div style="display:flex;gap:8px;margin-top:8px"><button type="button" id="bbOriginalAreaApply" style="border:0;border-radius:7px;background:#135fb0;color:white;padding:8px 12px;font-weight:bold">Scan Selected Area</button><button type="button" id="bbOriginalAreaCancel" style="border:1px solid #a5bcd2;border-radius:7px;background:white;padding:8px 12px">Cancel</button></div></div>'+
+ '<div id="bbOriginalVerification" role="status" hidden style="font-size:12px;font-weight:800;line-height:1.45;margin-top:7px;padding:8px;background:#fff;border:1px solid #d4dfec;border-radius:8px"></div><div id="bbOriginalOverride" hidden style="margin-top:8px"><label for="bbOriginalOverrideReason" style="display:block;font-weight:800;font-size:12px">Administrator review reason (required only for unclear or mismatched scans)</label><textarea id="bbOriginalOverrideReason" style="width:100%;min-height:60px;resize:vertical;border:1px solid #b2c8e2;border-radius:8px;padding:8px;font:12px Arial" placeholder="I inspected the actual paper invoice, its customer and invoice number because…"></textarea></div><button id="bbOriginalRemove" type="button" hidden style="margin:7px 0;padding:7px 12px;background:#fff0f0;border:1px solid #e3a5a5;border-radius:8px;color:#a52b2b;font-weight:800;cursor:pointer">✕ Remove wrong image</button><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
  anchor.parentNode.insertBefore(box,anchor);
  $('bbOriginalFile').addEventListener('change',e=>choose(e.target.files?.[0]));
  $('bbOriginalRemove').addEventListener('click',removeSelection);
  $('bbOriginalPaste').addEventListener('click',pasteButton);
+ $('bbOriginalSelectArea').addEventListener('click',()=>{void openAreaSelector().catch(e=>setMessage('Could not open area selector: '+e.message,true))});
+ $('bbOriginalScanWhole').addEventListener('click',restoreFullImageScan);
  void verifyOverridePermission();
  $('invoiceNumber')?.addEventListener('input',()=>{if(selected)void checkNumber()});
  $('bbOriginalRetry').addEventListener('click',async()=>{if(!retryId||!selected)return;try{await afterComplete({invoiceId:retryId},{invoiceId:retryId});}catch(e){setMessage('Retry failed: '+e.message,true)}});

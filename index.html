@@ -323,10 +323,8 @@
         '    if(!window.BBOriginalInvoice?.beforeComplete||!window.BBOriginalInvoice?.afterComplete) throw Error("Paper photo integration did not load. Invoice NOT sent; reopen the generator.");\n'
         +'    await window.BBOriginalInvoice.beforeComplete(payload);\n'
         +'    const bbRealSaved = await postSalesInvoiceBundle(payload, paymentPayload);\n'
-        +'    if(window.BBOriginalInvoice?.afterComplete){\n'
-        +'      try{await window.BBOriginalInvoice.afterComplete(payload,bbRealSaved)}\n'
-        +'      catch(error){window.BBOriginalInvoiceUploadPending=true;console.error("Original upload:",error);alert("The invoice WAS SAVED, but its original image was NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n'
-        +'    }\n');
+        +'    try{await window.BBOriginalInvoice.afterComplete(payload,bbRealSaved)}\n'
+        +'    catch(error){window.BBOriginalInvoiceUploadPending=true;console.error("Original upload:",error);alert("The invoice WAS SAVED, but its original image was NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n');
 
       // Keep the already-saved invoice visible if its original image needs retry.
       // Do not send another invoice save; the dedicated upload retry owns recovery.

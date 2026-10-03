@@ -324,8 +324,15 @@
         +'    const bbRealSaved = await postSalesInvoiceBundle(payload, paymentPayload);\n'
         +'    if(window.BBOriginalInvoice?.afterComplete){\n'
         +'      try{await window.BBOriginalInvoice.afterComplete(payload,bbRealSaved)}\n'
-        +'      catch(error){console.error("Original upload:",error);alert("The invoice WAS SAVED, but its original image was NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n'
+        +'      catch(error){window.BBOriginalInvoiceUploadPending=true;console.error("Original upload:",error);alert("The invoice WAS SAVED, but its original image was NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n'
         +'    }\n');
+
+      // Keep the already-saved invoice visible if its original image needs retry.
+      // Do not send another invoice save; the dedicated upload retry owns recovery.
+      const completeClear='    clearAllAfterSuccessfulSave();';
+      if(!html.includes(completeClear))throw Error('Invoice completion clear hook missing.');
+      html=html.replace(completeClear,
+        '    if(!window.BBOriginalInvoiceUploadPending)clearAllAfterSuccessfulSave();');
 
       const safeAdapter =
 

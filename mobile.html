@@ -232,9 +232,7 @@
         '    await postSalesInvoiceBundle(payload, paymentPayload);';
 
       const bbInvoiceSaveReplacement=
-        '    if(!window.BBOriginalInvoice?.beforeComplete||!window.BBOriginalInvoice?.afterComplete) throw Error("Paper photo integration did not load. Invoice NOT sent; reopen the generator.");\n'
-        +'    await window.BBOriginalInvoice.beforeComplete(payload);\n'
-        +'    const bbSavedInvoiceResult =\n'
+        '    const bbSavedInvoiceResult =\n'
         +'      await postSalesInvoiceBundle(payload, paymentPayload);';
 
       if(!html.includes(bbInvoiceSaveMarker)){
@@ -250,12 +248,10 @@
         '    clearAllAfterSuccessfulSave();';
 
       const bbInvoiceTelegramBeforeClear=
-        '    try{await window.BBOriginalInvoice.afterComplete(payload,bbSavedInvoiceResult)}\n'
-        +'    catch(error){window.BBOriginalInvoiceUploadPending=true;console.error("Original upload:",error);alert("Invoice SAVED but original NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n'
-        +'    if (window.BBTelegramInvoiceShare?.afterComplete) {\n'
+        '    if (window.BBTelegramInvoiceShare?.afterComplete) {\n'
         +'      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\n'
         +'    }\n\n'
-        +'    if(!window.BBOriginalInvoiceUploadPending)clearAllAfterSuccessfulSave();';
+        +'    clearAllAfterSuccessfulSave();';
 
       if(!html.includes(bbInvoiceClearMarker)){
         throw new Error('Mobile Invoice Telegram post-save marker was not found.');
@@ -310,8 +306,6 @@
         +'<scr'+'ipt src="mobile-invoice-preview.js?v=20260914-1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="invoice-ar-summary-v1.js?v=20260921-textonly1"></scr'+'ipt>\n'
         +'<scr'+'ipt src="telegram-invoice-share-v1.js?v=20261003-upload-pending1"></scr'+'ipt>\n'
-        +'<scr'+'ipt src="https://angsokhey11-cloud.github.io/big-brother-real-invoice/smart-invoice-ocr-v1.js?v=20261003-label-layout1"></scr'+'ipt>\n'
-        +'<scr'+'ipt src="original-paper-invoice-v1.js?v=20261003-stage-journal1"></scr'+'ipt>\n'
         +bbMobileCompleteFlow
         ;
 

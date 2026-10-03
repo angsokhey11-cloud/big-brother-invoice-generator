@@ -248,6 +248,7 @@ async function post(path,body,headers={}){
  return r.json();
 }
 async function beforeComplete(payload){
+ window.BBOriginalExpectedAttachment=!!selected;
  if(!selected)return {ready:true};
  if(uploading)throw Error('Original image upload is still processing. Wait before completing another invoice.');
  const expected=String(payload?.invoiceNo||$('invoiceNumber')?.value||'').trim();
@@ -270,7 +271,11 @@ async function beforeComplete(payload){
  throw Error(explanation+'\n\nScanner: '+status);
 }
 async function afterComplete(payload,serverResult){
- if(!selected||uploading)return {skipped:true};
+ if(!selected){
+  if(window.BBOriginalExpectedAttachment)throw Error('The original image selection was lost after invoice save. Invoice WAS SAVED; attach the photo through Pending Scan, not another invoice submission.');
+  return {skipped:true};
+ }
+ if(uploading)throw Error('Original image upload is already running. Do not submit another invoice.');
  const id=String(serverResult?.invoiceId||serverResult?.invoice_id||payload?.invoiceId||'').trim();
  if(!id)throw Error('Invoice saved, but its internal invoice ID was unavailable for attachment.');
  const expected=String(payload?.invoiceNo||retryNumber||$('invoiceNumber')?.value||'').trim();
@@ -285,23 +290,30 @@ async function afterComplete(payload,serverResult){
    throw Error('Paper original was not uploaded: invoice-number verification failed. Replace the picture, or request administrator inspection with a reason.');
   }
  }
- const file=selected;retryId=id;retryNumber=expected;uploading=true;setMessage('Saving verified original invoice securely…');
+ const file=selected;retryId=id;retryNumber=expected;uploading=true;setMessage('Invoice saved. Uploading its full original photo…');
  if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
  const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'}[file.type];
  const path=id+'/'+crypto.randomUUID()+'.'+ext;
  try{
   await post('/storage/v1/object/bb-real-invoices/'+path,file,{'Content-Type':file.type,'x-upsert':'false'});
+  setMessage('Photo sent. Registering the attachment against saved invoice '+expected+'…');
   try{
    await post('/rest/v1/rpc/bb_real_invoice_register_verified',JSON.stringify({p_invoice_id:id,p_storage_path:path,p_mime:file.type,p_source:'generator',p_scanned_number:result.scanned||'',p_verification_status:result.status,p_override_reason:result.status==='match'?null:reason}),{'Content-Type':'application/json'});
+   setMessage('Attachment registered. Checking Uploaded History record…');
+   const registered=await post('/rest/v1/rpc/bb_real_invoice_existing',JSON.stringify({p_id:id}),{'Content-Type':'application/json'});
+   if(registered?.path!==path)throw Error('Attachment registration could not be confirmed.');
   }catch(e){
    const t=await bearer();
+   // Cleanup policy does not delete successfully registered images. If the
+   // confirmation read failed after registration, preserve server evidence.
    await fetch(HOST+'/storage/v1/object/bb-real-invoices/'+path,{method:'DELETE',headers:{apikey:API_KEY,Authorization:'Bearer '+t}}).catch(()=>{});
    throw e;
   }
   choose(null);retryId='';retryNumber='';if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
   if($('bbOriginalFile'))$('bbOriginalFile').value='';
   window.BBOriginalInvoiceUploadPending=false;
-  setMessage('✓ Original uploaded. This invoice will not appear in Pending Scan.');
+  window.BBOriginalExpectedAttachment=false;
+  setMessage('✓ Original photo uploaded AND verified in the database. This invoice will not appear in Pending Scan.');
   return {success:true};
  }catch(e){setMessage('Invoice saved; original upload failed. '+e.message,true);if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=false;throw e;}finally{uploading=false}
 }

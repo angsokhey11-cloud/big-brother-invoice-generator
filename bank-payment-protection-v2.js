@@ -57,8 +57,7 @@ async function validateBank(payload){
  const actual=Number($('bbActualBankAmount')?.value);
  const curr=$('bbActualBankCurrency')?.value||payload.currency;
  if(!Number.isFinite(actual)||actual<=0){
-  window.bbShowInvoiceSaveError?.(new Error('Enter the actual bank amount before completing this invoice.'));
-  return false;
+  throw new Error('Enter the actual bank amount before completing this invoice.');
  }
  try{
   const good=await window.BBInvoiceBankRpc('bb_bank_validate_invoice_input',{
@@ -67,11 +66,10 @@ async function validateBank(payload){
    p_exchange_rate:Number(payload.exchangeRate),p_equivalent_amount:bankAmountFor(payload)
   });
   if(good!==true){
-   window.bbShowInvoiceSaveError?.(new Error('Bank transaction information does not match an available verified payment. Check customer, amount, currency and approved exchange rate.'));
-   return false;
+   throw new Error('Bank transaction details do not match an available verified payment. Check customer, amount, currency and approved exchange rate.');
   }
   return true;
- }catch(err){window.bbShowInvoiceSaveError?.(err);return false;}
+ }catch(err){throw err;}
 }
 function install(){
  inputUI();
@@ -106,15 +104,11 @@ function installSave(){
  const original=window.postSalesInvoiceBundle;
  window.postSalesInvoiceBundle=async function(invoice,payment){
   if(['Bank','Partially Paid in Bank','Cash + Bank'].includes(clean(invoice?.paymentMethod))){
-   if(!(await validateBank(invoice)))throw new Error('BB_BANK_INPUT_HANDLED');
+   await validateBank(invoice);
   }
   return original.apply(this,arguments);
  };
  window.postSalesInvoiceBundle.__bbBankV2=true;
-}
-const originalError=window.bbShowInvoiceSaveError;
-if(typeof originalError==='function'){
- window.bbShowInvoiceSaveError=function(e){if(e?.message==='BB_BANK_INPUT_HANDLED')return;return originalError.apply(this,arguments)};
 }
 const customer=$('customerName');
 customer?.addEventListener('input',()=>{if(lastCustomer!==customer.value){lastCustomer=customer.value;warned=null}});

@@ -320,7 +320,8 @@
       const originalSaveMarker='    await postSalesInvoiceBundle(payload, paymentPayload);';
       if(!html.includes(originalSaveMarker))throw Error('Desktop invoice save hook missing.');
       html=html.replace(originalSaveMarker,
-        '    if(window.BBOriginalInvoice?.beforeComplete) await window.BBOriginalInvoice.beforeComplete(payload);\n'
+        '    if(!window.BBOriginalInvoice?.beforeComplete||!window.BBOriginalInvoice?.afterComplete) throw Error("Paper photo integration did not load. Invoice NOT sent; reopen the generator.");\n'
+        +'    await window.BBOriginalInvoice.beforeComplete(payload);\n'
         +'    const bbRealSaved = await postSalesInvoiceBundle(payload, paymentPayload);\n'
         +'    if(window.BBOriginalInvoice?.afterComplete){\n'
         +'      try{await window.BBOriginalInvoice.afterComplete(payload,bbRealSaved)}\n'

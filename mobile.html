@@ -251,12 +251,12 @@
       const bbInvoiceTelegramBeforeClear=
         '    if(window.BBOriginalInvoice?.afterComplete){\n'
         +'      try{await window.BBOriginalInvoice.afterComplete(payload, bbSavedInvoiceResult)}\n'
-        +'      catch(error){console.error("Original upload:",error);alert("Invoice SAVED but original NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n'
+        +'      catch(error){window.BBOriginalInvoiceUploadPending=true;console.error("Original upload:",error);alert("Invoice SAVED but original NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n'
         +'    }\n'
         +'    if (window.BBTelegramInvoiceShare?.afterComplete) {\n'
         +'      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\n'
         +'    }\n\n'
-        +'    clearAllAfterSuccessfulSave();';
+        +'    if(!window.BBOriginalInvoiceUploadPending)clearAllAfterSuccessfulSave();';
 
       if(!html.includes(bbInvoiceClearMarker)){
         throw new Error('Mobile Invoice Telegram post-save marker was not found.');

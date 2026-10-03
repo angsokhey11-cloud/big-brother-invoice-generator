@@ -242,10 +242,25 @@ function init(){
   if(insideFallback){e.preventDefault();setMessage('Copy an invoice image or screenshot first, then paste.',true)}
  });
 }
-async function post(path,body,headers={}){
- const t=await bearer(),r=await fetch(HOST+path,{method:'POST',headers:{apikey:API_KEY,Authorization:'Bearer '+t,...headers},body});
- if(!r.ok){const data=await r.json().catch(()=>({}));throw Error(data.message||data.error||'Attachment upload failed')}
- return r.json();
+// Use the same authenticated request convention as Real Invoice Scanner.
+// Include the exact failing stage and server message instead of hiding errors.
+async function post(path,body,headers={},stage='attachment request'){
+ const t=await bearer();
+ let r;
+ try{
+  r=await fetch(HOST+path,{method:'POST',headers:{apikey:API_KEY,Authorization:'Bearer '+t,...headers},body,cache:'no-store'});
+ }catch(error){throw Error(stage+' could not connect: '+(error?.message||error))}
+ const raw=await r.text(),data=raw?(()=>{try{return JSON.parse(raw)}catch{return {message:raw.slice(0,180)}}})():null;
+ if(!r.ok)throw Error(stage+' failed ('+r.status+'): '+(data?.message||data?.error_description||data?.error||'Server rejected request'));
+ return data;
+}
+function reportUploadError(message){
+ const text='INVOICE ALREADY SAVED — PAPER PHOTO NOT REGISTERED. '+message+
+  ' Keep this page open. Use Retry original upload below; do NOT click Complete again.';
+ window.BBOriginalInvoiceUploadPending=true;
+ setMessage(text,true);
+ if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=false;
+ return text;
 }
 async function beforeComplete(payload){
  window.BBOriginalExpectedAttachment=!!selected;
@@ -290,17 +305,26 @@ async function afterComplete(payload,serverResult){
    throw Error('Paper original was not uploaded: invoice-number verification failed. Replace the picture, or request administrator inspection with a reason.');
   }
  }
- const file=selected;retryId=id;retryNumber=expected;uploading=true;setMessage('Invoice saved. Uploading its full original photo…');
+ const file=selected;retryId=id;retryNumber=expected;uploading=true;
+ window.BBOriginalInvoiceUploadPending=true;
+ setMessage('Invoice '+expected+' saved. Checking photo upload permission…');
  if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
  const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'}[file.type];
  const path=id+'/'+crypto.randomUUID()+'.'+ext;
  try{
-  await post('/storage/v1/object/bb-real-invoices/'+path,file,{'Content-Type':file.type,'x-upsert':'false'});
+  // Verify that this signed-in account has permission for the newly saved
+  // invoice BEFORE writing anything to Storage.
+  const allowed=await post('/rest/v1/rpc/bb_real_invoice_can_upload',
+   JSON.stringify({p_id:id}),{'Content-Type':'application/json'},'Photo upload permission check');
+  if(allowed!==true)throw Error('Photo upload permission denied for saved invoice '+expected+'. Check the account/location permissions.');
+  setMessage('Permission confirmed. Uploading full original photo…');
+  const storagePath='/storage/v1/object/bb-real-invoices/'+encodeURIComponent(path).replace('%2F','/');
+  await post(storagePath,file,{'Content-Type':file.type,'x-upsert':'false'},'Original photo storage upload');
   setMessage('Photo sent. Registering the attachment against saved invoice '+expected+'…');
   try{
-   await post('/rest/v1/rpc/bb_real_invoice_register_verified',JSON.stringify({p_invoice_id:id,p_storage_path:path,p_mime:file.type,p_source:'generator',p_scanned_number:result.scanned||'',p_verification_status:result.status,p_override_reason:result.status==='match'?null:reason}),{'Content-Type':'application/json'});
+   await post('/rest/v1/rpc/bb_real_invoice_register_verified',JSON.stringify({p_invoice_id:id,p_storage_path:path,p_mime:file.type,p_source:'generator',p_scanned_number:result.scanned||'',p_verification_status:result.status,p_override_reason:result.status==='match'?null:reason}),{'Content-Type':'application/json'},'Original photo registration');
    setMessage('Attachment registered. Checking Uploaded History record…');
-   const registered=await post('/rest/v1/rpc/bb_real_invoice_existing',JSON.stringify({p_id:id}),{'Content-Type':'application/json'});
+   const registered=await post('/rest/v1/rpc/bb_real_invoice_existing',JSON.stringify({p_id:id}),{'Content-Type':'application/json'},'Uploaded attachment verification');
    if(registered?.path!==path)throw Error('Attachment registration could not be confirmed.');
   }catch(e){
    const t=await bearer();
@@ -315,7 +339,7 @@ async function afterComplete(payload,serverResult){
   window.BBOriginalExpectedAttachment=false;
   setMessage('✓ Original photo uploaded AND verified in the database. This invoice will not appear in Pending Scan.');
   return {success:true};
- }catch(e){setMessage('Invoice saved; original upload failed. '+e.message,true);if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=false;throw e;}finally{uploading=false}
+ }catch(e){reportUploadError(e?.message||String(e));throw e;}finally{uploading=false}
 }
 window.BBOriginalInvoice={beforeComplete,afterComplete,init};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

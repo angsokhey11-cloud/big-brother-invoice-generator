@@ -74,8 +74,11 @@ async function openAreaSelector(){
  bitmap.close();
  const source=ctx.getImageData(0,0,canvas.width,canvas.height);
  panel.hidden=false;selectingArea=true;
- if($('bbOriginalAreaInfo'))$('bbOriginalAreaInfo').textContent='Drag a box tightly around ONLY the printed invoice number.';
- let origin=null,rect=null;
+ if($('bbOriginalAreaInfo'))$('bbOriginalAreaInfo').textContent='The default box targets the printed number. Drag a new box if your photo is positioned differently.';
+ let origin=null,rect={
+  x:canvas.width*.70,y:canvas.height*.025,
+  w:canvas.width*.23,h:canvas.height*.075
+ };
  const draw=()=>{
   ctx.putImageData(source,0,0);
   if(!rect)return;
@@ -121,6 +124,7 @@ async function openAreaSelector(){
   await checkNumber();
  };
  cancel.onclick=()=>{panel.hidden=true;selectingArea=false;};
+ draw();
 }
 function restoreFullImageScan(){
  scanCrop=null;scanCounter++;

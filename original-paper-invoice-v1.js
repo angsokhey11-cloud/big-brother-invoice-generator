@@ -202,7 +202,19 @@ function init(){
  $('bbOriginalScanWhole').addEventListener('click',restoreFullImageScan);
  void verifyOverridePermission();
  $('invoiceNumber')?.addEventListener('input',()=>{if(selected)void checkNumber()});
- $('bbOriginalRetry').addEventListener('click',async()=>{if(!retryId||!selected)return;try{await afterComplete({invoiceId:retryId},{invoiceId:retryId});}catch(e){setMessage('Retry failed: '+e.message,true)}});
+ $('bbOriginalRetry').addEventListener('click',async()=>{
+  if(!retryId||!selected||uploading)return;
+  const savedId=retryId,savedNumber=retryNumber,wasPending=!!window.BBOriginalInvoiceUploadPending;
+  try{
+   const result=await afterComplete({invoiceId:savedId,invoiceNo:savedNumber},{invoiceId:savedId});
+   if(result?.success&&wasPending){
+    window.BBOriginalInvoiceUploadPending=false;
+    // The invoice was previously saved. This clears the completed form only;
+    // it never submits another invoice or repeats stock deductions.
+    if(typeof window.clearAllAfterSuccessfulSave==='function')window.clearAllAfterSuccessfulSave();
+   }
+  }catch(e){setMessage('Retry failed: '+e.message,true)}
+ });
  document.addEventListener('paste',e=>{
   const area=$('bbOriginalPasteArea');
   const insideFallback=area&&(e.target===area||area.contains(e.target));
@@ -270,6 +282,7 @@ async function afterComplete(payload,serverResult){
   }
   choose(null);retryId='';retryNumber='';if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
   if($('bbOriginalFile'))$('bbOriginalFile').value='';
+  window.BBOriginalInvoiceUploadPending=false;
   setMessage('✓ Original uploaded. This invoice will not appear in Pending Scan.');
   return {success:true};
  }catch(e){setMessage('Invoice saved; original upload failed. '+e.message,true);if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=false;throw e;}finally{uploading=false}

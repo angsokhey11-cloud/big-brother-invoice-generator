@@ -232,7 +232,8 @@
         '    await postSalesInvoiceBundle(payload, paymentPayload);';
 
       const bbInvoiceSaveReplacement=
-        '    if(window.BBOriginalInvoice?.beforeComplete) await window.BBOriginalInvoice.beforeComplete(payload);\n'
+        '    if(!window.BBOriginalInvoice?.beforeComplete||!window.BBOriginalInvoice?.afterComplete) throw Error("Paper photo integration did not load. Invoice NOT sent; reopen the generator.");\n'
+        +'    await window.BBOriginalInvoice.beforeComplete(payload);\n'
         +'    const bbSavedInvoiceResult =\n'
         +'      await postSalesInvoiceBundle(payload, paymentPayload);';
 

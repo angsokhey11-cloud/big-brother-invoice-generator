@@ -316,23 +316,6 @@
          Confirmed Supabase invoices are mirrored to Google Sheets.
          ======================================================= */
 
-      // Original is uploaded only AFTER the invoice has saved successfully.
-      const originalSaveMarker='    await postSalesInvoiceBundle(payload, paymentPayload);';
-      if(!html.includes(originalSaveMarker))throw Error('Desktop invoice save hook missing.');
-      html=html.replace(originalSaveMarker,
-        '    if(!window.BBOriginalInvoice?.beforeComplete||!window.BBOriginalInvoice?.afterComplete) throw Error("Paper photo integration did not load. Invoice NOT sent; reopen the generator.");\n'
-        +'    await window.BBOriginalInvoice.beforeComplete(payload);\n'
-        +'    const bbRealSaved = await postSalesInvoiceBundle(payload, paymentPayload);\n'
-        +'    try{await window.BBOriginalInvoice.afterComplete(payload,bbRealSaved)}\n'
-        +'    catch(error){window.BBOriginalInvoiceUploadPending=true;console.error("Original upload:",error);alert("The invoice WAS SAVED, but its original image was NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n');
-
-      // Keep the already-saved invoice visible if its original image needs retry.
-      // Do not send another invoice save; the dedicated upload retry owns recovery.
-      const completeClear='    clearAllAfterSuccessfulSave();';
-      if(!html.includes(completeClear))throw Error('Invoice completion clear hook missing.');
-      html=html.replace(completeClear,
-        '    if(!window.BBOriginalInvoiceUploadPending)clearAllAfterSuccessfulSave();');
-
       const safeAdapter =
 
         adapterJs.replace(
@@ -422,18 +405,6 @@
         '<scr'
         +
         'ipt src="telegram-invoice-share-v1.js?v=20261003-upload-pending1"></scr'
-        +
-        'ipt>\n'
-        +
-        '<scr'
-        +
-        'ipt src="https://angsokhey11-cloud.github.io/big-brother-real-invoice/smart-invoice-ocr-v1.js?v=20261003-label-layout1"></scr'
-        +
-        'ipt>\n'
-        +
-        '<scr'
-        +
-        'ipt src="original-paper-invoice-v1.js?v=20261003-stage-journal1"></scr'
         +
         'ipt>';
 

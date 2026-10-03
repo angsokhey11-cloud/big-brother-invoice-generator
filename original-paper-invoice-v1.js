@@ -20,6 +20,7 @@ function setMessage(msg,error=false){const el=$('bbOriginalStatus');if(el){el.te
 function choose(file){
  scanCounter++;scanResult=null;verifiedNumber='';scanCrop=null;selectingArea=false;
  if($('bbOriginalCropPanel'))$('bbOriginalCropPanel').hidden=true;
+ if($('bbOriginalOCRCropPreview'))$('bbOriginalOCRCropPreview').replaceChildren();
  if($('bbOriginalSelectArea'))$('bbOriginalSelectArea').hidden=!file||!file.type.startsWith('image/');
  if($('bbOriginalScanWhole'))$('bbOriginalScanWhole').hidden=true;
  if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl='';selected=null;
@@ -121,8 +122,20 @@ async function openAreaSelector(){
   cropContext.drawImage(original,rect.x*sx,rect.y*sy,
    rect.w*sx,rect.h*sy,0,0,crop.width,crop.height);
   original.close();
-  scanCrop=await new Promise(resolve=>crop.toBlob(resolve,'image/png'));
-  if(!scanCrop){$('bbOriginalAreaInfo').textContent='Could not prepare selected area. Please retry.';return}
+  const blob=await new Promise(resolve=>crop.toBlob(resolve,'image/png'));
+  if(!blob){$('bbOriginalAreaInfo').textContent='Could not prepare selected area. Please retry.';return}
+  // Match Real Invoice Scanner exactly: send a named PNG File, not the raw
+  // Blob. Display the actual OCR input so a bad crop is easy to diagnose.
+  scanCrop=new File([blob],'invoice-number-area.png',{type:'image/png'});
+  const preview=$('bbOriginalOCRCropPreview');
+  if(preview){
+   preview.replaceChildren();
+   const image=document.createElement('img');
+   image.src=crop.toDataURL('image/png');
+   image.alt='Exact number crop sent to OCR';
+   image.style.cssText='display:block;max-width:100%;max-height:90px;object-fit:contain;border:1px solid #c4d2df;border-radius:5px;margin-top:5px;background:white';
+   preview.append(image);
+  }
   panel.hidden=true;selectingArea=false;
   if($('bbOriginalScanWhole'))$('bbOriginalScanWhole').hidden=false;
   setMessage('Scanning selected number area…');
@@ -195,7 +208,7 @@ function init(){
  '<div id="bbOriginalPasteFallback" hidden style="margin-top:9px">'+
  '<label for="bbOriginalPasteArea" style="display:block;font-size:12px;margin-bottom:5px">Tap this area and press Ctrl+V / ⌘V</label>'+
  '<div id="bbOriginalPasteArea" contenteditable="true" role="textbox" aria-label="Paste original invoice photo" style="min-height:55px;padding:10px;background:white;border:1px dashed #86a9ca;border-radius:9px;font-size:12px;color:#526c82">Paste your invoice image here</div></div>'+
- '<div id="bbOriginalPreview" style="margin-top:7px"></div>'+
+ '<div id="bbOriginalPreview" style="margin-top:7px"></div><div id="bbOriginalOCRCropPreview" aria-label="OCR scan crop preview"></div>'+
  '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button id="bbOriginalSelectArea" type="button" hidden style="padding:8px 10px;border-radius:8px;border:1px solid #95b9de;background:#e5f0ff;color:#205887;font-size:12px;font-weight:800">▣ Select Invoice Number Area</button><button id="bbOriginalScanWhole" type="button" hidden style="padding:8px 10px;border-radius:8px;border:1px solid #b4c6d6;background:white;color:#315776;font-size:12px">Scan Full Image Instead</button></div>'+
  '<div id="bbOriginalCropPanel" hidden style="margin-top:8px;padding:8px;border:1px solid #a9c5df;border-radius:8px;background:white"><div id="bbOriginalAreaInfo" style="font-size:12px;margin-bottom:7px">Drag around only the printed invoice number.</div><canvas id="bbOriginalCropCanvas" style="max-width:100%;width:100%;height:auto;touch-action:none;border:1px solid #b5c9df;border-radius:5px;display:block"></canvas><div style="display:flex;gap:8px;margin-top:8px"><button type="button" id="bbOriginalAreaApply" style="border:0;border-radius:7px;background:#135fb0;color:white;padding:8px 12px;font-weight:bold">Scan Selected Area</button><button type="button" id="bbOriginalAreaCancel" style="border:1px solid #a5bcd2;border-radius:7px;background:white;padding:8px 12px">Cancel</button></div></div>'+
  '<div id="bbOriginalVerification" role="status" hidden style="font-size:12px;font-weight:800;line-height:1.45;margin-top:7px;padding:8px;background:#fff;border:1px solid #d4dfec;border-radius:8px"></div><div id="bbOriginalOverride" hidden style="margin-top:8px"><label for="bbOriginalOverrideReason" style="display:block;font-weight:800;font-size:12px">Administrator review reason (required only for unclear or mismatched scans)</label><textarea id="bbOriginalOverrideReason" style="width:100%;min-height:60px;resize:vertical;border:1px solid #b2c8e2;border-radius:8px;padding:8px;font:12px Arial" placeholder="I inspected the actual paper invoice, its customer and invoice number because…"></textarea></div><button id="bbOriginalRemove" type="button" hidden style="margin:7px 0;padding:7px 12px;background:#fff0f0;border:1px solid #e3a5a5;border-radius:8px;color:#a52b2b;font-weight:800;cursor:pointer">✕ Remove wrong image</button><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';

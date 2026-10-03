@@ -1088,8 +1088,10 @@
       if(error.httpStatus>=400&&error.httpStatus<500&&
          error.httpStatus!==408&&error.httpStatus!==429){
         bbWritePendingInvoice(null);
+        throw error;
       }
-      throw error;
+      throw new Error(bbUncertainInvoiceMessage(pending,false)+
+        ' Original error: '+(error?.message||error));
     }
   };
 

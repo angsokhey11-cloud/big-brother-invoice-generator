@@ -57,8 +57,19 @@
       clearAllAfterSuccessfulSave();
     }catch(error){
       console.error('Desktop fast invoice complete failed:',error);
-      const message=String(error?.message||'Please try again.');
-      alert('Could not complete the invoice.\n\n'+message+'\n\nThe invoice was NOT cleared.');
+      if(typeof window.bbShowInvoiceSaveError==='function'){
+        window.bbShowInvoiceSaveError(error);
+      }else{
+        const notice=document.createElement('div');
+        notice.style.cssText='position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(8,24,43,.58)';
+        const card=document.createElement('div');
+        card.style.cssText='width:min(410px,100%);padding:23px;border-radius:16px;background:#fff;box-shadow:0 22px 65px #102c4460;text-align:center;font-family:Arial,sans-serif;color:#18324e';
+        const title=document.createElement('h3');title.textContent='Bank payment not authorized';title.style.color='#17457a';
+        const detail=document.createElement('p');
+        detail.textContent=/bank transaction id not verified|verified bank transaction/i.test(String(error?.message||''))?'This bank transaction is not registered for this customer or has already been used. Contact your administrator.':String(error?.message||'Could not complete the invoice.');
+        const button=document.createElement('button');button.type='button';button.textContent='OK';button.style.cssText='padding:12px 65px;border:0;border-radius:9px;background:#17457a;color:#fff;font-weight:bold';
+        button.onclick=()=>notice.remove();card.append(title,detail,button);notice.append(card);document.body.append(notice);button.focus();
+      }
     }finally{
       window.bbInvoiceSaving=false;
       if(button){button.disabled=false;button.innerHTML=oldText;}

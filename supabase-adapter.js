@@ -978,22 +978,109 @@
     return payload;
   };
 
+  /* Save uncertainty guard: invoice IDs remain the existing authoritative
+     duplicate key. The pending ID survives a temporary disconnect or reload.
+     Never automatically replay a transaction when its outcome is unknown. */
+  const BB_PENDING_INVOICE_PREFIX='bb_invoice_uncertain_v1_';
+  function bbInvoicePendingKey(){
+    const s=bbReadSession();
+    const account=String(s?.user?.id||'no-account').trim();
+    return BB_PENDING_INVOICE_PREFIX+account;
+  }
+  function bbReadPendingInvoice(){
+    try{return JSON.parse(localStorage.getItem(bbInvoicePendingKey())||'null')}
+    catch(_){return null}
+  }
+  function bbWritePendingInvoice(record){
+    try{
+      if(record)localStorage.setItem(bbInvoicePendingKey(),JSON.stringify(record));
+      else localStorage.removeItem(bbInvoicePendingKey());
+    }catch(error){
+      throw new Error('Invoice recovery storage is unavailable. Do not save until device storage works.');
+    }
+  }
+  function bbInvoiceFingerprint(p){
+    return JSON.stringify({
+      invoiceNo:p.invoiceNo,invoiceDate:p.invoiceDate,locationCode:p.locationCode,
+      customerId:p.customerId,customer:p.customer,salesperson:p.salesperson,
+      paymentMethod:p.paymentMethod,transactionId:p.transactionId,
+      grandTotal:p.grandTotal,currency:p.currency,
+      items:(p.items||[]).map(i=>[
+        i.productCode,i.productGroupCode,i.entryType,i.qty,i.unitPrice,i.amount
+      ])
+    });
+  }
+  async function bbVerifyInvoiceId(id){
+    return bbRpc('bb_sales_verify_invoice_save',{p_invoice_id:id});
+  }
+  function bbUncertainInvoiceMessage(pending,found){
+    return found
+      ? 'This invoice WAS SAVED in the database (Invoice No. '+(pending.invoiceNo||'')+
+        '). Do not save it again. Check Invoice History; if an image or Telegram step was interrupted, handle it separately.'
+      : 'INVOICE VERIFICATION REQUIRED. The last save response was interrupted. '+
+        'The app cannot confirm whether the database finished processing Invoice No. '+
+        (pending.invoiceNo||'')+'. Keep this form and reconnect, then press Complete '+
+        'to verify the ORIGINAL attempt. Do not create another invoice for this sale.';
+  }
+
   /* -----------------------------
      Atomic writes
   ----------------------------- */
   window.postSalesInvoiceBundle = async function postSalesInvoiceBundleSupabase(invoicePayload, paymentPayload) {
-    const splitPayment =
-      String(invoicePayload?.paymentMethod || '').trim() === 'Cash + Bank';
-
-    return bbRpc(
-      splitPayment
-        ? 'bb_sales_save_invoice_split_payment'
-        : 'bb_sales_save_invoice_bundle',
-      {
-        p_invoice: invoicePayload,
-        p_payment: paymentPayload || null
+    const fingerprint=bbInvoiceFingerprint(invoicePayload);
+    let pending=bbReadPendingInvoice();
+    if(pending){
+      let verification;
+      try{verification=await bbVerifyInvoiceId(pending.invoiceId)}
+      catch(error){throw new Error(bbUncertainInvoiceMessage(pending,false)+' Verification error: '+(error?.message||error))}
+      if(verification?.found){
+        pending.confirmedSaved=true;
+        bbWritePendingInvoice(pending);
+        if(pending.fingerprint===fingerprint)throw new Error(bbUncertainInvoiceMessage(pending,true));
+        // A different draft may proceed after the previous save was verified.
+        bbWritePendingInvoice(null);
+        pending=null;
+      }else if(pending.fingerprint!==fingerprint){
+        throw new Error(bbUncertainInvoiceMessage(pending,false)+
+          ' The original draft has changed. Reopen the original invoice or have an admin reconcile it first.');
       }
-    );
+    }
+    const invoiceId=pending?.invoiceId||invoicePayload.invoiceId;
+    if(!invoiceId)throw new Error('Missing invoice ID. Invoice not sent.');
+    invoicePayload.invoiceId=invoiceId;
+    if(!pending){
+      pending={invoiceId,invoiceNo:invoicePayload.invoiceNo,fingerprint,
+        createdAt:Date.now(),confirmedSaved:false};
+      bbWritePendingInvoice(pending);
+    }
+    const splitPayment=
+      String(invoicePayload?.paymentMethod||'').trim()==='Cash + Bank';
+    try{
+      const result=await bbRpc(
+        splitPayment?'bb_sales_save_invoice_split_payment':'bb_sales_save_invoice_bundle',
+        {p_invoice:invoicePayload,p_payment:paymentPayload||null}
+      );
+      bbWritePendingInvoice(null);
+      return result;
+    }catch(error){
+      // A network error can happen AFTER a committed invoice. Verify before
+      // showing a failure; never generate a new ID for an uncertain retry.
+      try{
+        const verified=await bbVerifyInvoiceId(invoiceId);
+        if(verified?.found){
+          pending.confirmedSaved=true;
+          bbWritePendingInvoice(pending);
+          throw new Error(bbUncertainInvoiceMessage(pending,true));
+        }
+      }catch(checkError){
+        if(pending.confirmedSaved)throw checkError;
+        throw new Error(bbUncertainInvoiceMessage(pending,false)+
+          ' Original error: '+(error?.message||error));
+      }
+      // Rejected saves retain the ID for the same draft; a corrected draft
+      // must first resolve the prior attempt rather than silently start over.
+      throw error;
+    }
   };
 
   window.postSalesInvoice = async function postSalesInvoiceSupabase(payload) {

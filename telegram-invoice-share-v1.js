@@ -347,6 +347,9 @@
           console.warn('Telegram invoice post-save hook:',error);
         })
         .finally(()=>{
+          // An invoice may already be saved while its original image needs retry.
+          // Do not erase the attached photo/retry state in that case.
+          if(window.BBOriginalInvoiceUploadPending)return;
           originalClear.apply(context,args);
         });
     };

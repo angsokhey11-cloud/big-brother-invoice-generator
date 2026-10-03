@@ -1200,4 +1200,6 @@
 
   bbTrackManualInvoiceNumber();
   bbStartSupabaseInvoice();
+  // Narrow authenticated RPC bridge for bank verification V2.
+  window.BBInvoiceBankRpc = bbRpc;
 })();

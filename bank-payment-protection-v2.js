@@ -56,13 +56,12 @@ function bankAmountFor(payload){
 async function validateBank(payload){
  const actual=Number($('bbActualBankAmount')?.value);
  const curr=$('bbActualBankCurrency')?.value||payload.currency;
- if(!Number.isFinite(actual)||actual<=0){
-  throw new Error('Enter the actual bank amount before completing this invoice.');
- }
+ const supplied=clean($('bbActualBankAmount')?.value)!=='';
+ if(supplied&&(!Number.isFinite(actual)||actual<=0))throw new Error('Enter a valid actual bank amount.');
  try{
   const good=await window.BBInvoiceBankRpc('bb_bank_validate_invoice_input',{
    p_customer_id:payload.customerId,p_transaction_id:payload.transactionId,
-   p_actual_amount:actual,p_actual_currency:curr,p_invoice_currency:payload.currency,
+   p_actual_amount:supplied?actual:null,p_actual_currency:curr,p_invoice_currency:payload.currency,
    p_exchange_rate:Number(payload.exchangeRate),p_equivalent_amount:bankAmountFor(payload)
   });
   if(good!==true){

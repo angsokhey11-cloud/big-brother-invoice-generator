@@ -250,10 +250,8 @@
         '    clearAllAfterSuccessfulSave();';
 
       const bbInvoiceTelegramBeforeClear=
-        '    if(window.BBOriginalInvoice?.afterComplete){\n'
-        +'      try{await window.BBOriginalInvoice.afterComplete(payload, bbSavedInvoiceResult)}\n'
-        +'      catch(error){window.BBOriginalInvoiceUploadPending=true;console.error("Original upload:",error);alert("Invoice SAVED but original NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n'
-        +'    }\n'
+        '    try{await window.BBOriginalInvoice.afterComplete(payload,bbSavedInvoiceResult)}\n'
+        +'    catch(error){window.BBOriginalInvoiceUploadPending=true;console.error("Original upload:",error);alert("Invoice SAVED but original NOT uploaded. Use Retry upload before leaving this page.\\n"+(error?.message||error))}\n'
         +'    if (window.BBTelegramInvoiceShare?.afterComplete) {\n'
         +'      await window.BBTelegramInvoiceShare.afterComplete(payload, bbSavedInvoiceResult);\n'
         +'    }\n\n'

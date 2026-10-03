@@ -353,6 +353,14 @@
   }
 
   function bbSalespersonStaffId() {
+    const batchId = String(document.getElementById('batchNumber')?.value || '').trim();
+    if (batchId) {
+      // Do not silently assign batch invoices to the permanent location owner.
+      const assigned = typeof getSelectedSimpleBatch === 'function'
+        ? getSelectedSimpleBatch() : null;
+      return assigned?.batchId === batchId
+        ? String(assigned.salesmanStaffId || '').trim() : '';
+    }
     const code = String(
       currentLocationCode || document.getElementById('mainLocation')?.value || ''
     ).trim();

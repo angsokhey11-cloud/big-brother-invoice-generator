@@ -4442,6 +4442,7 @@ function renderSimpleBatchPicker(preferredValue = null) {
   }
 
   updateSimpleBatchStatus();
+  syncInvoiceSalespersonFromBatch();
 }
 
 function updateSimpleBatchStatus() {
@@ -4477,6 +4478,8 @@ function normalizeSimpleBatchRows(openBatches) {
         String(batch.batchDate || "").trim(),
       salesmanName:
         String(batch.salesmanName || "").trim(),
+      salesmanStaffId:
+        String(batch.salesmanStaffId || "").trim(),
       driverName:
         String(batch.driverName || "").trim(),
       driver2Name:
@@ -4789,8 +4792,34 @@ function applySimpleBatchLocation() {
    * but re-apply in case another UI routine touched it.
    */
   select.disabled=true;
+  syncInvoiceSalespersonFromBatch();
 
   return true;
+}
+
+function syncInvoiceSalespersonFromBatch() {
+  const input = document.getElementById("salesName");
+  if (!input) return;
+  const batch = getSelectedSimpleBatch();
+  if (batch) {
+    // A batch's actual assigned salesman always takes precedence over location ownership.
+    // Never replace missing batch ownership with another salesman's name.
+    input.value = batch.salesmanName || "";
+    input.readOnly = true;
+    input.title = batch.salesmanName
+      ? "Assigned salesman for " + batch.batchId
+      : "This batch has no assigned salesman";
+    input.dataset.batchSalesman = batch.batchId;
+    return;
+  }
+  if (input.dataset.batchSalesman) {
+    // Direct sale goes back to the original, location-based salesperson.
+    input.value = locations.find(x => x.locationCode ===
+      String(document.getElementById("mainLocation")?.value || "").trim())?.salespersonName || "";
+  }
+  input.readOnly = false;
+  input.title = "";
+  delete input.dataset.batchSalesman;
 }
 
 function handleSimpleBatchChange() {
@@ -4802,6 +4831,7 @@ function handleSimpleBatchChange() {
   }else{
     unlockSimpleBatchLocation();
   }
+  syncInvoiceSalespersonFromBatch();
 
   const searchInput=
     document.getElementById("productSearch");

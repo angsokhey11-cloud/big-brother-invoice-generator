@@ -8811,6 +8811,58 @@ function bbShowInvoiceSuccess(payload, paymentPayload, batchLocalResult) {
   }, 1000);
 }
 
+function bbShowInvoiceSaveError(error) {
+  bbEnsureInvoicePromptStyle();
+  document.getElementById("bbInvoiceSaveErrorNotice")?.remove();
+  const raw = String(error?.message || "The invoice could not be completed.");
+  const bankSecurity = /bank transaction id not verified or already used|verified bank transaction|transaction id is reserved/i.test(raw);
+  const duplicate = /transaction id already exists|transaction id already used/i.test(raw);
+  const title = bankSecurity ? "Bank payment not authorized" : duplicate ? "Transaction already recorded" : "Invoice could not be completed";
+  const detail = bankSecurity
+    ? "This bank transaction has not been registered for this customer, or it has already been used. Please contact your administrator."
+    : duplicate
+      ? "This bank transaction ID is already recorded. Please check the transaction ID before trying again."
+      : raw;
+  const backdrop = document.createElement("div");
+  backdrop.id = "bbInvoiceSaveErrorNotice";
+  backdrop.className = "bb-invoice-prompt-backdrop";
+  backdrop.setAttribute("role", "alertdialog");
+  backdrop.setAttribute("aria-modal", "true");
+  backdrop.setAttribute("aria-labelledby", "bbInvoiceSaveErrorTitle");
+  const card = document.createElement("div");
+  card.className = "bb-invoice-prompt-card";
+  card.style.textAlign = "center";
+  const symbol = document.createElement("div");
+  symbol.textContent = "!";
+  symbol.style.cssText = "width:49px;height:49px;display:grid;place-items:center;border-radius:50%;background:#fff1ed;color:#c34533;font-size:29px;font-weight:900;margin:0 auto 13px;";
+  const heading = document.createElement("div");
+  heading.id = "bbInvoiceSaveErrorTitle";
+  heading.className = "bb-invoice-prompt-title";
+  heading.textContent = title;
+  const body = document.createElement("div");
+  body.textContent = detail;
+  body.style.cssText = "color:#50677d;line-height:1.55;font-size:14px;overflow-wrap:anywhere;";
+  const foot = document.createElement("div");
+  foot.textContent = bankSecurity || duplicate
+    ? "Invoice was not saved."
+    : "Check Invoice History before retrying if the connection was interrupted.";
+  foot.style.cssText = "font-size:12px;font-weight:800;color:#a3533b;margin-top:15px;";
+  const ok = document.createElement("button");
+  ok.type = "button";
+  ok.className = "bb-invoice-prompt-btn bb-invoice-prompt-complete";
+  ok.style.cssText = "width:100%;margin-top:20px;max-width:260px;";
+  ok.textContent = "OK";
+  const close = () => { backdrop.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = ev => { if (ev.key === "Escape") { ev.preventDefault(); close(); } };
+  ok.addEventListener("click", close);
+  backdrop.addEventListener("click", ev => { if (ev.target === backdrop) close(); });
+  document.addEventListener("keydown", onKey);
+  card.append(symbol, heading, body, foot, ok);
+  backdrop.appendChild(card);
+  document.body.appendChild(backdrop);
+  ok.focus({preventScroll:true});
+}
+
 async function completeInvoice(event) {
   if (event) {
     event.preventDefault();
@@ -8962,11 +9014,7 @@ async function completeInvoice(event) {
   } catch (error) {
     console.error("Fast invoice complete failed:", error);
 
-    alert(
-      "Could not complete the invoice.\n\n" +
-      (error?.message || "Please try again.") +
-      "\n\nThe invoice was NOT cleared."
-    );
+    bbShowInvoiceSaveError(error);
 
   } finally {
     window.bbInvoiceSaving = false;

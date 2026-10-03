@@ -208,7 +208,7 @@ function init(){
  '<div id="bbOriginalPasteFallback" hidden style="margin-top:9px">'+
  '<label for="bbOriginalPasteArea" style="display:block;font-size:12px;margin-bottom:5px">Tap this area and press Ctrl+V / ⌘V</label>'+
  '<div id="bbOriginalPasteArea" contenteditable="true" role="textbox" aria-label="Paste original invoice photo" style="min-height:55px;padding:10px;background:white;border:1px dashed #86a9ca;border-radius:9px;font-size:12px;color:#526c82">Paste your invoice image here</div></div>'+
- '<div id="bbOriginalPreview" style="margin-top:7px"></div><div id="bbOriginalOCRCropPreview" aria-label="OCR scan crop preview"></div>'+
+ '<div id="bbOriginalPreview" style="margin-top:7px"></div><div id="bbOriginalOCRCropPreview" aria-label="OCR scan crop preview"></div><div id="bbOriginalStageJournal" style="font-size:11px;color:#52637a;margin-top:5px"></div>'+
  '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button id="bbOriginalSelectArea" type="button" hidden style="padding:8px 10px;border-radius:8px;border:1px solid #95b9de;background:#e5f0ff;color:#205887;font-size:12px;font-weight:800">▣ Select Invoice Number Area</button><button id="bbOriginalScanWhole" type="button" hidden style="padding:8px 10px;border-radius:8px;border:1px solid #b4c6d6;background:white;color:#315776;font-size:12px">Scan Full Image Instead</button></div>'+
  '<div id="bbOriginalCropPanel" hidden style="margin-top:8px;padding:8px;border:1px solid #a9c5df;border-radius:8px;background:white"><div id="bbOriginalAreaInfo" style="font-size:12px;margin-bottom:7px">Drag around only the printed invoice number.</div><canvas id="bbOriginalCropCanvas" style="max-width:100%;width:100%;height:auto;touch-action:none;border:1px solid #b5c9df;border-radius:5px;display:block"></canvas><div style="display:flex;gap:8px;margin-top:8px"><button type="button" id="bbOriginalAreaApply" style="border:0;border-radius:7px;background:#135fb0;color:white;padding:8px 12px;font-weight:bold">Scan Selected Area</button><button type="button" id="bbOriginalAreaCancel" style="border:1px solid #a5bcd2;border-radius:7px;background:white;padding:8px 12px">Cancel</button></div></div>'+
  '<div id="bbOriginalVerification" role="status" hidden style="font-size:12px;font-weight:800;line-height:1.45;margin-top:7px;padding:8px;background:#fff;border:1px solid #d4dfec;border-radius:8px"></div><div id="bbOriginalOverride" hidden style="margin-top:8px"><label for="bbOriginalOverrideReason" style="display:block;font-weight:800;font-size:12px">Administrator review reason (required only for unclear or mismatched scans)</label><textarea id="bbOriginalOverrideReason" style="width:100%;min-height:60px;resize:vertical;border:1px solid #b2c8e2;border-radius:8px;padding:8px;font:12px Arial" placeholder="I inspected the actual paper invoice, its customer and invoice number because…"></textarea></div><button id="bbOriginalRemove" type="button" hidden style="margin:7px 0;padding:7px 12px;background:#fff0f0;border:1px solid #e3a5a5;border-radius:8px;color:#a52b2b;font-weight:800;cursor:pointer">✕ Remove wrong image</button><button id="bbOriginalRetry" type="button" hidden style="margin:6px 0;padding:7px 12px;background:#1f659b;border:0;border-radius:8px;color:white;font-weight:bold">Retry original upload</button><div id="bbOriginalStatus" role="status" style="font-size:12px;overflow-wrap:anywhere;margin-top:6px">Optional — attach the original paper invoice.</div>';
@@ -254,6 +254,17 @@ async function post(path,body,headers={},stage='attachment request'){
  if(!r.ok)throw Error(stage+' failed ('+r.status+'): '+(data?.message||data?.error_description||data?.error||'Server rejected request'));
  return data;
 }
+function originalStage(stage,invoiceNo='',detail=''){
+ try{
+  const record={stage,invoiceNo:String(invoiceNo||retryNumber||'').slice(0,32),
+   detail:String(detail||'').slice(0,200),time:new Date().toISOString()};
+  sessionStorage.setItem('BB_LAST_ORIGINAL_UPLOAD_STAGE_V1',JSON.stringify(record));
+  const el=$('bbOriginalStageJournal');
+  if(el)el.textContent='Photo upload: '+record.stage+
+   (record.invoiceNo?' · '+record.invoiceNo:'')+
+   (record.detail?' · '+record.detail:'');
+ }catch(_){}
+}
 function reportUploadError(message){
  const text='INVOICE ALREADY SAVED — PAPER PHOTO NOT REGISTERED. '+message+
   ' Keep this page open. Use Retry original upload below; do NOT click Complete again.';
@@ -264,6 +275,7 @@ function reportUploadError(message){
 }
 async function beforeComplete(payload){
  window.BBOriginalExpectedAttachment=!!selected;
+ if(selected)originalStage('Photo verified; waiting for invoice save',payload?.invoiceNo);
  if(!selected)return {ready:true};
  if(uploading)throw Error('Original image upload is still processing. Wait before completing another invoice.');
  const expected=String(payload?.invoiceNo||$('invoiceNumber')?.value||'').trim();
@@ -291,6 +303,7 @@ async function afterComplete(payload,serverResult){
   return {skipped:true};
  }
  if(uploading)throw Error('Original image upload is already running. Do not submit another invoice.');
+ originalStage('Attachment callback started',payload?.invoiceNo);
  const id=String(serverResult?.invoiceId||serverResult?.invoice_id||payload?.invoiceId||'').trim();
  if(!id)throw Error('Invoice saved, but its internal invoice ID was unavailable for attachment.');
  const expected=String(payload?.invoiceNo||retryNumber||$('invoiceNumber')?.value||'').trim();
@@ -307,6 +320,7 @@ async function afterComplete(payload,serverResult){
  }
  const file=selected;retryId=id;retryNumber=expected;uploading=true;
  window.BBOriginalInvoiceUploadPending=true;
+ originalStage('Checking upload permission',expected);
  setMessage('Invoice '+expected+' saved. Checking photo upload permission…');
  if($('bbOriginalRetry'))$('bbOriginalRetry').hidden=true;
  const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'}[file.type];
@@ -317,12 +331,15 @@ async function afterComplete(payload,serverResult){
   const allowed=await post('/rest/v1/rpc/bb_real_invoice_can_upload',
    JSON.stringify({p_id:id}),{'Content-Type':'application/json'},'Photo upload permission check');
   if(allowed!==true)throw Error('Photo upload permission denied for saved invoice '+expected+'. Check the account/location permissions.');
+  originalStage('Uploading photo to Storage',expected);
   setMessage('Permission confirmed. Uploading full original photo…');
   const storagePath='/storage/v1/object/bb-real-invoices/'+encodeURIComponent(path).replace('%2F','/');
   await post(storagePath,file,{'Content-Type':file.type,'x-upsert':'false'},'Original photo storage upload');
+  originalStage('Registering photo with invoice',expected);
   setMessage('Photo sent. Registering the attachment against saved invoice '+expected+'…');
   try{
    await post('/rest/v1/rpc/bb_real_invoice_register_verified',JSON.stringify({p_invoice_id:id,p_storage_path:path,p_mime:file.type,p_source:'generator',p_scanned_number:result.scanned||'',p_verification_status:result.status,p_override_reason:result.status==='match'?null:reason}),{'Content-Type':'application/json'},'Original photo registration');
+   originalStage('Verifying registered photo',expected);
    setMessage('Attachment registered. Checking Uploaded History record…');
    const registered=await post('/rest/v1/rpc/bb_real_invoice_existing',JSON.stringify({p_id:id}),{'Content-Type':'application/json'},'Uploaded attachment verification');
    if(registered?.path!==path)throw Error('Attachment registration could not be confirmed.');
@@ -337,10 +354,11 @@ async function afterComplete(payload,serverResult){
   if($('bbOriginalFile'))$('bbOriginalFile').value='';
   window.BBOriginalInvoiceUploadPending=false;
   window.BBOriginalExpectedAttachment=false;
+  originalStage('SUCCESS: photo registered',expected);
   setMessage('✓ Original photo uploaded AND verified in the database. This invoice will not appear in Pending Scan.');
   return {success:true};
- }catch(e){reportUploadError(e?.message||String(e));throw e;}finally{uploading=false}
+ }catch(e){originalStage('FAILED',expected,e?.message||String(e));reportUploadError(e?.message||String(e));throw e;}finally{uploading=false}
 }
-window.BBOriginalInvoice={beforeComplete,afterComplete,init};
+window.BBOriginalInvoice={beforeComplete,afterComplete,init,diagnostics:()=>{try{return JSON.parse(sessionStorage.getItem('BB_LAST_ORIGINAL_UPLOAD_STAGE_V1')||'null')}catch(_){return null}}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();

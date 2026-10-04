@@ -8666,6 +8666,45 @@ function bbEnsureInvoicePromptStyle() {
       color:#159454;
       font-size:18px;
     }
+    .bb-invoice-prompt-items{
+      margin-top:10px;
+      padding:9px 10px;
+      border:1px solid #d8e2ee;
+      border-radius:9px;
+      background:#f8fbff;
+      max-height:150px;
+      overflow:auto;
+    }
+    .bb-invoice-prompt-items-title{
+      margin-bottom:6px;
+      color:#31516f;
+      font-size:11px;
+      font-weight:900;
+      text-transform:uppercase;
+      letter-spacing:.25px;
+    }
+    .bb-invoice-prompt-item{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:10px;
+      align-items:center;
+      padding:4px 0;
+      border-top:1px solid #e7edf5;
+      font-size:12px;
+      line-height:1.25;
+    }
+    .bb-invoice-prompt-item:first-of-type{border-top:0}
+    .bb-invoice-prompt-item-code{
+      min-width:0;
+      color:#173b70;
+      font-weight:800;
+      overflow-wrap:anywhere;
+    }
+    .bb-invoice-prompt-item-qty{
+      color:#0f7b46;
+      font-weight:900;
+      white-space:nowrap;
+    }
     .bb-invoice-prompt-warning{
       margin:15px 0 0;
       color:#9b5d00;
@@ -8742,6 +8781,41 @@ window.BB_INVOICE_GENERATOR_BUILD = "20260924-invoiceseq1";
 function bbConfirmInvoiceCompletion(payload) {
   bbEnsureInvoicePromptStyle();
 
+  const bbSkuTotals = new Map();
+  (Array.isArray(payload?.items) ? payload.items : []).forEach(item => {
+    const sku = String(
+      item?.productCode ||
+      item?.productGroupCode ||
+      item?.groupCode ||
+      item?.productName ||
+      item?.name ||
+      "ITEM"
+    ).trim();
+
+    const qty = Number(item?.qty) || 0;
+    const unit = String(item?.unit || "").trim();
+    const key = sku + "||" + unit;
+    const current = bbSkuTotals.get(key) || { sku, unit, qty:0 };
+    current.qty += qty;
+    bbSkuTotals.set(key,current);
+  });
+
+  const bbSkuHtml = [...bbSkuTotals.values()]
+    .filter(item => item.qty > 0)
+    .map(item => {
+      const qtyText = Number(item.qty).toLocaleString("en-US", {
+        maximumFractionDigits: 2
+      });
+      const unitText = item.unit ? " " + escapeHtml(item.unit) : "";
+      return `
+        <div class="bb-invoice-prompt-item">
+          <div class="bb-invoice-prompt-item-code">${escapeHtml(item.sku)}</div>
+          <div class="bb-invoice-prompt-item-qty">${qtyText}${unitText}</div>
+        </div>
+      `;
+    })
+    .join("");
+
   return new Promise(resolve => {
     const existing =
       document.getElementById("bbInvoiceCompletePrompt");
@@ -8773,6 +8847,12 @@ function bbConfirmInvoiceCompletion(payload) {
             <strong>${escapeHtml(formatMoney(payload.grandTotal, payload.currency))}</strong>
           </div>
         </div>
+        ${bbSkuHtml ? `
+          <div class="bb-invoice-prompt-items">
+            <div class="bb-invoice-prompt-items-title">Product QTY by SKU</div>
+            ${bbSkuHtml}
+          </div>
+        ` : ""}
         <div class="bb-invoice-prompt-warning">
           Make sure you're double check on this.
         </div>

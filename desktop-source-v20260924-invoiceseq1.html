@@ -7198,7 +7198,7 @@ function updateInvoiceDate(rememberChoice = false) {
     bbRememberInvoiceDate(picker.value);
   }
 
-  // Default Due Date always follows Invoice Date + 4 days.
+  // Default Due Date follows the selected customer's credit-term rule.
   setDueDateFromInvoiceDate();
 }
 
@@ -7231,23 +7231,45 @@ function updateDueDate() {
 function setDueDateFromInvoiceDate() {
   const invoicePicker = document.getElementById("invoiceDate");
   const duePicker = document.getElementById("dueDate");
-  if (!invoicePicker || !duePicker) return;
+  if (!invoicePicker || !duePicker || !invoicePicker.value) return;
 
-  if (!invoicePicker.value) return;
-
-  // Default Due Date = Invoice Date + 4 calendar days.
-  // User can still change Due Date manually afterward.
   const parts = invoicePicker.value.split("-").map(Number);
   if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return;
 
-  const dueDate = new Date(parts[0], parts[1] - 1, parts[2]);
-  dueDate.setDate(dueDate.getDate() + 4);
+  const term = (typeof window.bbGetSelectedCustomerCreditTerm === "function")
+    ? window.bbGetSelectedCustomerCreditTerm()
+    : { type:"DAYS", value:4 };
+
+  const type = String(term?.type || "DAYS").toUpperCase();
+  const value = Number.isFinite(Number(term?.value)) ? Number(term.value) : 4;
+  const year = parts[0];
+  const monthIndex = parts[1] - 1;
+  const day = parts[2];
+  let dueDate;
+
+  if (type === "HALF_MONTH") {
+    // First half of month -> 15th. From the 15th onward -> 1st of next month.
+    dueDate = day < 15
+      ? new Date(year, monthIndex, 15)
+      : new Date(year, monthIndex + 1, 1);
+  } else if (type === "MONTHS") {
+    // Calendar-month credit terms always fall on the 1st of the target month.
+    const months = Math.max(1, Math.floor(value || 1));
+    dueDate = new Date(year, monthIndex + months, 1);
+  } else {
+    // Day terms remain exact calendar-day offsets.
+    const days = Math.max(0, Math.floor(value || 0));
+    dueDate = new Date(year, monthIndex, day);
+    dueDate.setDate(dueDate.getDate() + days);
+  }
 
   const yyyy = dueDate.getFullYear();
   const mm = String(dueDate.getMonth() + 1).padStart(2, "0");
   const dd = String(dueDate.getDate()).padStart(2, "0");
 
   duePicker.value = `${yyyy}-${mm}-${dd}`;
+  duePicker.dataset.creditTermType = type;
+  duePicker.dataset.creditTermValue = String(value);
   updateDueDate();
 }
 
@@ -7256,7 +7278,7 @@ function syncDueDateWithInvoiceDate() {
   const duePicker = document.getElementById("dueDate");
   if (!invoicePicker || !duePicker) return;
 
-  // If no Due Date exists yet, use Invoice Date + 4 days.
+  // If no Due Date exists yet, apply the selected customer's credit-term rule.
   if (!duePicker.value) {
     setDueDateFromInvoiceDate();
   }

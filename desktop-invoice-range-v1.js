@@ -144,12 +144,46 @@ function installSetGuard(){
   if(typeof original!=='function'||original.__bbInvoiceRangeWrapped)return;
 
   const wrapped=function bbInvoiceRangeSet(number){
-    const result=original.apply(this,arguments);
+    let nextNumber=number;
+    const b=bounds();
+    const p=numericPart(number);
+    if(b&&p&&p.number>=b.start&&p.number<=b.end&&skippedSet(b).has(p.number)){
+      let n=p.number;
+      const skips=skippedSet(b);
+      while(n<=b.end&&skips.has(n))n++;
+      if(n<=b.end)nextNumber=p.prefix+String(n).padStart(p.digits.length,'0');
+      else nextNumber='Range Complete';
+    }
+    const result=original.call(this,nextNumber);
     setTimeout(warnCurrent,0);
     return result;
   };
   wrapped.__bbInvoiceRangeWrapped=true;
   window.setInvoiceNumber=wrapped;
+}
+
+function installLoadNextGuard(){
+  const original=window.loadNextInvoiceNumber;
+  if(typeof original!=='function'||original.__bbInvoiceRangeWrapped)return;
+
+  const wrapped=function bbInvoiceRangeLoadNext(){
+    const input=$('invoiceNumber');
+    const b=bounds();
+    const p=numericPart(input?.value||'');
+
+    if(b&&p&&p.number>=b.start&&p.number>=b.end){
+      if(input){
+        input.value='Range Complete';
+        input.dataset.bbInvoiceRangeComplete='1';
+        input.title='Invoice range completed. Set a new paper invoice range.';
+      }
+      return;
+    }
+
+    return original.apply(this,arguments);
+  };
+  wrapped.__bbInvoiceRangeWrapped=true;
+  window.loadNextInvoiceNumber=wrapped;
 }
 
 function installUi(){
@@ -253,6 +287,7 @@ function boot(){
   installStyle();
   installIncrementGuard();
   installSetGuard();
+  installLoadNextGuard();
   if(!installUi()){
     setTimeout(boot,100);
     return;
@@ -263,6 +298,7 @@ function boot(){
     tries++;
     installIncrementGuard();
     installSetGuard();
+    installLoadNextGuard();
     warnCurrent();
     if(tries>=40)clearInterval(timer);
   },250);

@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 
-const BUILD='20261004-invoice-range3';
+const BUILD='20261004-invoice-range4';
 const STORAGE_KEY='BB_DESKTOP_INVOICE_RANGE_V1';
 const $=id=>document.getElementById(id);
 
@@ -76,6 +76,11 @@ function updateSummary(){
       invoiceInput.dataset.bbInvoiceRangeComplete='';
       invoiceInput.title='';
       try{
+        if(typeof window.bbClearManualInvoiceSequence==='function'){
+          window.bbClearManualInvoiceSequence();
+        }
+      }catch(_){}
+      try{
         if(typeof window.loadNextInvoiceNumber==='function'){
           window.loadNextInvoiceNumber();
         }
@@ -141,6 +146,11 @@ function installIncrementGuard(){
     if(next?.done){
       const input=$('invoiceNumber');
       if(input)input.dataset.bbInvoiceRangeComplete='1';
+      try{
+        if(typeof window.bbClearManualInvoiceSequence==='function'){
+          window.bbClearManualInvoiceSequence();
+        }
+      }catch(_){}
       return '';
     }
     if(next?.value)return next.value;

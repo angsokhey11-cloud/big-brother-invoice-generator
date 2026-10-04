@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 
-const BUILD='20261004-desktop-input1';
+const BUILD='20261004-desktop-input2';
 const $=id=>document.getElementById(id);
 
 function normalizeDecimalText(value){
@@ -85,19 +85,45 @@ function installCurrencyGuard(){
   if(typeof original!=='function'||original.__bbDesktopManualPriceGuard)return;
 
   const wrapped=function bbDesktopManualPriceCurrencyChange(){
-    const manualRows=[...document.querySelectorAll('#productList .product[data-bb-manual-price="1"]')]
+    /* Desktop rule: currency switching must NEVER rewrite the number
+       already visible in a product Price box. The operator owns that value. */
+    const priceRows=[...document.querySelectorAll('#productList .product')]
       .map(row=>({
+        row,
         input:row.querySelector('.product-price-input'),
         value:row.querySelector('.product-price-input')?.value??''
-      }));
+      }))
+      .filter(item=>item.input);
 
     const result=original.apply(this,arguments);
 
     const currency=String(window.getCurrency?.()||$('currency')?.value||'USD').toUpperCase();
-    manualRows.forEach(item=>{
+
+    priceRows.forEach(item=>{
       if(!item.input||!document.body.contains(item.input))return;
       item.input.value=item.value;
       item.input.step=currency==='KHR'?'1':'0.0001';
+
+      /* Keep the underlying row price aligned with the unchanged visible
+         number so later customer-price refreshes do not convert it again. */
+      item.row.dataset.bbManualPrice='1';
+      const selectedValue=Number(String(item.value).replace(/,/g,'.'))||0;
+      const rate=Number($('exchangeRate')?.value)||0;
+      const usdValue=currency==='KHR'&&rate>0
+        ? selectedValue/rate
+        : selectedValue;
+      item.row.dataset.usdPrice=String(usdValue);
+
+      try{
+        const lineId=String(item.row.dataset.lineId||'');
+        const selected=Array.isArray(window.selectedProducts)
+          ? window.selectedProducts.find(p=>String(p?.id||'')===lineId)
+          : null;
+        if(selected){
+          selected.usdPrice=usdValue;
+          selected.manualPrice=true;
+        }
+      }catch(_){}
     });
 
     if(typeof window.calculate==='function')window.calculate();

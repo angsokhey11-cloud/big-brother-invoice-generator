@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 
-const BUILD='20261004-desktop-input2';
+const BUILD='20261004-desktop-input3';
 const $=id=>document.getElementById(id);
 
 function normalizeDecimalText(value){
@@ -133,9 +133,58 @@ function installCurrencyGuard(){
   window.changeCurrency=wrapped;
 }
 
+function revealPaymentMethod(){
+  const select=$('paymentMethod');
+  if(!select)return;
+
+  try{
+    select.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+  }catch(_){}
+
+  try{select.focus({preventScroll:true})}catch(_){select.focus()}
+
+  setTimeout(()=>{
+    try{
+      if(typeof select.showPicker==='function'){
+        select.showPicker();
+      }else{
+        select.click();
+      }
+    }catch(_){
+      try{select.click()}catch(__){}
+    }
+  },80);
+}
+
+function installCompletePaymentGuard(){
+  const original=window.completeInvoice;
+  if(typeof original!=='function'||original.__bbDesktopPaymentReveal)return;
+
+  const wrapped=async function bbDesktopCompleteInvoice(event){
+    const payment=String($('paymentMethod')?.value||'').trim();
+
+    if(!payment){
+      if(event){
+        event.preventDefault?.();
+        event.stopPropagation?.();
+      }
+
+      alert('Please select a Payment Method before completing the invoice.');
+      revealPaymentMethod();
+      return;
+    }
+
+    return original.apply(this,arguments);
+  };
+
+  wrapped.__bbDesktopPaymentReveal=true;
+  window.completeInvoice=wrapped;
+}
+
 function init(){
   prepareAll(document);
   installCurrencyGuard();
+  installCompletePaymentGuard();
 
   const observer=new MutationObserver(records=>{
     records.forEach(record=>{
@@ -144,6 +193,7 @@ function init(){
       });
     });
     installCurrencyGuard();
+    installCompletePaymentGuard();
   });
   observer.observe(document.body,{childList:true,subtree:true});
 

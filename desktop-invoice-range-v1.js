@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 
-const BUILD='20261004-invoice-range1';
+const BUILD='20261004-invoice-range3';
 const STORAGE_KEY='BB_DESKTOP_INVOICE_RANGE_V1';
 const $=id=>document.getElementById(id);
 
@@ -70,6 +70,17 @@ function updateSummary(){
     out.value='Set range';
     out.title='Enter Start Invoice and End Invoice';
     save();
+
+    const invoiceInput=$('invoiceNumber');
+    if(invoiceInput && String(invoiceInput.value||'').trim()==='Range Complete'){
+      invoiceInput.dataset.bbInvoiceRangeComplete='';
+      invoiceInput.title='';
+      try{
+        if(typeof window.loadNextInvoiceNumber==='function'){
+          window.loadNextInvoiceNumber();
+        }
+      }catch(_){}
+    }
     return;
   }
   const skips=skippedSet(b);
@@ -186,6 +197,38 @@ function installLoadNextGuard(){
   window.loadNextInvoiceNumber=wrapped;
 }
 
+function installCompleteRangeGuard(){
+  const original=window.completeInvoice;
+  if(typeof original!=='function'||original.__bbInvoiceRangeCompleteGuard)return;
+
+  const wrapped=async function bbInvoiceRangeCompleteGuard(event){
+    const input=$('invoiceNumber');
+    const value=String(input?.value||'').trim();
+
+    if(value==='Range Complete'||input?.dataset.bbInvoiceRangeComplete==='1'){
+      if(event){
+        event.preventDefault?.();
+        event.stopPropagation?.();
+      }
+
+      alert('Invoice range is complete. Please set a new invoice range or clear the range before saving another invoice.');
+
+      const start=$('bbInvoiceRangeStart');
+      if(start){
+        try{start.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'})}catch(_){}
+        try{start.focus({preventScroll:true})}catch(_){start.focus()}
+        try{start.select()}catch(_){}
+      }
+      return;
+    }
+
+    return original.apply(this,arguments);
+  };
+
+  wrapped.__bbInvoiceRangeCompleteGuard=true;
+  window.completeInvoice=wrapped;
+}
+
 function installUi(){
   const header=document.querySelector('.header-main');
   const title=header?.querySelector('h1');
@@ -288,6 +331,7 @@ function boot(){
   installIncrementGuard();
   installSetGuard();
   installLoadNextGuard();
+  installCompleteRangeGuard();
   if(!installUi()){
     setTimeout(boot,100);
     return;
@@ -299,6 +343,7 @@ function boot(){
     installIncrementGuard();
     installSetGuard();
     installLoadNextGuard();
+    installCompleteRangeGuard();
     warnCurrent();
     if(tries>=40)clearInterval(timer);
   },250);

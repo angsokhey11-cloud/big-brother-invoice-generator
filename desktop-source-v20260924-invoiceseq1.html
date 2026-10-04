@@ -4392,6 +4392,9 @@ function simpleBatchDateText(value) {
 }
 
 function simpleBatchOptionText(batch) {
+  const date =
+    simpleBatchDateText(batch.batchDate) || "No Date";
+
   const salesman =
     batch.salesmanName || "No Salesman";
 
@@ -4401,7 +4404,7 @@ function simpleBatchOptionText(batch) {
     "-";
 
   return (
-    batch.batchId +
+    date +
     " — " +
     salesman +
     " — " +
@@ -4459,12 +4462,11 @@ function updateSimpleBatchStatus() {
 
   setSimpleBatchStatus(
     "✓ " +
-    batch.batchId +
+    (simpleBatchDateText(batch.batchDate) || "No Date") +
     " · " +
     (batch.salesmanName || "-") +
     " · " +
-    (batch.locationName || batch.locationCode || "-") +
-    " · Batch Number only.",
+    (batch.locationName || batch.locationCode || "-"),
     "ok"
   );
 }

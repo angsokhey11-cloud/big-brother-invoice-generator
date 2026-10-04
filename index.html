@@ -224,6 +224,80 @@
           );
 
 
+      /* =======================================================
+         DESKTOP-ONLY FAST ENTRY PATCHES
+         - Currency switch never rewrites keyed product prices.
+         - Missing Payment Method opens the native picker directly.
+         Mobile does not use this loader.
+         ======================================================= */
+
+      html = html.replace(
+`function changeCurrency() {
+  const currency = getCurrency();
+  const rate = getExchangeRate();
+
+  if (currency === "KHR" && rate <= 0) {
+    alert("Please enter a valid exchange rate.");
+    document.getElementById("currency").value = "USD";
+    return;
+  }
+
+  document.querySelectorAll(".product").forEach(product => {
+    const inputs = product.querySelectorAll("input");
+
+    const usdPrice = Number(product.dataset.usdPrice) || 0;
+
+    inputs[1].value =
+      usdToSelected(usdPrice, currency);
+
+    inputs[1].step =
+      currency === "KHR" ? "1" : "0.01";
+  });
+
+  calculate();
+}`,
+`function changeCurrency() {
+  const currency = getCurrency();
+  const rate = getExchangeRate();
+
+  if (currency === "KHR" && rate <= 0) {
+    alert("Please enter a valid exchange rate.");
+    document.getElementById("currency").value = "USD";
+    return;
+  }
+
+  document.querySelectorAll(".product").forEach(product => {
+    const priceInput = product.querySelector(".product-price-input");
+    if (priceInput) {
+      priceInput.step = currency === "KHR" ? "1" : "0.0001";
+    }
+  });
+
+  calculate();
+}`
+      );
+
+      html = html.replace(
+`  if (!payload.paymentMethod) {
+    alert("Please select a Payment Method before completing the invoice.");
+    return;
+  }`,
+`  if (!payload.paymentMethod) {
+    const paymentSelect = document.getElementById("paymentMethod");
+    if (paymentSelect) {
+      try { paymentSelect.focus({preventScroll:true}); } catch (_) { paymentSelect.focus(); }
+      try {
+        if (typeof paymentSelect.showPicker === "function") paymentSelect.showPicker();
+        else paymentSelect.click();
+      } catch (_) {
+        try { paymentSelect.click(); } catch (__) {}
+      }
+    }
+    return;
+  }`
+      );
+
+
 
       /* =======================================================
          SUPABASE OWNS STARTUP
@@ -416,7 +490,7 @@
         +
         '<scr'
         +
-        'ipt src="desktop-input-behavior-v1.js?v=20261004-desktop-input4"></scr'
+        'ipt src="desktop-input-behavior-v1.js?v=20261004-desktop-input5"></scr'
         +
         'ipt>\n'
         +

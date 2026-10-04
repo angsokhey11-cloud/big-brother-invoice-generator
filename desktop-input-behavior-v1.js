@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 
-const BUILD='20261004-desktop-input3';
+const BUILD='20261004-desktop-input4';
 const $=id=>document.getElementById(id);
 
 function normalizeDecimalText(value){
@@ -161,6 +161,48 @@ function installCompletePaymentGuard(){
   if(typeof original!=='function'||original.__bbDesktopPaymentReveal)return;
 
   const wrapped=async function bbDesktopCompleteInvoice(event){
+    const customerName=String($('customerName')?.value||'').trim();
+
+    if(customerName){
+      try{
+        if(typeof window.fillCustomerInformation==='function'){
+          window.fillCustomerInformation();
+        }
+      }catch(_){}
+
+      let customerId='';
+      try{
+        const payload=typeof window.buildSalesInvoicePayload==='function'
+          ? window.buildSalesInvoicePayload()
+          : null;
+        customerId=String(payload?.customerId||'').trim();
+      }catch(_){}
+
+      if(!customerId){
+        if(event){
+          event.preventDefault?.();
+          event.stopPropagation?.();
+        }
+
+        alert('Customer does not exist in Customer Master. Please select a valid customer before completing the invoice.');
+
+        const input=$('customerName');
+        if(input){
+          try{input.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'})}catch(_){}
+          try{input.focus({preventScroll:true})}catch(_){input.focus()}
+          try{input.select()}catch(_){}
+        }
+
+        try{
+          if(typeof window.showCustomerOptions==='function'){
+            window.showCustomerOptions();
+          }
+        }catch(_){}
+
+        return;
+      }
+    }
+
     const payment=String($('paymentMethod')?.value||'').trim();
 
     if(!payment){

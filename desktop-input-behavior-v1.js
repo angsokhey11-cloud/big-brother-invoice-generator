@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 
-const BUILD='20261004-desktop-input5';
+const BUILD='20261004-desktop-input6';
 const $=id=>document.getElementById(id);
 
 function normalizeDecimalText(value){
@@ -137,23 +137,63 @@ function revealPaymentMethod(){
   const select=$('paymentMethod');
   if(!select)return;
 
+  document.getElementById('bbPaymentMethodQuickMenu')?.remove();
+
   try{
     select.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
   }catch(_){}
 
   try{select.focus({preventScroll:true})}catch(_){select.focus()}
 
-  setTimeout(()=>{
-    try{
-      if(typeof select.showPicker==='function'){
-        select.showPicker();
-      }else{
-        select.click();
-      }
-    }catch(_){
-      try{select.click()}catch(__){}
-    }
-  },80);
+  const menu=document.createElement('div');
+  menu.id='bbPaymentMethodQuickMenu';
+
+  [...select.options]
+    .filter(option=>String(option.value||'').trim())
+    .forEach(option=>{
+      const button=document.createElement('button');
+      button.type='button';
+      button.textContent=option.textContent||option.value;
+      button.dataset.value=option.value;
+      button.addEventListener('click',()=>{
+        select.value=button.dataset.value||'';
+        select.dispatchEvent(new Event('change',{bubbles:true}));
+        menu.remove();
+        try{select.focus({preventScroll:true})}catch(_){}
+      });
+      menu.appendChild(button);
+    });
+
+  document.body.appendChild(menu);
+
+  const rect=select.getBoundingClientRect();
+  const menuWidth=Math.max(rect.width,240);
+  menu.style.position='fixed';
+  menu.style.zIndex='2147483647';
+  menu.style.width=menuWidth+'px';
+  menu.style.left=Math.min(
+    Math.max(8,rect.left),
+    Math.max(8,window.innerWidth-menuWidth-8)
+  )+'px';
+
+  const estimatedHeight=Math.min(menu.childElementCount*39+8,310);
+  const spaceBelow=window.innerHeight-rect.bottom-8;
+  const top=spaceBelow>=estimatedHeight
+    ? rect.bottom+4
+    : Math.max(8,rect.top-estimatedHeight-4);
+  menu.style.top=top+'px';
+
+  const closeOutside=event=>{
+    if(event.target===select||menu.contains(event.target))return;
+    menu.remove();
+    document.removeEventListener('pointerdown',closeOutside,true);
+  };
+  setTimeout(()=>document.addEventListener('pointerdown',closeOutside,true),0);
+
+  const first=menu.querySelector('button');
+  if(first){
+    try{first.focus({preventScroll:true})}catch(_){first.focus()}
+  }
 }
 
 function installCompletePaymentGuard(){
@@ -211,18 +251,7 @@ function installCompletePaymentGuard(){
         event.stopPropagation?.();
       }
 
-      /* Must happen synchronously from the Complete click or Chromium
-         blocks the native picker as a non-user-initiated action. */
-      const select=$('paymentMethod');
-      if(select){
-        try{select.focus({preventScroll:true})}catch(_){select.focus()}
-        try{
-          if(typeof select.showPicker==='function')select.showPicker();
-          else select.click();
-        }catch(_){
-          try{select.click()}catch(__){}
-        }
-      }
+      revealPaymentMethod();
       return;
     }
 
@@ -234,6 +263,42 @@ function installCompletePaymentGuard(){
 }
 
 function init(){
+  if(!$('bbPaymentMethodQuickMenuStyle')){
+    const style=document.createElement('style');
+    style.id='bbPaymentMethodQuickMenuStyle';
+    style.textContent=`
+      #bbPaymentMethodQuickMenu{
+        padding:4px;
+        border:1px solid #9fb7d4;
+        border-radius:8px;
+        background:#fff;
+        box-shadow:0 12px 30px rgba(18,45,78,.22);
+        max-height:310px;
+        overflow:auto;
+      }
+      #bbPaymentMethodQuickMenu button{
+        display:block;
+        width:100%;
+        min-height:36px;
+        padding:8px 12px;
+        border:0;
+        border-radius:5px;
+        background:#fff;
+        color:#173b70;
+        text-align:left;
+        font:600 13px "Segoe UI",Tahoma,Arial,sans-serif;
+        cursor:pointer;
+      }
+      #bbPaymentMethodQuickMenu button:hover,
+      #bbPaymentMethodQuickMenu button:focus{
+        outline:0;
+        background:#1f63b5;
+        color:#fff;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   prepareAll(document);
   installCurrencyGuard();
   installCompletePaymentGuard();

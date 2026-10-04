@@ -295,7 +295,15 @@
   function moveActive(delta){
     const rows=visibleRows();
     if(!rows.length)return;
-    activeIndex=Math.max(0,Math.min(rows.length-1,activeIndex+delta));
+
+    if(delta<0 && activeIndex<=0){
+      activeIndex=rows.length-1;
+    }else if(delta>0 && activeIndex>=rows.length-1){
+      activeIndex=0;
+    }else{
+      activeIndex=Math.max(0,Math.min(rows.length-1,activeIndex+delta));
+    }
+
     ensureActiveVisible(rows);
     render();
     requestAnimationFrame(focusActiveProduct);

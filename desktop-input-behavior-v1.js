@@ -6,7 +6,7 @@
 (function(){
 'use strict';
 
-const BUILD='20261004-desktop-input4';
+const BUILD='20261004-desktop-input5';
 const $=id=>document.getElementById(id);
 
 function normalizeDecimalText(value){
@@ -211,8 +211,18 @@ function installCompletePaymentGuard(){
         event.stopPropagation?.();
       }
 
-      alert('Please select a Payment Method before completing the invoice.');
-      revealPaymentMethod();
+      /* Must happen synchronously from the Complete click or Chromium
+         blocks the native picker as a non-user-initiated action. */
+      const select=$('paymentMethod');
+      if(select){
+        try{select.focus({preventScroll:true})}catch(_){select.focus()}
+        try{
+          if(typeof select.showPicker==='function')select.showPicker();
+          else select.click();
+        }catch(_){
+          try{select.click()}catch(__){}
+        }
+      }
       return;
     }
 

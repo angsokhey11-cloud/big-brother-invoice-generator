@@ -9,7 +9,7 @@
 (function(){
   'use strict';
 
-  const BUILD='20260930-service1';
+  const BUILD='20261004-keyboard-nav1';
   const PAGE_SIZE=7;
   const EPS=0.000001;
 
@@ -37,7 +37,8 @@
   };
   const q=selector=>document.querySelector(selector);
 
-  let page=0;
+  let page=0; // Sliding window start index, not page number.
+  let activeIndex=0;
   let useGroups=false;
   let open=false;
   let refreshing=false;
@@ -256,15 +257,48 @@
     return applySearch(rows,productCompare);
   }
 
-  function totalPages(rows){
-    return Math.max(1,Math.ceil(rows.length/PAGE_SIZE));
+  function maxWindowStart(rows){
+    return Math.max(0,rows.length-PAGE_SIZE);
   }
 
   function normalizedPage(rows){
-    const pages=totalPages(rows);
-    if(page>=pages)page=pages-1;
+    const max=maxWindowStart(rows);
+    if(page>max)page=max;
     if(page<0)page=0;
     return page;
+  }
+
+  function clampActiveIndex(rows){
+    if(!rows.length){activeIndex=0;return 0}
+    if(activeIndex>=rows.length)activeIndex=rows.length-1;
+    if(activeIndex<0)activeIndex=0;
+    return activeIndex;
+  }
+
+  function ensureActiveVisible(rows){
+    clampActiveIndex(rows);
+    if(activeIndex<page)page=activeIndex;
+    if(activeIndex>=page+PAGE_SIZE)page=activeIndex-PAGE_SIZE+1;
+    normalizedPage(rows);
+  }
+
+  function focusActiveProduct(){
+    const rows=visibleRows();
+    if(!rows.length)return;
+    ensureActiveVisible(rows);
+    const button=q('#bbInvoiceDesktopProductButtons .bb-invoice-product-name-button[data-row-index="'+activeIndex+'"]');
+    if(button){
+      try{button.focus({preventScroll:true})}catch(_){button.focus()}
+    }
+  }
+
+  function moveActive(delta){
+    const rows=visibleRows();
+    if(!rows.length)return;
+    activeIndex=Math.max(0,Math.min(rows.length-1,activeIndex+delta));
+    ensureActiveVisible(rows);
+    render();
+    requestAnimationFrame(focusActiveProduct);
   }
 
   function pickerContextText(rows){
@@ -387,18 +421,21 @@
       search.value=searchQuery;
     }
 
+    const hadProductFocus=
+      document.activeElement?.classList?.contains('bb-invoice-product-name-button')===true;
     const rows=visibleRows();
-    const current=normalizedPage(rows);
-    const pages=totalPages(rows);
-    const start=current*PAGE_SIZE;
+    clampActiveIndex(rows);
+    const start=normalizedPage(rows);
     const pageRows=rows.slice(start,start+PAGE_SIZE);
 
     syncToggle();
 
     meta.textContent=pickerContextText(rows);
-    pageText.textContent=rows.length?((current+1)+' / '+pages):'0 / 0';
-    prev.disabled=current<=0;
-    next.disabled=current>=pages-1 || !rows.length;
+    pageText.textContent=rows.length
+      ? ((start+1)+'-'+Math.min(start+PAGE_SIZE,rows.length)+' / '+rows.length)
+      : '0 / 0';
+    prev.disabled=start<=0;
+    next.disabled=start>=maxWindowStart(rows) || !rows.length;
 
     add.textContent=refreshing?'Refreshing Stock…':(open?'Close Products':'+ Add Product');
     add.disabled=refreshing;
@@ -419,10 +456,14 @@
       return;
     }
 
-    pageRows.forEach(product=>{
+    pageRows.forEach((product,offset)=>{
       const button=document.createElement('button');
       button.type='button';
       button.className='bb-invoice-product-name-button';
+      const rowIndex=start+offset;
+      button.dataset.rowIndex=String(rowIndex);
+      button.tabIndex=rowIndex===activeIndex?0:-1;
+      if(rowIndex===activeIndex)button.classList.add('is-active');
 
       const remaining=remainingOf(product);
       const batch=selectedBatch();
@@ -458,7 +499,34 @@
 
       button.appendChild(qtySpan);
 
+      button.addEventListener('focus',()=>{
+        activeIndex=rowIndex;
+      });
+
+      button.addEventListener('keydown',event=>{
+        if(event.key==='ArrowLeft'){
+          event.preventDefault();
+          moveActive(-1);
+          return;
+        }
+        if(event.key==='ArrowRight'){
+          event.preventDefault();
+          moveActive(1);
+          return;
+        }
+        if(event.key==='ArrowUp'){
+          event.preventDefault();
+          const search=q('#bbInvoiceDesktopProductSearch');
+          if(search){
+            try{search.focus({preventScroll:true})}catch(_){search.focus()}
+            try{search.select()}catch(_){}
+          }
+          return;
+        }
+      });
+
       button.addEventListener('click',()=>{
+        activeIndex=rowIndex;
         open=false;
         render();
         addProductInline(product);
@@ -466,6 +534,10 @@
 
       buttons.appendChild(button);
     });
+
+    if(hadProductFocus){
+      requestAnimationFrame(focusActiveProduct);
+    }
   }
 
   async function refreshDirectSaleBeforeOpen(){
@@ -569,10 +641,12 @@
     }
 
     setTimeout(()=>{
-      const search=q('#bbInvoiceDesktopProductSearch');
-      if(search&&open){
-        search.focus();
-        search.select();
+      if(open){
+        activeIndex=0;
+        page=0;
+        activeIndex=0;
+        render();
+        focusActiveProduct();
       }
     },0);
   }
@@ -819,6 +893,11 @@
       }
 
       .bb-invoice-product-name-button:hover,
+      .bb-invoice-product-name-button.is-active{
+        border-color:#3e78b7;
+        box-shadow:0 0 0 2px rgba(62,120,183,.13);
+      }
+
       .bb-invoice-product-name-button:focus-visible{
         border-color:#6c9bd0;
         background:#eaf4ff;
@@ -880,12 +959,16 @@
     q('#bbInvoiceDesktopProductAdd')?.addEventListener('click',toggleOpen);
 
     q('#bbInvoiceDesktopProductPrev')?.addEventListener('click',()=>{
+      const rows=visibleRows();
       page=Math.max(0,page-1);
+      activeIndex=Math.max(page,Math.min(activeIndex,page+PAGE_SIZE-1));
       render();
     });
 
     q('#bbInvoiceDesktopProductNext')?.addEventListener('click',()=>{
-      page+=1;
+      const rows=visibleRows();
+      page=Math.min(maxWindowStart(rows),page+1);
+      activeIndex=Math.max(page,Math.min(activeIndex,page+PAGE_SIZE-1));
       render();
     });
 
@@ -894,15 +977,26 @@
       search.addEventListener('input',()=>{
         searchQuery=search.value||'';
         page=0;
+        activeIndex=0;
         render();
       });
 
       search.addEventListener('keydown',event=>{
+        if(event.key==='ArrowDown'){
+          event.preventDefault();
+          const rows=visibleRows();
+          if(rows.length){
+            activeIndex=Math.max(page,Math.min(activeIndex,page+PAGE_SIZE-1,rows.length-1));
+            focusActiveProduct();
+          }
+          return;
+        }
         if(event.key==='Enter'){
-          const first=q('#bbInvoiceDesktopProductButtons .bb-invoice-product-name-button');
-          if(first){
+          const active=q('#bbInvoiceDesktopProductButtons .bb-invoice-product-name-button[data-row-index="'+activeIndex+'"]') ||
+            q('#bbInvoiceDesktopProductButtons .bb-invoice-product-name-button');
+          if(active){
             event.preventDefault();
-            first.click();
+            active.click();
           }
         }
       });
@@ -918,6 +1012,7 @@
         useGroups=toggle.checked===true;
         saveGroupPreference();
         page=0;
+        activeIndex=0;
         render();
       });
     }
@@ -974,6 +1069,7 @@
     const wrapped=function(){
       const result=original.apply(this,arguments);
       page=0;
+      activeIndex=0;
       searchQuery='';
       open=false;
       setTimeout(render,0);

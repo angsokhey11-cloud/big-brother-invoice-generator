@@ -422,9 +422,14 @@
         value.mode === 'manual' &&
         String(value.invoiceNo || '').trim()
       ) {
+        const invoiceNo=String(value.invoiceNo || '').trim();
+        if(invoiceNo==='Range Complete'){
+          localStorage.removeItem(bbInvoiceSequenceKey());
+          return null;
+        }
         return {
           mode: 'manual',
-          invoiceNo: String(value.invoiceNo || '').trim()
+          invoiceNo
         };
       }
     } catch (_) {}
@@ -436,7 +441,8 @@
     if (
       !value ||
       value === 'Loading...' ||
-      value === 'Unavailable'
+      value === 'Unavailable' ||
+      value === 'Range Complete'
     ) return;
 
     try {
@@ -453,6 +459,12 @@
   function bbManualInvoiceSequenceNo() {
     return bbReadInvoiceSequence()?.invoiceNo || '';
   }
+
+  window.bbClearManualInvoiceSequence = function bbClearManualInvoiceSequence() {
+    try{
+      localStorage.removeItem(bbInvoiceSequenceKey());
+    }catch(_){}
+  };
 
   function bbTrackManualInvoiceNumber() {
     const input = document.getElementById('invoiceNumber');

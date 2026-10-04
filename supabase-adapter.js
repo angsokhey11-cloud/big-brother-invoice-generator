@@ -138,9 +138,23 @@
       googleMapsLink: String(row?.googleMapsLink || '').trim(),
       latitude: row?.latitude ?? null,
       longitude: row?.longitude ?? null,
-      deliveryLocationNote: String(row?.deliveryLocationNote || '').trim()
+      deliveryLocationNote: String(row?.deliveryLocationNote || '').trim(),
+      creditTermType: String(row?.creditTermType || 'DAYS').trim().toUpperCase(),
+      creditTermValue: Number.isFinite(Number(row?.creditTermValue)) ? Number(row.creditTermValue) : 4
     };
   }
+
+  window.bbGetSelectedCustomerCreditTerm = function bbGetSelectedCustomerCreditTerm() {
+    const selected = bbSelectedCustomerId
+      ? customers.find(item => item.customerId === bbSelectedCustomerId)
+      : null;
+    return {
+      type: String(selected?.creditTermType || 'DAYS').toUpperCase(),
+      value: Number.isFinite(Number(selected?.creditTermValue))
+        ? Number(selected.creditTermValue)
+        : 4
+    };
+  };
 
   function bbMergeCustomerIntoPool(customer) {
     if (!customer?.customerId) return;
@@ -787,6 +801,9 @@
     document.getElementById('customerAddress').value = customer.address || '';
     bbShowCustomerLocationAlert(customer);
     loadCustomerPrices(customer.name);
+    if (typeof window.setDueDateFromInvoiceDate === 'function') {
+      window.setDueDateFromInvoiceDate();
+    }
   };
 
   window.selectCustomer = function selectCustomerSupabase(customer) {
@@ -813,6 +830,9 @@
 
     const locationAlertShown = bbShowCustomerLocationAlert(normalized);
     loadCustomerPrices(normalized.name);
+    if (typeof window.setDueDateFromInvoiceDate === 'function') {
+      window.setDueDateFromInvoiceDate();
+    }
 
     if (!locationAlertShown) {
       setTimeout(() => {

@@ -236,22 +236,31 @@
   const currency = getCurrency();
   const rate = getExchangeRate();
 
-  if (currency === "KHR" && rate <= 0) {
+  if(currency === "KHR" && rate <= 0) {
     alert("Please enter a valid exchange rate.");
     document.getElementById("currency").value = "USD";
     return;
   }
 
-  document.querySelectorAll(".product").forEach(product => {
-    const inputs = product.querySelectorAll("input");
+  document.querySelectorAll("#productList .product").forEach(row => {
+    const lineId = row.dataset.lineId || "";
+    const item = selectedProducts.find(p => p.id === lineId);
+    const product = getInvoiceSearchPool().find(
+      p => p.code === (row.dataset.productCode || "") || p.name === (row.dataset.product || "")
+    );
 
-    const usdPrice = Number(product.dataset.usdPrice) || 0;
+    if(item && product && !item.manualPrice) {
+      const canonical = getPriceForProduct(product);
+      item.usdPrice = canonical;
+      row.dataset.usdPrice = canonical;
+    }
 
-    inputs[1].value =
-      usdToSelected(usdPrice, currency);
-
-    inputs[1].step =
-      currency === "KHR" ? "1" : "0.01";
+    const priceInput = row.querySelector(".product-price-input");
+    if(priceInput) {
+      const canonical = Number(row.dataset.usdPrice) || 0;
+      priceInput.value = usdToSelected(canonical, currency);
+      priceInput.step = currency === "KHR" ? "1" : "0.0001";
+    }
   });
 
   calculate();
@@ -260,15 +269,15 @@
   const currency = getCurrency();
   const rate = getExchangeRate();
 
-  if (currency === "KHR" && rate <= 0) {
+  if(currency === "KHR" && rate <= 0) {
     alert("Please enter a valid exchange rate.");
     document.getElementById("currency").value = "USD";
     return;
   }
 
-  document.querySelectorAll(".product").forEach(product => {
-    const priceInput = product.querySelector(".product-price-input");
-    if (priceInput) {
+  document.querySelectorAll("#productList .product").forEach(row => {
+    const priceInput = row.querySelector(".product-price-input");
+    if(priceInput) {
       priceInput.step = currency === "KHR" ? "1" : "0.0001";
     }
   });

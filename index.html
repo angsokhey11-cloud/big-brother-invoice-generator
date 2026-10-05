@@ -191,6 +191,10 @@
       let adapterJs =
         await adapterResponse.text();
 
+      const dialogTag='<scr'+'ipt src="https://angsokhey11-cloud.github.io/big-brother-dashboard/bb-system-dialog-v1.js?v=20261005-dialog2"></scr'+'ipt>';
+      const dialogHeadClose=html.toLowerCase().indexOf('</head>');
+      if(dialogHeadClose>=0)html=html.slice(0,dialogHeadClose)+dialogTag+'\n'+html.slice(dialogHeadClose);
+
 
 
       /* =======================================================

@@ -1241,5 +1241,14 @@
   bbTrackManualInvoiceNumber();
   bbStartSupabaseInvoice();
   // Narrow authenticated RPC bridge for bank verification V2.
+  window.bbGetSelectedCustomerForBank = function(){
+    const customer=bbFindSelectedCustomer();
+    if(!customer)return null;
+    return {
+      customerId:String(customer.customerId||bbSelectedCustomerId||'').trim(),
+      name:String(customer.name||'').trim(),
+      locationCode:String(customer.locationCode||'').trim()
+    };
+  };
   window.BBInvoiceBankRpc = bbRpc;
 })();

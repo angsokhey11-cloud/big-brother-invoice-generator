@@ -9204,8 +9204,11 @@ function clearAllAfterSuccessfulSave() {
    CLEAR EVERYTHING
 ========================================== */
 
-function clearAll() {
-  if (!confirm("Clear this invoice?")) return;
+async function clearAll() {
+  const ok=window.bbConfirm
+    ? await window.bbConfirm("Clear this invoice?",{title:"Clear Invoice",okText:"Clear Invoice",cancelText:"Cancel"})
+    : confirm("Clear this invoice?");
+  if(!ok)return;
 
   selectedProducts = [];
 

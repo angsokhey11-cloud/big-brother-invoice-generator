@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261010-khmer-font3';
+  const BUILD='20261010-khmer-font-loaded4';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -69,6 +69,14 @@
       const option=event.target.closest?.('.customer-option');
       if(option&&list.contains(option))mark(options().indexOf(option));
     });
+    /* Load real Khmer glyphs: naming a font in CSS does not install it. */
+    if(!document.getElementById('bbInvoiceKhmerFont')){
+      const font=document.createElement('link');
+      font.id='bbInvoiceKhmerFont';
+      font.rel='stylesheet';
+      font.href='https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;500;600;700&display=swap';
+      document.head.appendChild(font);
+    }
     const style=document.createElement('style');
     style.id='bbCustomerKeyboardStyle';
     style.textContent=`
@@ -91,7 +99,7 @@
         color:#172f50!important;
       }
       #customerOptions .customer-option-details{
-        font-size:12.5px!important;font-weight:500!important;line-height:1.65!important;
+        font-size:13px!important;font-weight:600!important;line-height:1.7!important;
         color:#445a75!important;
       }
       .customer-options .customer-option.bb-customer-key-active{

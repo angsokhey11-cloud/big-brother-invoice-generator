@@ -1206,6 +1206,108 @@
     }, true);
   }
 
+  /* BB Khmer keyboard invoice input — display ASCII digits without changing math. */
+  const bbNumericSelector = [
+    '#invoiceQtyInput', '#invoicePriceInput', '#amountPaid',
+    '.product-qty-input', '.product-price-input'
+  ].join(', ');
+  function bbEnglishDigits(value) {
+    return String(value).replace(/[\u17e0-\u17e9]/g, digit =>
+      String(digit.charCodeAt(0) - 0x17e0)
+    ).replace(/[\u0660-\u0669]/g, digit =>
+      String(digit.charCodeAt(0) - 0x0660)
+    );
+  }
+  function bbPrepareNumericFields(root) {
+    const fields = [];
+    if (root?.matches?.(bbNumericSelector)) fields.push(root);
+    root?.querySelectorAll?.(bbNumericSelector).forEach(el => fields.push(el));
+    fields.forEach(input => {
+      // Number inputs reject Khmer digits in some browsers before 'input' fires.
+      if (input.type === 'number') input.type = 'text';
+      input.setAttribute('inputmode', 'decimal');
+      const clean = bbEnglishDigits(input.value);
+      if (clean !== input.value) input.value = clean;
+    });
+  }
+  function bbNormalizeNumericInput(input) {
+    if (!input?.matches?.(bbNumericSelector)) return;
+    if (input.dataset.bbKhmerComposing === '1') return;
+    const oldValue = input.value;
+    const value = bbEnglishDigits(oldValue);
+    if (value === oldValue) return;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    input.value = value;
+    if (start !== null && end !== null) {
+      const convertedStart = bbEnglishDigits(oldValue.slice(0, start)).length;
+      const convertedEnd = bbEnglishDigits(oldValue.slice(0, end)).length;
+      input.setSelectionRange(convertedStart, convertedEnd);
+    }
+  }
+  bbPrepareNumericFields(document);
+  new MutationObserver(records => {
+    for (const record of records) {
+      record.addedNodes.forEach(node => {
+        if (node.nodeType === 1) bbPrepareNumericFields(node);
+      });
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('input', event => {
+    bbNormalizeNumericInput(event.target);
+  }, true);
+  document.addEventListener('compositionstart', event => {
+    if (event.target?.matches?.(bbNumericSelector))
+      event.target.dataset.bbKhmerComposing = '1';
+  }, true);
+  document.addEventListener('compositionend', event => {
+    if (!event.target?.matches?.(bbNumericSelector)) return;
+    delete event.target.dataset.bbKhmerComposing;
+    bbNormalizeNumericInput(event.target);
+    event.target.dispatchEvent(new Event('input', { bubbles: true }));
+  }, true);
+
+  /* Customer dropdown keyboard control, compatible with Khmer text composition. */
+  let bbActiveCustomerOption = -1;
+  function bbHighlightCustomerOption(options, index) {
+    bbActiveCustomerOption = index;
+    options.forEach((option, i) => {
+      const active = i === index;
+      option.style.backgroundColor = active ? '#e6f0ff' : '';
+      option.setAttribute('aria-selected', String(active));
+    });
+    options[index]?.scrollIntoView({ block: 'nearest' });
+  }
+  const bbCustomerInput = document.getElementById('customerName');
+  bbCustomerInput?.addEventListener('keydown', event => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) return;
+    const list = document.getElementById('customerOptions');
+    if (!list) return;
+    let options = [...list.querySelectorAll('.customer-option')];
+    if (!options.length || list.style.display === 'none') {
+      if (event.key === 'Enter') return;
+      window.showCustomerOptions?.();
+      options = [...list.querySelectorAll('.customer-option')];
+    }
+    if (!options.length) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const current = bbActiveCustomerOption >= 0 && bbActiveCustomerOption < options.length
+        ? bbActiveCustomerOption : (direction > 0 ? -1 : 0);
+      bbHighlightCustomerOption(options, (current + direction + options.length) % options.length);
+    } else if (bbActiveCustomerOption >= 0 && bbActiveCustomerOption < options.length) {
+      event.preventDefault();
+      options[bbActiveCustomerOption].dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, cancelable: true })
+      );
+      bbActiveCustomerOption = -1;
+    }
+  });
+  bbCustomerInput?.addEventListener('input', () => { bbActiveCustomerOption = -1; });
+  bbCustomerInput?.addEventListener('blur', () => { bbActiveCustomerOption = -1; });
+
   /* Prevent a stale Google-era Batch cache from appearing before live Supabase data. */
   try {
     localStorage.removeItem(SIMPLE_BATCH_LIST_CACHE_KEY);

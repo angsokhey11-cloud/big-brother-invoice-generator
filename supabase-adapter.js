@@ -1216,7 +1216,7 @@
       String(digit.charCodeAt(0) - 0x17e0)
     ).replace(/[\u0660-\u0669]/g, digit =>
       String(digit.charCodeAt(0) - 0x0660)
-    );
+    ).replace(/[។．]/g, '.').replace(/\u200b(?=\.)|(?<=\.)\u200b/g, '');
   }
   function bbPrepareNumericFields(root) {
     const fields = [];
@@ -1267,8 +1267,14 @@
     event.target.dispatchEvent(new Event('input', { bubbles: true }));
   }, true);
 
-  /* Customer dropdown keyboard control, compatible with Khmer text composition. */
+  /* Keep arrow selection stable during Khmer IME input and async search redraws. */
   let bbActiveCustomerOption = -1;
+  let bbActiveCustomerKey = '';
+  const bbCustomerInput = document.getElementById('customerName');
+  const bbCustomerList = document.getElementById('customerOptions');
+  function bbCustomerOptions() {
+    return [...(bbCustomerList?.querySelectorAll('.customer-option') || [])];
+  }
   function bbHighlightCustomerOption(options, index) {
     bbActiveCustomerOption = index;
     options.forEach((option, i) => {
@@ -1276,37 +1282,66 @@
       option.style.backgroundColor = active ? '#e6f0ff' : '';
       option.setAttribute('aria-selected', String(active));
     });
-    options[index]?.scrollIntoView({ block: 'nearest' });
+    const chosen = options[index];
+    bbActiveCustomerKey = chosen?.textContent || '';
+    chosen?.scrollIntoView({ block: 'nearest' });
   }
-  const bbCustomerInput = document.getElementById('customerName');
+  function bbSyncCustomerHighlight() {
+    const options = bbCustomerOptions();
+    if (!options.length || bbActiveCustomerOption < 0) return;
+    const preserved = options.findIndex(option => option.textContent === bbActiveCustomerKey);
+    bbHighlightCustomerOption(options, preserved >= 0
+      ? preserved : Math.min(bbActiveCustomerOption, options.length - 1));
+  }
+  if (bbCustomerList) {
+    new MutationObserver(bbSyncCustomerHighlight)
+      .observe(bbCustomerList, { childList: true });
+  }
+  // Capture so a legacy document handler cannot swallow the arrow or Enter.
   bbCustomerInput?.addEventListener('keydown', event => {
-    if (event.isComposing || event.keyCode === 229) return;
-    if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key)) return;
-    const list = document.getElementById('customerOptions');
-    if (!list) return;
-    let options = [...list.querySelectorAll('.customer-option')];
-    if (!options.length || list.style.display === 'none') {
-      if (event.key === 'Enter') return;
+    const key = event.key === 'Down' ? 'ArrowDown' :
+      event.key === 'Up' ? 'ArrowUp' : event.key;
+    if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(key)) return;
+    // Enter during an unfinished Khmer composition must confirm the IME,
+    // not prematurely select a customer. Arrow navigation remains available.
+    if (key === 'Enter' && (event.isComposing || event.keyCode === 229)) return;
+    let options = bbCustomerOptions();
+    if ((!options.length || bbCustomerList.style.display === 'none') &&
+        key !== 'Enter') {
       window.showCustomerOptions?.();
-      options = [...list.querySelectorAll('.customer-option')];
+      options = bbCustomerOptions();
     }
-    if (!options.length) return;
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    if (!options.length || bbCustomerList?.style.display === 'none') return;
+    if (key !== 'Enter') {
       event.preventDefault();
-      const direction = event.key === 'ArrowDown' ? 1 : -1;
-      const current = bbActiveCustomerOption >= 0 && bbActiveCustomerOption < options.length
+      event.stopImmediatePropagation();
+      const direction = key === 'ArrowDown' ? 1 : -1;
+      const current = bbActiveCustomerOption >= 0 &&
+        bbActiveCustomerOption < options.length
         ? bbActiveCustomerOption : (direction > 0 ? -1 : 0);
-      bbHighlightCustomerOption(options, (current + direction + options.length) % options.length);
-    } else if (bbActiveCustomerOption >= 0 && bbActiveCustomerOption < options.length) {
+      bbHighlightCustomerOption(options,
+        (current + direction + options.length) % options.length);
+    } else {
+      if (bbActiveCustomerOption < 0 || bbActiveCustomerOption >= options.length) {
+        bbHighlightCustomerOption(options, 0);
+      }
       event.preventDefault();
-      options[bbActiveCustomerOption].dispatchEvent(
+      event.stopImmediatePropagation();
+      options[bbActiveCustomerOption]?.dispatchEvent(
         new MouseEvent('mousedown', { bubbles: true, cancelable: true })
       );
       bbActiveCustomerOption = -1;
+      bbActiveCustomerKey = '';
     }
+  }, true);
+  bbCustomerInput?.addEventListener('input', () => {
+    bbActiveCustomerOption = -1;
+    bbActiveCustomerKey = '';
   });
-  bbCustomerInput?.addEventListener('input', () => { bbActiveCustomerOption = -1; });
-  bbCustomerInput?.addEventListener('blur', () => { bbActiveCustomerOption = -1; });
+  bbCustomerInput?.addEventListener('blur', () => {
+    bbActiveCustomerOption = -1;
+    bbActiveCustomerKey = '';
+  });
 
   /* Prevent a stale Google-era Batch cache from appearing before live Supabase data. */
   try {

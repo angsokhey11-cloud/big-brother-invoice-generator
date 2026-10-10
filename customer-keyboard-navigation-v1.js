@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261010-customer-layer-focus2';
+  const BUILD='20261010-khmer-font3';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -79,6 +79,21 @@
       .bb-left-column .invoice-card .customer-field,
       .bb-left-column .invoice-card .customer-autocomplete{position:relative;overflow:visible!important;}
       .bb-left-column .invoice-card .customer-options{z-index:9999!important;}
+      /* Clear, readable Khmer customer names and address details on tablets. */
+      #customerName, #customerOptions, #customerOptions .customer-option,
+      #customerOptions .customer-option-name, #customerOptions .customer-option-details{
+        font-family:"Noto Sans Khmer","Khmer OS Battambang","Khmer OS Siemreap","Segoe UI",Arial,sans-serif!important;
+        -webkit-font-smoothing:auto!important;
+        text-rendering:optimizeLegibility;
+      }
+      #customerOptions .customer-option-name{
+        font-size:14px!important;font-weight:700!important;line-height:1.55!important;
+        color:#172f50!important;
+      }
+      #customerOptions .customer-option-details{
+        font-size:12.5px!important;font-weight:500!important;line-height:1.65!important;
+        color:#445a75!important;
+      }
       .customer-options .customer-option.bb-customer-key-active{
         background:#e1eeff!important;color:#123d72!important;
         outline:2px solid #397bc5;outline-offset:-2px;

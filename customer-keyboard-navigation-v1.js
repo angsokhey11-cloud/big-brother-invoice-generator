@@ -1,0 +1,80 @@
+/* BIG BROTHER Invoice Generator — customer autocomplete keyboard navigation.
+   Reuses the legacy dropdown's mousedown selection handler so customer
+   information, price loading and product-search focus remain unchanged. */
+(function(){
+  'use strict';
+  const BUILD='20261010-customer-keyboard1';
+  function init(){
+    const input=document.getElementById('customerName');
+    const list=document.getElementById('customerOptions');
+    if(!input||!list||input.dataset.bbCustomerKeys==='1')return;
+    input.dataset.bbCustomerKeys='1';
+    let active=-1;
+    const options=()=>[...list.querySelectorAll('.customer-option')];
+    const isOpen=()=>list.style.display!=='none'&&options().length>0;
+    input.setAttribute('aria-autocomplete','list');
+    input.setAttribute('aria-controls','customerOptions');
+    input.setAttribute('aria-haspopup','listbox');
+    list.setAttribute('role','listbox');
+    function mark(index){
+      const items=options();
+      active=index>=0&&index<items.length?index:-1;
+      items.forEach((item,i)=>{
+        const selected=i===active;
+        item.classList.toggle('bb-customer-key-active',selected);
+        item.setAttribute('role','option');
+        item.setAttribute('aria-selected',String(selected));
+        if(!item.id)item.id='bb-customer-key-option-'+i;
+      });
+      if(active>=0){
+        input.setAttribute('aria-activedescendant',items[active].id);
+        items[active].scrollIntoView({block:'nearest'});
+      }else{
+        input.removeAttribute('aria-activedescendant');
+      }
+    }
+    input.addEventListener('input',()=>mark(-1));
+    input.addEventListener('keydown',event=>{
+      if(event.isComposing||event.keyCode===229)return;
+      const key=event.key;
+      if(key==='ArrowDown'||key==='ArrowUp'){
+        if(!isOpen()&&typeof window.showCustomerOptions==='function'){
+          window.showCustomerOptions();
+        }
+        if(!isOpen())return;
+        event.preventDefault();
+        const count=options().length;
+        mark(key==='ArrowDown'?(active+1)%count:(active<0?count-1:(active-1+count)%count));
+        return;
+      }
+      if(key==='Escape'){
+        if(!isOpen())return;
+        event.preventDefault();
+        list.style.display='none';
+        mark(-1);
+        return;
+      }
+      if(key==='Enter'&&isOpen()){
+        const items=options();
+        const selected=items[active>=0?active:0];
+        if(!selected)return;
+        event.preventDefault();
+        event.stopPropagation();
+        /* Existing mousedown listener is the single source of truth. */
+        selected.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));
+        mark(-1);
+      }
+    },true);
+    list.addEventListener('mousemove',event=>{
+      const option=event.target.closest?.('.customer-option');
+      if(option&&list.contains(option))mark(options().indexOf(option));
+    });
+    const style=document.createElement('style');
+    style.id='bbCustomerKeyboardStyle';
+    style.textContent='.customer-options .customer-option.bb-customer-key-active{background:#e1eeff!important;color:#123d72!important;outline:2px solid #397bc5;outline-offset:-2px;}';
+    if(!document.getElementById(style.id))document.head.appendChild(style);
+    window.BB_INVOICE_CUSTOMER_KEYBOARD_BUILD=BUILD;
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+  else init();
+})();

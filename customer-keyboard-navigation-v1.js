@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261010-customer-keyboard1';
+  const BUILD='20261010-customer-layer-focus2';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -71,8 +71,38 @@
     });
     const style=document.createElement('style');
     style.id='bbCustomerKeyboardStyle';
-    style.textContent='.customer-options .customer-option.bb-customer-key-active{background:#e1eeff!important;color:#123d72!important;outline:2px solid #397bc5;outline-offset:-2px;}';
+    style.textContent=`
+      /* Lift the entire invoice card above the following product card.
+         A z-index on the dropdown alone cannot escape sibling stacking contexts. */
+      .bb-left-column .invoice-card{position:relative!important;z-index:30!important;overflow:visible!important;}
+      .bb-left-column .invoice-card:focus-within{z-index:40!important;}
+      .bb-left-column .invoice-card .customer-field,
+      .bb-left-column .invoice-card .customer-autocomplete{position:relative;overflow:visible!important;}
+      .bb-left-column .invoice-card .customer-options{z-index:9999!important;}
+      .customer-options .customer-option.bb-customer-key-active{
+        background:#e1eeff!important;color:#123d72!important;
+        outline:2px solid #397bc5;outline-offset:-2px;
+      }`;
     if(!document.getElementById(style.id))document.head.appendChild(style);
+    /* Only successful invoice cleanup triggers this function.
+       Do not steal focus during failed saves or confirmation prompts. */
+    function installAfterSaveFocus(){
+      const original=window.clearAllAfterSuccessfulSave;
+      if(typeof original!=='function'||original.__bbCustomerAfterSaveFocus)return;
+      const wrapped=function(){
+        const result=original.apply(this,arguments);
+        const target=document.getElementById('customerName');
+        if(target){
+          const menu=document.getElementById('customerOptions');
+          if(menu)menu.style.display='none';
+          try{target.focus({preventScroll:true})}catch(_){target.focus()}
+        }
+        return result;
+      };
+      wrapped.__bbCustomerAfterSaveFocus=true;
+      window.clearAllAfterSuccessfulSave=wrapped;
+    }
+    installAfterSaveFocus();
     window.BB_INVOICE_CUSTOMER_KEYBOARD_BUILD=BUILD;
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});

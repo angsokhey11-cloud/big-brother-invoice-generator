@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261010-khmer-font-loaded4';
+  const BUILD='20261010-portal-location5';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -16,6 +16,38 @@
     input.setAttribute('aria-controls','customerOptions');
     input.setAttribute('aria-haspopup','listbox');
     list.setAttribute('role','listbox');
+    /* Put suggestions in body to escape product-card stacking contexts entirely. */
+    document.body.appendChild(list);
+    list.classList.add('bb-customer-portal');
+    function positionCustomerDropdown(){
+      if(list.style.display==='none')return;
+      const bounds=input.getBoundingClientRect();
+      list.style.left=Math.round(bounds.left)+'px';
+      list.style.width=Math.round(bounds.width)+'px';
+      const below=window.innerHeight-bounds.bottom-10;
+      const maxHeight=Math.min(260,Math.max(120,below));
+      list.style.maxHeight=maxHeight+'px';
+      list.style.top=Math.round(bounds.bottom+4)+'px';
+    }
+    const originalShow=window.showCustomerOptions;
+    if(typeof originalShow==='function'&&!originalShow.__bbPortal){
+      const show=function(){
+        const result=originalShow.apply(this,arguments);
+        positionCustomerDropdown();
+        return result;
+      };
+      show.__bbPortal=true;
+      window.showCustomerOptions=show;
+    }
+    input.addEventListener('focus',()=>requestAnimationFrame(positionCustomerDropdown));
+    input.addEventListener('input',()=>requestAnimationFrame(positionCustomerDropdown));
+    window.addEventListener('resize',positionCustomerDropdown,{passive:true});
+    window.addEventListener('scroll',positionCustomerDropdown,{capture:true,passive:true});
+    document.addEventListener('pointerdown',event=>{
+      if(!list.contains(event.target)&&event.target!==input){
+        list.style.display='none';
+      }
+    },true);
     function mark(index){
       const items=options();
       active=index>=0&&index<items.length?index:-1;
@@ -86,9 +118,18 @@
       .bb-left-column .invoice-card:focus-within{z-index:40!important;}
       .bb-left-column .invoice-card .customer-field,
       .bb-left-column .invoice-card .customer-autocomplete{position:relative;overflow:visible!important;}
-      .bb-left-column .invoice-card .customer-options{z-index:9999!important;}
+      #customerOptions.bb-customer-portal{
+        position:fixed!important;right:auto!important;bottom:auto!important;
+        z-index:2147483000!important;box-sizing:border-box!important;
+        background:#fff!important;border:1px solid #9bb7dc!important;
+        border-radius:9px!important;overflow-y:auto!important;
+        box-shadow:0 12px 32px rgba(23,59,112,.22)!important;
+      }
+      #mainLocation{font-weight:600!important;}
+      #mainLocation option{font-weight:500!important;}
       /* Clear, readable Khmer customer names and address details on tablets. */
-      #customerName, #customerOptions, #customerOptions .customer-option,
+      #customerName, #mainLocation, #mainLocation option,
+      #customerOptions, #customerOptions .customer-option,
       #customerOptions .customer-option-name, #customerOptions .customer-option-details{
         font-family:"Noto Sans Khmer","Khmer OS Battambang","Khmer OS Siemreap","Segoe UI",Arial,sans-serif!important;
         -webkit-font-smoothing:auto!important;

@@ -14,7 +14,7 @@ function installLayout(){
  }
  .header-main:has(#bbCustomerBalanceHeader)>h1{display:none!important}
  .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{min-width:0;width:100%}
- .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
+ .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;width:70%;max-width:70%}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
  .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important}
  .header-main #bbCustomerBalanceValue{display:block!important;text-align:left!important}
@@ -33,7 +33,7 @@ function createPanel(){
  if(!range||!range.parentElement)return false;
  const panel=document.createElement('div');panel.id='bbCustomerBalanceHeader';
  panel.className='no-print';
- panel.style.cssText='min-width:0;width:100%;max-width:none;align-self:end;box-sizing:border-box;background:transparent!important;border:0!important;box-shadow:none!important';
+ panel.style.cssText='min-width:0;width:70%;max-width:70%;align-self:end;box-sizing:border-box;background:transparent!important;border:0!important;box-shadow:none!important';
  const label=document.createElement('label');label.textContent='Customer Bank Balance';
  label.style.cssText='display:block;font:800 10px Arial,sans-serif;color:#31516f;margin:0 0 3px;line-height:1;white-space:nowrap';
  const amount=document.createElement('div');amount.id='bbCustomerBalanceValue';

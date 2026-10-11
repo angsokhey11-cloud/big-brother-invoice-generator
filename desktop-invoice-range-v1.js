@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 
-const BUILD='20261004-invoice-range4';
+const BUILD='20261011-invoice-range5';
 const STORAGE_KEY='BB_DESKTOP_INVOICE_RANGE_V1';
 const $=id=>document.getElementById(id);
 
@@ -35,18 +35,16 @@ function bounds(){
 }
 
 function resolveSkipToken(raw,b){
-  const text=cleanDigits(raw);
-  if(!text)return null;
+  const text=String(raw??'').trim();
+  if(!/^\d+$/.test(text))return null;
   const n=Number(text);
-  if(!Number.isSafeInteger(n)||n<0)return null;
-
+  if(!Number.isSafeInteger(n)||n<=0)return null;
+  // Full invoice number entered: skip that exact invoice.
   if(n>=b.start&&n<=b.end)return n;
-
-  // Shorthand: 5,10,15,30 inside 4001-4050 => 4005,4010,4015,4030.
-  const power=Math.max(100,10**Math.max(2,text.length));
-  let candidate=Math.floor(b.start/power)*power+n;
-  while(candidate<b.start)candidate+=power;
-  return candidate<=b.end?candidate:null;
+  // Short numbers are 1-based positions within this paper book range.
+  // Example: 3951–3993 with 2,7,22,32 => 3952,3957,3972,3982.
+  const relative=b.start+n-1;
+  return relative<=b.end?relative:null;
 }
 
 function skippedSet(b){

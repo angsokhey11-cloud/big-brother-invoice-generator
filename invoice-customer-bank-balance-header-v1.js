@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.4.2 — display-only customer bank balance. */
+/* BIG BROTHER V3.4.3 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -10,13 +10,13 @@ function createPanel(){
  if(!range||!range.parentElement)return false;
  const panel=document.createElement('div');panel.id='bbCustomerBalanceHeader';
  panel.className='no-print';
- panel.style.cssText='flex:0 1 315px;min-width:265px;max-width:370px;align-self:center;box-sizing:border-box';
+ panel.style.cssText='flex:0 1 270px;min-width:205px;max-width:310px;align-self:end;box-sizing:border-box;background:transparent';
  const label=document.createElement('label');label.textContent='Customer Bank Balance';
- label.style.cssText='display:block;font:700 12px Arial,sans-serif;color:#345475;margin-bottom:5px';
+ label.style.cssText='display:block;font:800 10px Arial,sans-serif;color:#31516f;margin:0 0 3px;line-height:1;white-space:nowrap';
  const amount=document.createElement('div');amount.id='bbCustomerBalanceValue';
- amount.style.cssText='padding:10px 13px;border:1px solid #cbd7e5;border-radius:9px;background:#f8fafc;font:800 18px Arial,sans-serif;min-height:23px';
+ amount.style.cssText='display:flex;align-items:center;box-sizing:border-box;width:100%;height:34px;min-height:34px;padding:5px 9px;border:1px solid #c5d3e2;border-radius:8px;background:#fff;font:800 15px Arial,sans-serif;white-space:nowrap';
  const hint=document.createElement('div');hint.id='bbCustomerBalanceHint';
- hint.style.cssText='font:11px Arial,sans-serif;color:#718096;margin-top:4px';
+ hint.style.cssText='font:10px Arial,sans-serif;color:#718096;margin-top:3px;white-space:nowrap';
  panel.append(label,amount,hint);
  range.insertAdjacentElement('afterend',panel);
  return true;
@@ -26,8 +26,10 @@ function show(value,hint,active){
  const panel=el('bbCustomerBalanceHeader'),amount=el('bbCustomerBalanceValue'),sub=el('bbCustomerBalanceHint');
  if(!panel||!amount||!sub)return;
  amount.textContent=value;sub.textContent=hint;
- panel.style.background=active?'#effaf3':'#f4f8fc';
- panel.style.borderColor=active?'#86cba1':'#d3e0ed';
+ panel.style.background='transparent';
+ panel.style.borderColor='transparent';
+ amount.style.background='#fff';
+ amount.style.borderColor='#c5d3e2';
  amount.style.color=active?'#166b3b':'#506780';
 }
 async function check(id){

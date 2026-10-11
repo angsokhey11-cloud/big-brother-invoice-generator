@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261010-portal-location5';
+  const BUILD='20261011-highlight-select6';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -91,10 +91,13 @@
         const selected=items[active>=0?active:0];
         if(!selected)return;
         event.preventDefault();
-        event.stopPropagation();
-        /* Existing mousedown listener is the single source of truth. */
-        selected.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true}));
-        mark(-1);
+        event.stopImmediatePropagation();
+        /* Freeze the exact highlighted DOM option before selection fires input/change
+           and re-renders the suggestions. The original option handler owns
+           customer ID, address, phone, prices and focus. */
+        selected.dispatchEvent(new MouseEvent('mousedown',{bubbles:false,cancelable:true}));
+        active=-1;
+        input.removeAttribute('aria-activedescendant');
       }
     },true);
     list.addEventListener('mousemove',event=>{

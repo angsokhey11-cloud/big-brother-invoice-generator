@@ -3,13 +3,14 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261011-ime-highlight12';
+  const BUILD='20261011-ime-snapshot13';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
     if(!input||!list||input.dataset.bbCustomerKeys==='1')return;
     input.dataset.bbCustomerKeys='1';
     let active=-1;
+    let arrowSelectedName='';
     const options=()=>[...list.querySelectorAll('.customer-option')];
     const isOpen=()=>list.style.display!=='none'&&options().length>0;
     input.setAttribute('aria-autocomplete','list');
@@ -59,6 +60,7 @@
         if(!item.id)item.id='bb-customer-key-option-'+i;
       });
       if(active>=0){
+        arrowSelectedName=items[active].querySelector('.customer-option-name')?.textContent||'';
         input.setAttribute('aria-activedescendant',items[active].id);
         items[active].scrollIntoView({block:'nearest'});
       }else{
@@ -71,22 +73,28 @@
     input.addEventListener('input',event=>{
       // IME can emit input events while arrows move through composition candidates.
       // Do not discard a visibly highlighted customer during that process.
-      if(active>=0&&(composing||event.isComposing))return;
+      if(arrowSelectedName&&(composing||event.isComposing||event.inputType==='insertCompositionText'))return;
+      if(arrowSelectedName&&event.isTrusted===false)return;
+      arrowSelectedName='';
       mark(-1);
     });
     function commitHighlighted(event){
       const items=options();
-      const selected=items.find(item=>item.classList.contains('bb-customer-key-active'))
+      const highlighted=items.find(item=>item.classList.contains('bb-customer-key-active'))
         ||(active>=0?items[active]:null);
-      if(!selected||!isOpen())return false;
-      const exactName=selected.querySelector('.customer-option-name')?.textContent||'';
+      // The Khmer IME can rebuild/close suggestions between Arrow and Enter.
+      // Persist the explicit arrow target separately from the transient DOM list.
+      const exactName=arrowSelectedName
+        ||highlighted?.querySelector('.customer-option-name')?.textContent||'';
       if(!exactName)return false;
-      event.preventDefault();
-      event.stopImmediatePropagation();
       const selectedOk=typeof window.bbSelectCustomerByExactName==='function'
         &&window.bbSelectCustomerByExactName(exactName);
       if(!selectedOk)return false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      arrowSelectedName='';
       active=-1;
+      list.style.display='none';
       input.removeAttribute('aria-activedescendant');
       return true;
     }
@@ -109,6 +117,7 @@
       if(key==='Escape'&&isOpen()){
         event.preventDefault();
         list.style.display='none';
+        arrowSelectedName='';
         mark(-1);
       }
     },true);
@@ -120,7 +129,7 @@
     diag.id='bbCustomerKeyDiagnostic';
     diag.style.cssText='position:fixed;z-index:2147483646;right:8px;bottom:8px;width:min(380px,calc(100vw - 16px));max-height:34vh;overflow:auto;background:#10243c;color:#fff;border:2px solid #53b4ff;border-radius:9px;padding:8px;font:11px/1.5 monospace;box-shadow:0 4px 22px #0006;display:none;white-space:pre-wrap;overflow-wrap:anywhere';
     const caption=document.createElement('div');
-    caption.textContent='⌨ Customer Keyboard Diagnostic — V3.5.17';
+    caption.textContent='⌨ Customer Keyboard Diagnostic — V3.5.18';
     caption.style.cssText='font-weight:bold;color:#8de1ff;margin-bottom:5px';
     const status=document.createElement('div');
     const log=document.createElement('div');

@@ -1,16 +1,33 @@
-/* BIG BROTHER V3.4.3 — display-only customer bank balance. */
+/* BIG BROTHER V3.4.4 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
 const el=id=>document.getElementById(id);
 const fmt=(n,d)=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+function installLayout(){
+ if(el('bbCustomerBalanceLayoutV344'))return;
+ const style=document.createElement('style');style.id='bbCustomerBalanceLayoutV344';
+ style.textContent=`@media(min-width:901px){
+ .header-main:has(#bbCustomerBalanceHeader){
+  grid-template-columns:minmax(0,1.65fr) minmax(220px,1fr) auto!important;
+  gap:12px!important;align-items:end!important;
+ }
+ .header-main:has(#bbCustomerBalanceHeader)>h1{display:none!important}
+ .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{min-width:0;width:100%}
+ .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
+ }
+ @media(max-width:900px){
+ .header-main #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
+ }`;
+ document.head.appendChild(style);
+}
 function createPanel(){
  if(el('bbCustomerBalanceHeader'))return true;
  const range=el('bbInvoiceRangeDetector');
  if(!range||!range.parentElement)return false;
  const panel=document.createElement('div');panel.id='bbCustomerBalanceHeader';
  panel.className='no-print';
- panel.style.cssText='flex:0 1 270px;min-width:205px;max-width:310px;align-self:end;box-sizing:border-box;background:transparent';
+ panel.style.cssText='min-width:0;width:100%;max-width:none;align-self:end;box-sizing:border-box;background:transparent';
  const label=document.createElement('label');label.textContent='Customer Bank Balance';
  label.style.cssText='display:block;font:800 10px Arial,sans-serif;color:#31516f;margin:0 0 3px;line-height:1;white-space:nowrap';
  const amount=document.createElement('div');amount.id='bbCustomerBalanceValue';
@@ -19,6 +36,7 @@ function createPanel(){
  hint.style.cssText='font:10px Arial,sans-serif;color:#718096;margin-top:3px;white-space:nowrap';
  panel.append(label,amount,hint);
  range.insertAdjacentElement('afterend',panel);
+ installLayout();
  return true;
 }
 function show(value,hint,active){
@@ -30,7 +48,7 @@ function show(value,hint,active){
  panel.style.borderColor='transparent';
  amount.style.background='#fff';
  amount.style.borderColor='#c5d3e2';
- amount.style.color=active?'#166b3b':'#506780';
+ amount.style.color=active?'#174a91':'#506780';
 }
 async function check(id){
  const token=++sequence;pending=true;lastCheck=Date.now();

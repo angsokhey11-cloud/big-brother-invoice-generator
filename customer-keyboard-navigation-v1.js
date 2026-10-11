@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261011-khmer-keydiag11';
+  const BUILD='20261011-ime-highlight12';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -65,11 +65,21 @@
         input.removeAttribute('aria-activedescendant');
       }
     }
-    input.addEventListener('input',()=>mark(-1));
+    let composing=false;
+    input.addEventListener('compositionstart',()=>{composing=true});
+    input.addEventListener('compositionend',()=>{composing=false});
+    input.addEventListener('input',event=>{
+      // IME can emit input events while arrows move through composition candidates.
+      // Do not discard a visibly highlighted customer during that process.
+      if(active>=0&&(composing||event.isComposing))return;
+      mark(-1);
+    });
     function commitHighlighted(event){
-      if(active<0||!isOpen())return false;
-      const selected=options()[active];
-      const exactName=selected?.querySelector('.customer-option-name')?.textContent||'';
+      const items=options();
+      const selected=items.find(item=>item.classList.contains('bb-customer-key-active'))
+        ||(active>=0?items[active]:null);
+      if(!selected||!isOpen())return false;
+      const exactName=selected.querySelector('.customer-option-name')?.textContent||'';
       if(!exactName)return false;
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -82,30 +92,25 @@
     }
     input.addEventListener('keydown',event=>{
       const key=event.key;
-      /* Khmer IMEs may report composing/229 for Space or Enter even
-         after the user has explicitly highlighted a dropdown result. */
-      if((key==='Enter'||key===' '||key==='Spacebar')&&active>=0){
-        if(commitHighlighted(event))return;
-      }
-      if(event.isComposing||event.keyCode===229)return;
       if(key==='ArrowDown'||key==='ArrowUp'){
-        if(!isOpen()&&typeof window.showCustomerOptions==='function'){
-          window.showCustomerOptions();
-        }
+        if(!isOpen()&&typeof window.showCustomerOptions==='function')window.showCustomerOptions();
         if(!isOpen())return;
         event.preventDefault();
+        event.stopImmediatePropagation();
         const count=options().length;
-        mark(key==='ArrowDown'?(active+1)%count:(active<0?count-1:(active-1+count)%count));
+        const highlighted=options().findIndex(item=>item.classList.contains('bb-customer-key-active'));
+        const current=highlighted>=0?highlighted:active;
+        mark(key==='ArrowDown'?(current+1)%count:(current<0?count-1:(current-1+count)%count));
         return;
       }
-      if(key==='Escape'){
-        if(!isOpen())return;
+      if(key==='Enter'||key===' '||key==='Spacebar'){
+        if(commitHighlighted(event))return;
+      }
+      if(key==='Escape'&&isOpen()){
         event.preventDefault();
         list.style.display='none';
         mark(-1);
-        return;
       }
-      if(key==='Enter'&&isOpen())commitHighlighted(event);
     },true);
     /* Pointer hover must not override selection made with arrow keys.
        Mouse/touch selection continues through the original mousedown handler. */
@@ -115,7 +120,7 @@
     diag.id='bbCustomerKeyDiagnostic';
     diag.style.cssText='position:fixed;z-index:2147483646;right:8px;bottom:8px;width:min(380px,calc(100vw - 16px));max-height:34vh;overflow:auto;background:#10243c;color:#fff;border:2px solid #53b4ff;border-radius:9px;padding:8px;font:11px/1.5 monospace;box-shadow:0 4px 22px #0006;display:none;white-space:pre-wrap;overflow-wrap:anywhere';
     const caption=document.createElement('div');
-    caption.textContent='⌨ Customer Keyboard Diagnostic — V3.5.16';
+    caption.textContent='⌨ Customer Keyboard Diagnostic — V3.5.17';
     caption.style.cssText='font-weight:bold;color:#8de1ff;margin-bottom:5px';
     const status=document.createElement('div');
     const log=document.createElement('div');

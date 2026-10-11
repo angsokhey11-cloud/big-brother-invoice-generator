@@ -3670,7 +3670,7 @@ textarea:focus{
      </div>
      
     </div>
-    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.12" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.12</span>
+    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.13" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.13</span>
    </div>
 
    <div class="bb-desktop-workspace">
@@ -5700,6 +5700,17 @@ function selectCustomer(customer) {
   }, 40);
 }
 
+
+/* Keyboard selection: resolve the exact visible customer from the same
+   customer array and call the normal selection path, not a synthetic click. */
+window.bbSelectCustomerByExactName = function(name) {
+  const exact = String(name || '').trim();
+  const customer = customers.find(c => c.name === exact)
+    || customers.find(c => c.name.toLowerCase() === exact.toLowerCase());
+  if (!customer) return false;
+  selectCustomer(customer);
+  return true;
+};
 
 const customerNameInput =
   document.getElementById("customerName");

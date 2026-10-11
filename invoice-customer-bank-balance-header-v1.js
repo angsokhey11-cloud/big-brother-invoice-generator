@@ -1,58 +1,34 @@
-/* BIG BROTHER V3.5.5 — display-only customer bank balance. */
+/* BIG BROTHER V3.5.6 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
 const el=id=>document.getElementById(id);
 const fmt=(n,d)=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 function installLayout(){
- if(el('bbCustomerBalanceLayoutV344'))return;
- const style=document.createElement('style');style.id='bbCustomerBalanceLayoutV344';
+ if(el('bbCustomerBalanceLayoutV356'))return;
+ const style=document.createElement('style');
+ style.id='bbCustomerBalanceLayoutV356';
  style.textContent=`@media(min-width:901px){
  .header-main:has(#bbCustomerBalanceHeader){
-  grid-template-columns:minmax(0,1fr) var(--bb-balance-track,360px) auto!important;
-  column-gap:22px!important;align-items:end!important;
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) clamp(260px,26vw,385px) auto!important;
+  column-gap:16px!important;
+  align-items:end!important;
  }
  .header-main:has(#bbCustomerBalanceHeader)>h1{display:none!important}
- .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{min-width:0;width:100%}
- .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;justify-self:start!important;margin:0!important;transform:none!important}
+ .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{grid-column:1!important;min-width:0!important;width:100%!important}
+ .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{grid-column:2!important;justify-self:stretch!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important;transform:none!important}
+ .header-main:has(#bbCustomerBalanceHeader) .header-currency{grid-column:3!important;margin:0!important}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
- .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important}
- .header-main #bbCustomerBalanceValue{display:block!important;text-align:left!important}
+ .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important;display:block!important;text-align:left!important}
  .header-main #bbCustomerBalanceInnerText{display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important}
  .header-main #bbCustomerBalanceHint{display:block!important;position:static!important;width:100%!important;max-width:100%!important;text-align:left!important}
  .header-main #bbCustomerBalanceHintText{display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important}
  }
  @media(max-width:900px){
- .header-main #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
+ .header-main #bbCustomerBalanceHeader{min-width:0;max-width:none;width:100%}
  }`;
  document.head.appendChild(style);
-}
-function syncBalanceWidth(){
- const rangeInput=el('bbInvoiceRangeResult'),panel=el('bbCustomerBalanceHeader');
- if(!rangeInput||!panel)return;
- const width=(rangeInput.closest('.bb-range-result')||rangeInput).getBoundingClientRect().width;
- if(width>0){
-  panel.style.setProperty('min-width',width+'px','important');
-  panel.style.setProperty('width',width+'px','important');
-  panel.style.setProperty('max-width',width+'px','important');
-  panel.parentElement?.style.setProperty('--bb-balance-track',width+'px');
-  panel.style.setProperty('margin-left','0','important');
-  panel.style.setProperty('transform','none','important');
-  for(const id of ['bbCustomerBalanceValue','bbCustomerBalanceHint']){
-   const node=el(id);
-   if(node){node.style.setProperty('min-width','100%','important');node.style.setProperty('width','100%','important');node.style.setProperty('max-width','100%','important');}
-  }
- }
-}
-let widthObserver;
-function watchBalanceWidth(){
- syncBalanceWidth();
- const input=el('bbInvoiceRangeResult');
- if(input&&typeof ResizeObserver!=='undefined'&&!widthObserver){
-  widthObserver=new ResizeObserver(syncBalanceWidth);
-  widthObserver.observe(input);
- }
- window.addEventListener('resize',syncBalanceWidth,{passive:true});
 }
 function createPanel(){
  if(el('bbCustomerBalanceHeader'))return true;
@@ -78,9 +54,10 @@ function createPanel(){
  hint.style.setProperty('display','block','important');
  hint.style.setProperty('text-align','left','important');
  panel.append(label,amount,hint);
- range.insertAdjacentElement('afterend',panel);
+ const currency=range.parentElement.querySelector('.header-currency');
+ if(currency)currency.insertAdjacentElement('beforebegin',panel);
+ else range.insertAdjacentElement('afterend',panel);
  installLayout();
- watchBalanceWidth();
  return true;
 }
 function show(value,hint,active){

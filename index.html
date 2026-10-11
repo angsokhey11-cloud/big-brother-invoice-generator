@@ -134,7 +134,7 @@
         await Promise.all([
 
           fetch(
-            'desktop-source-v20260924-invoiceseq1.html?v=20261011-v341-bank-balance',
+            'desktop-source-v20260924-invoiceseq1.html?v=20261011-stable-recovery7',
             {
               cache:'no-store'
             }
@@ -497,7 +497,7 @@
         +
         '<scr'
         +
-        'ipt src="bank-payment-protection-v2.js?v=20261011-clean-bank-ui1"></scr'
+        'ipt src="bank-payment-protection-v2.js?v=20261011-customer-balance-header1"></scr'
         +
         'ipt>\n'
         +
@@ -524,8 +524,6 @@
       /* =======================================================
          INSERT BEFORE FINAL BODY CLOSE
          ======================================================= */
-
-      html=html.replace('</body>', '<scr'+'ipt src="invoice-customer-bank-balance-header-v1.js?v=20261011-balancefix1"></scr'+'ipt></body>');
 
       const bodyCloseIndex =
 

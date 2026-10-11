@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.4.9 — display-only customer bank balance. */
+/* BIG BROTHER V3.4.10 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -17,7 +17,8 @@ function installLayout(){
  .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
  .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important}
- .header-main #bbCustomerBalanceHint{display:flex!important;justify-content:center!important;align-items:center!important;position:static!important;left:auto!important;right:auto!important;bottom:auto!important;transform:none!important;width:100%!important;max-width:100%!important;text-align:center!important}
+ .header-main #bbCustomerBalanceHint{display:block!important;position:static!important;width:100%!important;max-width:100%!important;text-align:left!important}
+ .header-main #bbCustomerBalanceHintText{display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important}
  }
  @media(max-width:900px){
  .header-main #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
@@ -37,7 +38,11 @@ function createPanel(){
  amount.style.cssText='display:flex;align-items:center;box-sizing:border-box;width:100%;height:34px;min-height:34px;padding:5px 9px;border:1px solid #c5d3e2;border-radius:8px;background:#fff;font:800 15px Arial,sans-serif;white-space:nowrap';
  const hint=document.createElement('div');hint.id='bbCustomerBalanceHint';
  hint.style.cssText='display:flex!important;justify-content:center!important;align-items:center!important;position:static!important;transform:none!important;left:auto!important;right:auto!important;bottom:auto!important;box-sizing:border-box;width:100%!important;max-width:100%!important;font:10px Arial,sans-serif;color:#718096;margin:3px 0 0;white-space:nowrap;text-align:center!important';
- hint.style.paddingLeft='32px';
+ const hintText=document.createElement('span');hintText.id='bbCustomerBalanceHintText';
+ hintText.style.cssText='display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important;width:max-content!important;white-space:nowrap';
+ hint.appendChild(hintText);
+ hint.style.setProperty('display','block','important');
+ hint.style.setProperty('text-align','left','important');
  panel.append(label,amount,hint);
  range.insertAdjacentElement('afterend',panel);
  installLayout();
@@ -47,7 +52,9 @@ function show(value,hint,active){
  if(!createPanel())return;
  const panel=el('bbCustomerBalanceHeader'),amount=el('bbCustomerBalanceValue'),sub=el('bbCustomerBalanceHint');
  if(!panel||!amount||!sub)return;
- amount.textContent=value;sub.textContent=hint;
+ amount.textContent=value;
+ const hintText=el('bbCustomerBalanceHintText');
+ if(hintText)hintText.textContent=hint;else sub.textContent=hint;
  panel.style.setProperty('background','transparent','important');
  panel.style.setProperty('border','0','important');
  panel.style.setProperty('box-shadow','none','important');

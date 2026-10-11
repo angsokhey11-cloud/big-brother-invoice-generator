@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261011-exact-select8';
+  const BUILD='20261011-space-select9';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -86,7 +86,7 @@
         mark(-1);
         return;
       }
-      if(key==='Enter'&&isOpen()){
+      if((key==='Enter'||(key===' '&&active>=0))&&isOpen()){
         const items=options();
         const selected=items[active>=0?active:0];
         if(!selected)return;

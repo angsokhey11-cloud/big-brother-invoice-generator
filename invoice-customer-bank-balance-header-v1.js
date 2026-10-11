@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.5.3 — display-only customer bank balance. */
+/* BIG BROTHER V3.5.4 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -32,12 +32,14 @@ function syncBalanceWidth(){
  if(!rangeInput||!panel)return;
  const width=(rangeInput.closest('.bb-range-result')||rangeInput).getBoundingClientRect().width;
  if(width>0){
+  panel.style.setProperty('min-width',width+'px','important');
   panel.style.setProperty('width',width+'px','important');
   panel.style.setProperty('max-width',width+'px','important');
-  panel.style.setProperty('transform','translateX(18px)','important');
+  panel.style.setProperty('margin-left','18px','important');
+  panel.style.setProperty('transform','none','important');
   for(const id of ['bbCustomerBalanceValue','bbCustomerBalanceHint']){
    const node=el(id);
-   if(node){node.style.setProperty('width',width+'px','important');node.style.setProperty('max-width',width+'px','important');}
+   if(node){node.style.setProperty('min-width','100%','important');node.style.setProperty('width','100%','important');node.style.setProperty('max-width','100%','important');}
   }
  }
 }

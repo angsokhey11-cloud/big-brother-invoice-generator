@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261011-space-select9';
+  const BUILD='20261011-ime-select10';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -66,9 +66,28 @@
       }
     }
     input.addEventListener('input',()=>mark(-1));
+    function commitHighlighted(event){
+      if(active<0||!isOpen())return false;
+      const selected=options()[active];
+      const exactName=selected?.querySelector('.customer-option-name')?.textContent||'';
+      if(!exactName)return false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const selectedOk=typeof window.bbSelectCustomerByExactName==='function'
+        &&window.bbSelectCustomerByExactName(exactName);
+      if(!selectedOk)return false;
+      active=-1;
+      input.removeAttribute('aria-activedescendant');
+      return true;
+    }
     input.addEventListener('keydown',event=>{
-      if(event.isComposing||event.keyCode===229)return;
       const key=event.key;
+      /* Khmer IMEs may report composing/229 for Space or Enter even
+         after the user has explicitly highlighted a dropdown result. */
+      if((key==='Enter'||key===' '||key==='Spacebar')&&active>=0){
+        if(commitHighlighted(event))return;
+      }
+      if(event.isComposing||event.keyCode===229)return;
       if(key==='ArrowDown'||key==='ArrowUp'){
         if(!isOpen()&&typeof window.showCustomerOptions==='function'){
           window.showCustomerOptions();
@@ -86,23 +105,7 @@
         mark(-1);
         return;
       }
-      if((key==='Enter'||(key===' '&&active>=0))&&isOpen()){
-        const items=options();
-        const selected=items[active>=0?active:0];
-        if(!selected)return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        /* Use the exact highlighted name against the source customer data.
-           Synthetic mousedown can be overtaken by other suggestion handlers. */
-        const exactName=selected.querySelector('.customer-option-name')?.textContent||'';
-        const success=typeof window.bbSelectCustomerByExactName==='function'
-          &&window.bbSelectCustomerByExactName(exactName);
-        if(!success){
-          selected.dispatchEvent(new MouseEvent('mousedown',{bubbles:false,cancelable:true}));
-        }
-        active=-1;
-        input.removeAttribute('aria-activedescendant');
-      }
+      if(key==='Enter'&&isOpen())commitHighlighted(event);
     },true);
     /* Pointer hover must not override selection made with arrow keys.
        Mouse/touch selection continues through the original mousedown handler. */

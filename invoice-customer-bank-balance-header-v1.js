@@ -1,11 +1,11 @@
-/* BIG BROTHER V3.5.7 — display-only customer bank balance. */
+/* BIG BROTHER V3.5.8 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
 const el=id=>document.getElementById(id);
 const fmt=(n,d)=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 function installLayout(){
- if(el('bbCustomerBalanceLayoutV356'))return;
+ if(el('bbCustomerBalanceLayoutV358'))return;
  const style=document.createElement('style');
  style.id='bbCustomerBalanceLayoutV356';
  style.textContent=`@media(min-width:901px){
@@ -19,6 +19,13 @@ function installLayout(){
  .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{grid-column:1!important;min-width:0!important;width:100%!important;grid-template-columns:minmax(60px,.75fr) minmax(60px,.75fr) minmax(110px,1.25fr) minmax(150px,1.6fr)!important}
  .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{grid-column:2!important;justify-self:stretch!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important;transform:none!important}
  .header-main:has(#bbCustomerBalanceHeader) .header-currency{grid-column:3!important;margin:0!important}
+ .header-main.bb-balance-narrow:has(#bbCustomerBalanceHeader){
+  grid-template-columns:minmax(0,1fr) auto!important;
+  row-gap:5px!important;
+ }
+ .header-main.bb-balance-narrow #bbInvoiceRangeDetector{grid-column:1!important;grid-row:1!important}
+ .header-main.bb-balance-narrow .header-currency{grid-column:2!important;grid-row:1!important}
+ .header-main.bb-balance-narrow #bbCustomerBalanceHeader{grid-column:1!important;grid-row:2!important;justify-self:end!important;width:285px!important;max-width:100%!important}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
  .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important;display:block!important;text-align:left!important}
  .header-main #bbCustomerBalanceInnerText{display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important}
@@ -29,6 +36,18 @@ function installLayout(){
  .header-main #bbCustomerBalanceHeader{min-width:0;max-width:none;width:100%}
  }`;
  document.head.appendChild(style);
+}
+let headerSizeObserver;
+function watchHeaderSpace(){
+ const header=document.querySelector('.header-main');
+ if(!header)return;
+ const apply=()=>header.classList.toggle('bb-balance-narrow',header.getBoundingClientRect().width<1290);
+ apply();
+ if(typeof ResizeObserver!=='undefined'&&!headerSizeObserver){
+  headerSizeObserver=new ResizeObserver(apply);
+  headerSizeObserver.observe(header);
+ }
+ window.addEventListener('resize',apply,{passive:true});
 }
 function createPanel(){
  if(el('bbCustomerBalanceHeader'))return true;
@@ -58,6 +77,7 @@ function createPanel(){
  if(currency)currency.insertAdjacentElement('beforebegin',panel);
  else range.insertAdjacentElement('afterend',panel);
  installLayout();
+ watchHeaderSpace();
  return true;
 }
 function show(value,hint,active){

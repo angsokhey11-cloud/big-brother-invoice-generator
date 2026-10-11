@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.5.4 — display-only customer bank balance. */
+/* BIG BROTHER V3.5.5 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -9,12 +9,12 @@ function installLayout(){
  const style=document.createElement('style');style.id='bbCustomerBalanceLayoutV344';
  style.textContent=`@media(min-width:901px){
  .header-main:has(#bbCustomerBalanceHeader){
-  grid-template-columns:minmax(0,1.65fr) minmax(220px,1fr) auto!important;
-  gap:12px!important;align-items:end!important;
+  grid-template-columns:minmax(0,1fr) var(--bb-balance-track,360px) auto!important;
+  column-gap:22px!important;align-items:end!important;
  }
  .header-main:has(#bbCustomerBalanceHeader)>h1{display:none!important}
  .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{min-width:0;width:100%}
- .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;justify-self:start!important}
+ .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;justify-self:start!important;margin:0!important;transform:none!important}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
  .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important}
  .header-main #bbCustomerBalanceValue{display:block!important;text-align:left!important}
@@ -35,7 +35,8 @@ function syncBalanceWidth(){
   panel.style.setProperty('min-width',width+'px','important');
   panel.style.setProperty('width',width+'px','important');
   panel.style.setProperty('max-width',width+'px','important');
-  panel.style.setProperty('margin-left','18px','important');
+  panel.parentElement?.style.setProperty('--bb-balance-track',width+'px');
+  panel.style.setProperty('margin-left','0','important');
   panel.style.setProperty('transform','none','important');
   for(const id of ['bbCustomerBalanceValue','bbCustomerBalanceHint']){
    const node=el(id);

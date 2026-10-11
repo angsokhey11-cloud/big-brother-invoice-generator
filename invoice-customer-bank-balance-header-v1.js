@@ -1,54 +1,46 @@
-/* Customer bank balance reminder: display only, never consumes funds. */
+/* BIG BROTHER V3.4.1 — display-only customer bank balance. */
 (function(){
 'use strict';
-const field=()=>document.getElementById('customerName');
-let seq=0,lastId='',timer=null;
-function box(){
- let el=document.getElementById('bbCustomerBalanceHeader');
- if(el)return el;
- const header=document.querySelector('.header-main');
- if(!header)return null;
- el=document.createElement('div');el.id='bbCustomerBalanceHeader';
- el.setAttribute('role','status');el.setAttribute('aria-live','polite');
- el.style.cssText='display:block;flex:1 1 200px;max-width:360px;min-width:195px;align-self:center;border:1px solid #d2dce7;border-radius:10px;background:#f5f7fa;padding:7px 11px;box-sizing:border-box;line-height:1.3';
- const currency=header.querySelector('.header-currency');
- if(currency)header.insertBefore(el,currency);else header.appendChild(el);
- return el;
+let customerId='',sequence=0,lastCheck=0,pending=false;
+const el=id=>document.getElementById(id);
+const fmt=(n,d)=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+function show(value,hint,active){
+ const panel=el('bbCustomerBalanceHeader'),amount=el('bbCustomerBalanceValue'),sub=el('bbCustomerBalanceHint');
+ if(!panel||!amount||!sub)return;
+ amount.textContent=value;sub.textContent=hint;
+ panel.style.background=active?'#effaf3':'#f4f8fc';
+ panel.style.borderColor=active?'#86cba1':'#d3e0ed';
+ amount.style.color=active?'#166b3b':'#506780';
 }
-function render(title,amount,help,active){
- const el=box();if(!el)return;
- el.style.background=active?'#effaf3':'#f5f7fa';
- el.style.borderColor=active?'#8fcda5':'#d2dce7';
- el.replaceChildren();
- const l=document.createElement('div');l.textContent='💳 Customer Bank Balance';l.style.cssText='font:700 11px Arial,sans-serif;color:#365876';
- const a=document.createElement('div');a.textContent=amount;a.style.cssText='font:800 15px Arial,sans-serif;color:'+(active?'#16633c':'#50677c')+';margin-top:2px';
- const h=document.createElement('div');h.textContent=help;h.style.cssText='font:400 10px Arial,sans-serif;color:#6d7e8e;margin-top:2px';
- el.append(l,a,h);
-}
-function fmt(value,digits){return Number(value||0).toLocaleString('en-US',{minimumFractionDigits:digits,maximumFractionDigits:digits});}
-async function update(){
- const selected=window.bbGetSelectedCustomerForBank?.();
- const customerId=String(selected?.customerId||'').trim();
- const current=++seq;
- if(!customerId){lastId='';render('','Select customer','Choose a customer to check available funds',false);return;}
- lastId=customerId;
- render('','Checking balance…','Retrieving verified remaining balance',false);
+async function check(id){
+ const token=++sequence;pending=true;lastCheck=Date.now();
+ show('Checking balance…','Reading verified remaining balance',false);
  try{
-  const rows=await window.BBInvoiceBankRpc('bb_customer_bank_balance_list',{p_customer_id:customerId});
-  if(current!==seq)return;
-  const available=(Array.isArray(rows)?rows:[]).filter(r=>Number(r.remaining_amount)>0);
-  const usd=available.filter(r=>r.currency==='USD').reduce((s,r)=>s+Number(r.remaining_amount),0);
-  const khr=available.filter(r=>r.currency==='KHR').reduce((s,r)=>s+Number(r.remaining_amount),0);
-  render('',available.length?'$'+fmt(usd,2)+'  |  '+fmt(khr,0)+'៛':'No available balance',
-  available.length?available.length+' transaction(s) · Select Bank to use':'No verified balance for this customer',available.length>0);
- }catch(e){if(current===seq)render('','Balance unavailable','Check connection or permissions',false);}
+  const list=await window.BBInvoiceBankRpc('bb_customer_bank_balance_list',{p_customer_id:id});
+  if(token!==sequence)return;
+  const rows=(Array.isArray(list)?list:[]).filter(x=>Number(x.remaining_amount)>0);
+  const usd=rows.filter(x=>x.currency==='USD').reduce((s,x)=>s+Number(x.remaining_amount),0);
+  const khr=rows.filter(x=>x.currency==='KHR').reduce((s,x)=>s+Number(x.remaining_amount),0);
+  show(rows.length?'$'+fmt(usd,2)+' | '+fmt(khr,0)+'៛':'No available balance',
+       rows.length?rows.length+' registered transaction(s) · Select Bank to use':'No unused registered bank transfers',rows.length>0);
+ }catch(err){
+  if(token===sequence)show('Balance unavailable','Please check connection or access',false);
+ }finally{if(token===sequence)pending=false;}
 }
-function schedule(){clearTimeout(timer);timer=setTimeout(update,230);}
-function init(){
- box();render('','Select customer','Balance appears after customer selection',false);
- field()?.addEventListener('input',schedule);
- field()?.addEventListener('change',schedule);
- document.getElementById('mainLocation')?.addEventListener('change',schedule);
+function tick(){
+ if(typeof window.bbGetSelectedCustomerForBank!=='function'||typeof window.BBInvoiceBankRpc!=='function')return;
+ const selected=window.bbGetSelectedCustomerForBank();
+ const id=String(selected?.customerId||'').trim();
+ if(id!==customerId){
+  customerId=id;sequence++;pending=false;lastCheck=0;
+  if(!id){show('Select customer','Verified remaining balance',false);return;}
+ }
+ if(id&&!pending&&(lastCheck===0||Date.now()-lastCheck>20000))check(id);
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+function initialize(){
+ show('Select customer','Verified remaining balance',false);
+ tick();
+ setInterval(tick,700);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize,{once:true});else initialize();
 })();

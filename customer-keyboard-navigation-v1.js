@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261011-highlight-select6';
+  const BUILD='20261011-keyboard-locked7';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -100,10 +100,8 @@
         input.removeAttribute('aria-activedescendant');
       }
     },true);
-    list.addEventListener('mousemove',event=>{
-      const option=event.target.closest?.('.customer-option');
-      if(option&&list.contains(option))mark(options().indexOf(option));
-    });
+    /* Pointer hover must not override selection made with arrow keys.
+       Mouse/touch selection continues through the original mousedown handler. */
     /* Load real Khmer glyphs: naming a font in CSS does not install it. */
     if(!document.getElementById('bbInvoiceKhmerFont')){
       const font=document.createElement('link');

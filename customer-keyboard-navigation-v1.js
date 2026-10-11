@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261011-ime-select10';
+  const BUILD='20261011-khmer-keydiag11';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -109,6 +109,43 @@
     },true);
     /* Pointer hover must not override selection made with arrow keys.
        Mouse/touch selection continues through the original mousedown handler. */
+    /* Temporary on-screen tablet keyboard diagnostic. Read-only: no selection
+       changes, no external logging, no persistence. */
+    const diag=document.createElement('div');
+    diag.id='bbCustomerKeyDiagnostic';
+    diag.style.cssText='position:fixed;z-index:2147483646;right:8px;bottom:8px;width:min(380px,calc(100vw - 16px));max-height:34vh;overflow:auto;background:#10243c;color:#fff;border:2px solid #53b4ff;border-radius:9px;padding:8px;font:11px/1.5 monospace;box-shadow:0 4px 22px #0006;display:none;white-space:pre-wrap;overflow-wrap:anywhere';
+    const caption=document.createElement('div');
+    caption.textContent='⌨ Customer Keyboard Diagnostic — V3.5.16';
+    caption.style.cssText='font-weight:bold;color:#8de1ff;margin-bottom:5px';
+    const status=document.createElement('div');
+    const log=document.createElement('div');
+    diag.append(caption,status,log);
+    document.body.appendChild(diag);
+    let entries=[];
+    function diagnosticStatus(){
+      const highlighted=options().find(x=>x.classList.contains('bb-customer-key-active'));
+      const name=highlighted?.querySelector('.customer-option-name')?.textContent||'(none)';
+      status.textContent='Highlighted: '+name+' | active index: '+active+' | open: '+isOpen()+' | focus: '+(document.activeElement===input);
+    }
+    function recordKey(event){
+      if(event.target!==input)return;
+      diag.style.display='block';
+      const type=event.type;
+      const key='key' in event?event.key:'';
+      const code='code' in event?event.code:'';
+      const inputType='inputType' in event?event.inputType:'';
+      const composing='isComposing' in event?event.isComposing:false;
+      const line=type+' key='+JSON.stringify(key)+' code='+code+' keyCode='+(event.keyCode??'-')+' inputType='+inputType+' IME='+composing+' idx='+active;
+      entries.push(line);
+      entries=entries.slice(-12);
+      diagnosticStatus();
+      log.textContent=entries.join('\\n');
+    }
+    ['keydown','keyup','beforeinput','input','compositionstart','compositionupdate','compositionend'].forEach(type=>
+      document.addEventListener(type,recordKey,true));
+    input.addEventListener('focus',()=>{diag.style.display='block';diagnosticStatus()});
+    input.addEventListener('blur',diagnosticStatus);
+    list.addEventListener('pointerdown',diagnosticStatus,true);
     /* Load real Khmer glyphs: naming a font in CSS does not install it. */
     if(!document.getElementById('bbInvoiceKhmerFont')){
       const font=document.createElement('link');

@@ -101,7 +101,7 @@ function renderAvailablePayments(){
      '<div style="min-width:0"><div style="font-weight:900;color:#173d69;overflow-wrap:anywhere">'+
        clean(tx.transaction_id).replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))+
      '</div><div style="font-size:11px;color:#61768c;margin-top:3px">'+
-       bankDate(tx.received_date)+' · '+actual+(inv!==clean(tx.currency).toUpperCase()?' → '+equiv:'')+
+       bankDate(tx.received_date)+' · Original '+actual+' · Remaining '+bankMoney(tx.remaining_amount,tx.currency)+(inv!==clean(tx.currency).toUpperCase()?' → '+bankMoney(tx.equivalent_remaining,inv):'')+
        (tx.bank_name?' · '+clean(tx.bank_name).replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])):'')+
      '</div></div>'+
      '<button type="button" data-bb-bank-use="'+clean(tx.transaction_id).replace(/"/g,'&quot;')+'" style="border:0;border-radius:8px;background:#174979;color:#fff;padding:8px 12px;font-weight:800;cursor:pointer">Use</button>'+
@@ -123,9 +123,13 @@ async function loadAvailablePayments(){
  const box=$('bbRegisteredPayments');
  if(box)box.innerHTML='<div style="font-size:12px;color:#6a7d91">Checking verified bank payments…</div>';
  try{
-   const rows=await window.BBInvoiceBankRpc('bb_bank_customer_available_transactions',{p_customer_id:customerId});
+   const [rows,balances]=await Promise.all([
+     window.BBInvoiceBankRpc('bb_bank_customer_available_transactions',{p_customer_id:customerId}),
+     window.BBInvoiceBankRpc('bb_customer_bank_balance_list',{p_customer_id:customerId})
+   ]);
+   const byId=new Map((Array.isArray(balances)?balances:[]).map(x=>[String(x.transaction_id),x]));
    if(seq!==availableLoadSeq)return;
-   availablePayments=Array.isArray(rows)?rows:[];
+   availablePayments=(Array.isArray(rows)?rows:[]).map(x=>({...x,...(byId.get(String(x.transaction_id))||{})})).filter(x=>Number(x.remaining_amount)>0);
    renderAvailablePayments();
  }catch(error){
    if(seq!==availableLoadSeq)return;

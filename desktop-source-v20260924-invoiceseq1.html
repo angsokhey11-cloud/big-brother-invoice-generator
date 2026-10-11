@@ -5667,6 +5667,9 @@ function showCustomerOptions() {
 function selectCustomer(customer) {
   document.getElementById("customerName").value =
     customer.name;
+  // Let registered-bank-balance and other listeners know a dropdown customer was selected.
+  document.getElementById("customerName").dispatchEvent(new Event("input", { bubbles: true }));
+  document.getElementById("customerName").dispatchEvent(new Event("change", { bubbles: true }));
 
   document.getElementById("customerPhone").value =
     customer.phone || "";

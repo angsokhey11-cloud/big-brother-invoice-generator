@@ -3633,7 +3633,16 @@ textarea:focus{
 }
 
 </style>
- <style id="bbVersionBadgeOutsideRateV35">\n@media(min-width:901px){.header-main:has(#bbInvoiceVersionBadge){position:relative!important;padding-right:68px!important;box-sizing:border-box!important}.header-main #bbInvoiceVersionBadge{position:absolute!important;right:6px!important;top:50%!important;transform:translateY(-50%)!important;z-index:2!important}}\n@media(max-width:900px){#bbInvoiceVersionBadge{display:inline-block;margin-left:8px}}\n</style>
+ <style id="bbVersionBadgeOutsideRateV35">
+@media(min-width:901px){
+ .header-main:has(#bbInvoiceVersionBadge){position:relative!important;box-sizing:border-box!important;padding-right:68px!important}
+ .header-main #bbInvoiceVersionBadge{position:absolute!important;right:4px!important;top:50%!important;transform:translateY(-50%)!important;z-index:5!important;display:inline-block!important}
+ .header-main .header-currency{margin-right:0!important}
+}
+@media(max-width:900px){
+ .header-main #bbInvoiceVersionBadge{display:inline-block!important;margin-left:8px}
+}
+</style>
 </head>
  <body>
   <div class="calculator">

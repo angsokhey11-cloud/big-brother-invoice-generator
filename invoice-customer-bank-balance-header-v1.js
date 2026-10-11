@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.5 — display-only customer bank balance. */
+/* BIG BROTHER V3.5.1 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -14,7 +14,7 @@ function installLayout(){
  }
  .header-main:has(#bbCustomerBalanceHeader)>h1{display:none!important}
  .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{min-width:0;width:100%}
- .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;width:70%;max-width:70%}
+ .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
  .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important}
  .header-main #bbCustomerBalanceValue{display:block!important;text-align:left!important}
@@ -26,6 +26,25 @@ function installLayout(){
  .header-main #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
  }`;
  document.head.appendChild(style);
+}
+function syncBalanceWidth(){
+ const rangeInput=el('bbInvoiceRangeResult'),panel=el('bbCustomerBalanceHeader');
+ if(!rangeInput||!panel)return;
+ const width=rangeInput.getBoundingClientRect().width;
+ if(width>0){
+  panel.style.setProperty('width',width+'px','important');
+  panel.style.setProperty('max-width',width+'px','important');
+ }
+}
+let widthObserver;
+function watchBalanceWidth(){
+ syncBalanceWidth();
+ const input=el('bbInvoiceRangeResult');
+ if(input&&typeof ResizeObserver!=='undefined'&&!widthObserver){
+  widthObserver=new ResizeObserver(syncBalanceWidth);
+  widthObserver.observe(input);
+ }
+ window.addEventListener('resize',syncBalanceWidth,{passive:true});
 }
 function createPanel(){
  if(el('bbCustomerBalanceHeader'))return true;
@@ -53,6 +72,7 @@ function createPanel(){
  panel.append(label,amount,hint);
  range.insertAdjacentElement('afterend',panel);
  installLayout();
+ watchBalanceWidth();
  return true;
 }
 function show(value,hint,active){

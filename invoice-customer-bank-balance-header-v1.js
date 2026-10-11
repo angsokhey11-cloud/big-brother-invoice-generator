@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.4.7 — display-only customer bank balance. */
+/* BIG BROTHER V3.4.8 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -17,7 +17,7 @@ function installLayout(){
  .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
  .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important}
- .header-main #bbCustomerBalanceHint{position:absolute!important;left:50%!important;right:auto!important;bottom:0!important;transform:translateX(-50%)!important;width:max-content!important;max-width:100%!important;text-align:center!important}
+ .header-main #bbCustomerBalanceHint{display:flex!important;justify-content:center!important;align-items:center!important;position:static!important;left:auto!important;right:auto!important;bottom:auto!important;transform:none!important;width:100%!important;max-width:100%!important;text-align:center!important}
  }
  @media(max-width:900px){
  .header-main #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
@@ -30,13 +30,13 @@ function createPanel(){
  if(!range||!range.parentElement)return false;
  const panel=document.createElement('div');panel.id='bbCustomerBalanceHeader';
  panel.className='no-print';
- panel.style.cssText='position:relative;min-width:0;width:100%;max-width:none;align-self:end;box-sizing:border-box;padding-bottom:15px;background:transparent!important;border:0!important;box-shadow:none!important';
+ panel.style.cssText='min-width:0;width:100%;max-width:none;align-self:end;box-sizing:border-box;background:transparent!important;border:0!important;box-shadow:none!important';
  const label=document.createElement('label');label.textContent='Customer Bank Balance';
  label.style.cssText='display:block;font:800 10px Arial,sans-serif;color:#31516f;margin:0 0 3px;line-height:1;white-space:nowrap';
  const amount=document.createElement('div');amount.id='bbCustomerBalanceValue';
  amount.style.cssText='display:flex;align-items:center;box-sizing:border-box;width:100%;height:34px;min-height:34px;padding:5px 9px;border:1px solid #c5d3e2;border-radius:8px;background:#fff;font:800 15px Arial,sans-serif;white-space:nowrap';
  const hint=document.createElement('div');hint.id='bbCustomerBalanceHint';
- hint.style.cssText='position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:block;width:max-content;max-width:100%;font:10px Arial,sans-serif;color:#718096;margin:0;white-space:nowrap;text-align:center';
+ hint.style.cssText='display:flex!important;justify-content:center!important;align-items:center!important;position:static!important;transform:none!important;left:auto!important;right:auto!important;bottom:auto!important;box-sizing:border-box;width:100%!important;max-width:100%!important;font:10px Arial,sans-serif;color:#718096;margin:3px 0 0;white-space:nowrap;text-align:center!important';
  panel.append(label,amount,hint);
  range.insertAdjacentElement('afterend',panel);
  installLayout();

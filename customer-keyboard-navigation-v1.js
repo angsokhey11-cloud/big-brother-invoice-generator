@@ -3,7 +3,7 @@
    information, price loading and product-search focus remain unchanged. */
 (function(){
   'use strict';
-  const BUILD='20261011-keyboard-locked7';
+  const BUILD='20261011-exact-select8';
   function init(){
     const input=document.getElementById('customerName');
     const list=document.getElementById('customerOptions');
@@ -92,10 +92,14 @@
         if(!selected)return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        /* Freeze the exact highlighted DOM option before selection fires input/change
-           and re-renders the suggestions. The original option handler owns
-           customer ID, address, phone, prices and focus. */
-        selected.dispatchEvent(new MouseEvent('mousedown',{bubbles:false,cancelable:true}));
+        /* Use the exact highlighted name against the source customer data.
+           Synthetic mousedown can be overtaken by other suggestion handlers. */
+        const exactName=selected.querySelector('.customer-option-name')?.textContent||'';
+        const success=typeof window.bbSelectCustomerByExactName==='function'
+          &&window.bbSelectCustomerByExactName(exactName);
+        if(!success){
+          selected.dispatchEvent(new MouseEvent('mousedown',{bubbles:false,cancelable:true}));
+        }
         active=-1;
         input.removeAttribute('aria-activedescendant');
       }

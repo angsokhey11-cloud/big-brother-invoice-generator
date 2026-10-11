@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.5.6 — display-only customer bank balance. */
+/* BIG BROTHER V3.5.7 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -11,12 +11,12 @@ function installLayout(){
  style.textContent=`@media(min-width:901px){
  .header-main:has(#bbCustomerBalanceHeader){
   display:grid!important;
-  grid-template-columns:minmax(0,1fr) clamp(260px,26vw,385px) auto!important;
+  grid-template-columns:minmax(0,1fr) 285px auto!important;
   column-gap:16px!important;
   align-items:end!important;
  }
  .header-main:has(#bbCustomerBalanceHeader)>h1{display:none!important}
- .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{grid-column:1!important;min-width:0!important;width:100%!important}
+ .header-main:has(#bbCustomerBalanceHeader) #bbInvoiceRangeDetector{grid-column:1!important;min-width:0!important;width:100%!important;grid-template-columns:minmax(60px,.75fr) minmax(60px,.75fr) minmax(110px,1.25fr) minmax(150px,1.6fr)!important}
  .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{grid-column:2!important;justify-self:stretch!important;width:100%!important;min-width:0!important;max-width:none!important;margin:0!important;transform:none!important}
  .header-main:has(#bbCustomerBalanceHeader) .header-currency{grid-column:3!important;margin:0!important}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}

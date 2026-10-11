@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.4.8 — display-only customer bank balance. */
+/* BIG BROTHER V3.4.9 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -37,6 +37,7 @@ function createPanel(){
  amount.style.cssText='display:flex;align-items:center;box-sizing:border-box;width:100%;height:34px;min-height:34px;padding:5px 9px;border:1px solid #c5d3e2;border-radius:8px;background:#fff;font:800 15px Arial,sans-serif;white-space:nowrap';
  const hint=document.createElement('div');hint.id='bbCustomerBalanceHint';
  hint.style.cssText='display:flex!important;justify-content:center!important;align-items:center!important;position:static!important;transform:none!important;left:auto!important;right:auto!important;bottom:auto!important;box-sizing:border-box;width:100%!important;max-width:100%!important;font:10px Arial,sans-serif;color:#718096;margin:3px 0 0;white-space:nowrap;text-align:center!important';
+ hint.style.paddingLeft='32px';
  panel.append(label,amount,hint);
  range.insertAdjacentElement('afterend',panel);
  installLayout();

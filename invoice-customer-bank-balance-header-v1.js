@@ -1,4 +1,4 @@
-/* BIG BROTHER V3.4.1 — display-only customer bank balance. */
+/* BIG BROTHER V3.4.2 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
@@ -10,13 +10,13 @@ function createPanel(){
  if(!range||!range.parentElement)return false;
  const panel=document.createElement('div');panel.id='bbCustomerBalanceHeader';
  panel.className='no-print';
- panel.style.cssText='flex:0 1 240px;min-width:190px;max-width:275px;align-self:center;box-sizing:border-box';
+ panel.style.cssText='flex:0 1 315px;min-width:265px;max-width:370px;align-self:center;box-sizing:border-box';
  const label=document.createElement('label');label.textContent='Customer Bank Balance';
- label.style.cssText='display:block;font:700 10px Arial,sans-serif;color:#345475;margin-bottom:4px';
+ label.style.cssText='display:block;font:700 12px Arial,sans-serif;color:#345475;margin-bottom:5px';
  const amount=document.createElement('div');amount.id='bbCustomerBalanceValue';
- amount.style.cssText='padding:7px 9px;border:1px solid #cbd7e5;border-radius:7px;background:#f8fafc;font:800 13px Arial,sans-serif;min-height:18px';
+ amount.style.cssText='padding:10px 13px;border:1px solid #cbd7e5;border-radius:9px;background:#f8fafc;font:800 18px Arial,sans-serif;min-height:23px';
  const hint=document.createElement('div');hint.id='bbCustomerBalanceHint';
- hint.style.cssText='font:10px Arial,sans-serif;color:#718096;margin-top:3px';
+ hint.style.cssText='font:11px Arial,sans-serif;color:#718096;margin-top:4px';
  panel.append(label,amount,hint);
  range.insertAdjacentElement('afterend',panel);
  return true;

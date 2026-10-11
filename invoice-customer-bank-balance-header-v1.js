@@ -1,13 +1,13 @@
-/* BIG BROTHER V3.5.8 — display-only customer bank balance. */
+/* BIG BROTHER V3.5.9 — display-only customer bank balance. */
 (function(){
 'use strict';
 let customerId='',sequence=0,lastCheck=0,pending=false;
 const el=id=>document.getElementById(id);
 const fmt=(n,d)=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 function installLayout(){
- if(el('bbCustomerBalanceLayoutV358'))return;
+ if(el('bbCustomerBalanceLayoutV359'))return;
  const style=document.createElement('style');
- style.id='bbCustomerBalanceLayoutV356';
+ style.id='bbCustomerBalanceLayoutV359';
  style.textContent=`@media(min-width:901px){
  .header-main:has(#bbCustomerBalanceHeader){
   display:grid!important;
@@ -25,7 +25,7 @@ function installLayout(){
  }
  .header-main.bb-balance-narrow #bbInvoiceRangeDetector{grid-column:1!important;grid-row:1!important}
  .header-main.bb-balance-narrow .header-currency{grid-column:2!important;grid-row:1!important}
- .header-main.bb-balance-narrow #bbCustomerBalanceHeader{grid-column:1!important;grid-row:2!important;justify-self:end!important;width:285px!important;max-width:100%!important}
+ .header-main.bb-balance-narrow #bbCustomerBalanceHeader{grid-column:1!important;grid-row:2!important;justify-self:end!important;width:285px!important;min-width:285px!important;max-width:285px!important}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
  .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important;display:block!important;text-align:left!important}
  .header-main #bbCustomerBalanceInnerText{display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important}
@@ -41,7 +41,7 @@ let headerSizeObserver;
 function watchHeaderSpace(){
  const header=document.querySelector('.header-main');
  if(!header)return;
- const apply=()=>header.classList.toggle('bb-balance-narrow',header.getBoundingClientRect().width<1290);
+ const apply=()=>header.classList.toggle('bb-balance-narrow',header.getBoundingClientRect().width<1090);
  apply();
  if(typeof ResizeObserver!=='undefined'&&!headerSizeObserver){
   headerSizeObserver=new ResizeObserver(apply);

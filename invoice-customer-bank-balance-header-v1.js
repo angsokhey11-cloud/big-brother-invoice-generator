@@ -4,7 +4,25 @@
 let customerId='',sequence=0,lastCheck=0,pending=false;
 const el=id=>document.getElementById(id);
 const fmt=(n,d)=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+function createPanel(){
+ if(el('bbCustomerBalanceHeader'))return true;
+ const range=el('bbInvoiceRangeDetector');
+ if(!range||!range.parentElement)return false;
+ const panel=document.createElement('div');panel.id='bbCustomerBalanceHeader';
+ panel.className='no-print';
+ panel.style.cssText='flex:0 1 240px;min-width:190px;max-width:275px;align-self:center;box-sizing:border-box';
+ const label=document.createElement('label');label.textContent='Customer Bank Balance';
+ label.style.cssText='display:block;font:700 10px Arial,sans-serif;color:#345475;margin-bottom:4px';
+ const amount=document.createElement('div');amount.id='bbCustomerBalanceValue';
+ amount.style.cssText='padding:7px 9px;border:1px solid #cbd7e5;border-radius:7px;background:#f8fafc;font:800 13px Arial,sans-serif;min-height:18px';
+ const hint=document.createElement('div');hint.id='bbCustomerBalanceHint';
+ hint.style.cssText='font:10px Arial,sans-serif;color:#718096;margin-top:3px';
+ panel.append(label,amount,hint);
+ range.insertAdjacentElement('afterend',panel);
+ return true;
+}
 function show(value,hint,active){
+ if(!createPanel())return;
  const panel=el('bbCustomerBalanceHeader'),amount=el('bbCustomerBalanceValue'),sub=el('bbCustomerBalanceHint');
  if(!panel||!amount||!sub)return;
  amount.textContent=value;sub.textContent=hint;
@@ -16,7 +34,7 @@ async function check(id){
  const token=++sequence;pending=true;lastCheck=Date.now();
  show('Checking balance…','Reading verified remaining balance',false);
  try{
-  const list=await window.BBInvoiceBankRpc('bb_customer_bank_balance_list',{p_customer_id:id});
+  const list=await window.BBInvoiceBankRpc('bb_customer_bank_balance_list_v2',{p_customer_id:id});
   if(token!==sequence)return;
   const rows=(Array.isArray(list)?list:[]).filter(x=>Number(x.remaining_amount)>0);
   const usd=rows.filter(x=>x.currency==='USD').reduce((s,x)=>s+Number(x.remaining_amount),0);
@@ -28,6 +46,7 @@ async function check(id){
  }finally{if(token===sequence)pending=false;}
 }
 function tick(){
+ createPanel();
  if(typeof window.bbGetSelectedCustomerForBank!=='function'||typeof window.BBInvoiceBankRpc!=='function')return;
  const selected=window.bbGetSelectedCustomerForBank();
  const id=String(selected?.customerId||'').trim();
@@ -38,6 +57,7 @@ function tick(){
  if(id&&!pending&&(lastCheck===0||Date.now()-lastCheck>20000))check(id);
 }
 function initialize(){
+ if(!createPanel())setTimeout(createPanel,150);
  show('Select customer','Verified remaining balance',false);
  tick();
  setInterval(tick,700);

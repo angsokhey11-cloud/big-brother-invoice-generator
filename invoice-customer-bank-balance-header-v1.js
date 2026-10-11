@@ -17,6 +17,8 @@ function installLayout(){
  .header-main:has(#bbCustomerBalanceHeader) #bbCustomerBalanceHeader{min-width:0;width:100%;max-width:none}
  .header-main #bbCustomerBalanceHeader{background:transparent!important;border:0!important;box-shadow:none!important}
  .header-main #bbCustomerBalanceValue{color:#174a91!important;background:#fff!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important}
+ .header-main #bbCustomerBalanceValue{display:block!important;text-align:left!important}
+ .header-main #bbCustomerBalanceInnerText{display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important}
  .header-main #bbCustomerBalanceHint{display:block!important;position:static!important;width:100%!important;max-width:100%!important;text-align:left!important}
  .header-main #bbCustomerBalanceHintText{display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important}
  }
@@ -36,6 +38,11 @@ function createPanel(){
  label.style.cssText='display:block;font:800 10px Arial,sans-serif;color:#31516f;margin:0 0 3px;line-height:1;white-space:nowrap';
  const amount=document.createElement('div');amount.id='bbCustomerBalanceValue';
  amount.style.cssText='display:flex;align-items:center;justify-content:center;text-align:center;box-sizing:border-box;width:100%;height:34px;min-height:34px;padding:5px 9px;border:1px solid #c5d3e2;border-radius:8px;background:#fff;font:800 15px Arial,sans-serif;white-space:nowrap';
+ const amountText=document.createElement('span');amountText.id='bbCustomerBalanceInnerText';
+ amountText.style.cssText='display:inline-block!important;position:relative!important;left:50%!important;transform:translateX(-50%)!important;width:max-content!important;white-space:nowrap';
+ amount.appendChild(amountText);
+ amount.style.setProperty('display','block','important');
+ amount.style.setProperty('line-height','22px','important');
  const hint=document.createElement('div');hint.id='bbCustomerBalanceHint';
  hint.style.cssText='display:flex!important;justify-content:center!important;align-items:center!important;position:static!important;transform:none!important;left:auto!important;right:auto!important;bottom:auto!important;box-sizing:border-box;width:100%!important;max-width:100%!important;font:10px Arial,sans-serif;color:#718096;margin:3px 0 0;white-space:nowrap;text-align:center!important';
  const hintText=document.createElement('span');hintText.id='bbCustomerBalanceHintText';
@@ -52,11 +59,10 @@ function show(value,hint,active){
  if(!createPanel())return;
  const panel=el('bbCustomerBalanceHeader'),amount=el('bbCustomerBalanceValue'),sub=el('bbCustomerBalanceHint');
  if(!panel||!amount||!sub)return;
- amount.textContent=value;
- amount.style.setProperty('display','flex','important');
- amount.style.setProperty('justify-content','center','important');
- amount.style.setProperty('align-items','center','important');
- amount.style.setProperty('text-align','center','important');
+ const inner=el('bbCustomerBalanceInnerText');
+ if(inner)inner.textContent=value;else amount.textContent=value;
+ amount.style.setProperty('display','block','important');
+ amount.style.setProperty('text-align','left','important');
  const hintText=el('bbCustomerBalanceHintText');
  if(hintText)hintText.textContent=hint;else sub.textContent=hint;
  panel.style.setProperty('background','transparent','important');

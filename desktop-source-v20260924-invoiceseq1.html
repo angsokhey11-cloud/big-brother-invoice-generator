@@ -3670,7 +3670,7 @@ textarea:focus{
      </div>
      
     </div>
-    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.18" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.18</span>
+    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.19" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.19</span>
    </div>
 
    <div class="bb-desktop-workspace">
@@ -7079,6 +7079,30 @@ function calculate() {
    Credit = Amount Paid + remaining Credit
 ========================================== */
 
+/* Keep the real Amount Paid input visible whenever a partial payment is chosen.
+   This is display-only: invoice totals/payment records continue to use #amountPaid. */
+function bbIsPartialInvoicePayment() {
+  const method = document.getElementById("paymentMethod")?.value || "";
+  return method === "Partially Paid in Cash" ||
+         method === "Partially Paid in Bank";
+}
+
+function bbSyncInvoicePaymentVisibility() {
+  const showDiscount = document.getElementById("showDiscount")?.checked === true;
+  const showPayment = document.getElementById("showPayment")?.checked === true ||
+                      bbIsPartialInvoicePayment();
+
+  const details = document.getElementById("optionalPaymentDetails");
+  const discountRow = document.querySelector(".discount-row");
+  const paymentRow = document.querySelector(".payment-row");
+  const creditRow = document.querySelector(".change-row");
+
+  if (details) details.style.display = (showDiscount || showPayment) ? "block" : "none";
+  if (discountRow) discountRow.style.display = showDiscount ? "" : "none";
+  if (paymentRow) paymentRow.style.display = showPayment ? "" : "none";
+  if (creditRow) creditRow.style.display = showPayment ? "" : "none";
+}
+
 function handlePaymentMethodChange() {
   const paymentMethod = document.getElementById("paymentMethod")?.value || "";
   const needsBank =
@@ -7110,6 +7134,7 @@ function handlePaymentMethodChange() {
     }
   }
 
+  bbSyncInvoicePaymentVisibility();
   calculate();
 }
 
@@ -7471,7 +7496,7 @@ function getFinalInvoiceState() {
   const invoiceHasCredit = outstanding > 0;
 
   const showDiscount = document.getElementById("showDiscount")?.checked === true;
-  const showPayment = document.getElementById("showPayment")?.checked === true;
+  const showPayment = document.getElementById("showPayment")?.checked === true || bbIsPartialInvoicePayment();
   const showExchange = document.getElementById("showExchange")?.checked === true;
 
   let exchangeUsd = grandTotal;
@@ -8226,56 +8251,11 @@ function toggleOptionalMenu() {
 }
 
 function toggleOptionalSection(section) {
-
-  const showDiscount =
-    document.getElementById("showDiscount")?.checked || false;
-
-  const showPayment =
-    document.getElementById("showPayment")?.checked || false;
+  // Partial cash/bank payments must remain visible even when More Options changes.
+  bbSyncInvoicePaymentVisibility();
 
   const showExchange =
     document.getElementById("showExchange")?.checked || false;
-
-  /* Discount */
-  const discountRow =
-    document.querySelector(".discount-row");
-
-  if (discountRow) {
-    discountRow.style.display =
-      showDiscount ? "" : "none";
-  }
-
-  /*
-   * Discount + Payment rows live inside this wrapper.
-   * Show the wrapper whenever either option is selected.
-   * This is the missing piece in the previous version.
-   */
-  const paymentDetails =
-    document.getElementById("optionalPaymentDetails");
-
-  if (paymentDetails) {
-    paymentDetails.style.display =
-      (showDiscount || showPayment)
-        ? "block"
-        : "none";
-  }
-
-  /* Amount Paid + Change */
-  const paymentRow =
-    document.querySelector(".payment-row");
-
-  const changeRow =
-    document.querySelector(".change-row");
-
-  if (paymentRow) {
-    paymentRow.style.display =
-      showPayment ? "" : "none";
-  }
-
-  if (changeRow) {
-    changeRow.style.display =
-      showPayment ? "" : "none";
-  }
 
   /* Exchange Calculation */
   const exchangeBox =
@@ -8358,6 +8338,7 @@ function initializeMoreOptions() {
   if (exchangeBox) {
     exchangeBox.style.display = "none";
   }
+  bbSyncInvoicePaymentVisibility();
 }
 
 if (document.readyState === "loading") {

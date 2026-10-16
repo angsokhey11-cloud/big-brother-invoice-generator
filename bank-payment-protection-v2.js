@@ -10,6 +10,7 @@ let lastCustomer='';
 let isChecking=false;
 let availablePayments=[];
 let userSelectedRegisteredId='';
+let adminMayTypeManualId=false;
 let availableCustomerId='';
 let availableLoadSeq=0;
 let availableTimer=null;
@@ -63,6 +64,14 @@ function exactBankOption(name){
  select.value=option.value;
  select.dispatchEvent(new Event('change',{bubbles:true}));
 }
+function clearRegisteredSelection(){
+ userSelectedRegisteredId='';
+ const field=$('transactionId');
+ if(field){field.value='';field.dispatchEvent(new Event('input',{bubbles:true}));}
+ const amt=$('bbActualBankAmount');if(amt)amt.value='';
+ const bank=$('paymentBank');if(bank){bank.value='';bank.dispatchEvent(new Event('change',{bubbles:true}));}
+ renderAvailablePayments();
+}
 function applyRegisteredPayment(tx){
  if(!tx)return;
  userSelectedRegisteredId=clean(tx.transaction_id);
@@ -79,7 +88,7 @@ function applyRegisteredPayment(tx){
  exactBankOption(tx.bank_name);
  document.querySelectorAll('[data-bb-bank-use]').forEach(b=>{
    const active=userSelectedRegisteredId===b.dataset.bbBankUse;
-   b.textContent=active?'✓ Selected':'Use';
+   b.textContent=active?'✓ Selected (Undo)':'Use';
    b.style.background=active?'#198754':'#174979';
  });
 }
@@ -110,9 +119,12 @@ function renderAvailablePayments(){
    '</div>';
  }).join('');
  box.querySelectorAll('[data-bb-bank-use]').forEach(btn=>{
-   btn.onclick=()=>applyRegisteredPayment(availablePayments.find(x=>clean(x.transaction_id)===btn.dataset.bbBankUse));
+   btn.onclick=()=>{
+   if(userSelectedRegisteredId===btn.dataset.bbBankUse){clearRegisteredSelection();return;}
+   applyRegisteredPayment(availablePayments.find(x=>clean(x.transaction_id)===btn.dataset.bbBankUse));
+  };
   const active=!!userSelectedRegisteredId&&btn.dataset.bbBankUse===userSelectedRegisteredId;
-  btn.textContent=active?'✓ Selected':'Use';
+  btn.textContent=active?'✓ Selected (Undo)':'Use';
   btn.style.background=active?'#198754':'#174979';
  });
  // Never auto-select even when exactly one registered payment is available.
@@ -161,7 +173,7 @@ function inputUI(){
  '<label style="font-size:13px;font-weight:700">Bank currency<select id="bbActualBankCurrency" style="width:100%;margin-top:5px;padding:9px;border:1px solid #adc4db;border-radius:8px"><option value="USD">USD</option><option value="KHR">KHR</option></select></label>'+
  '<label style="font-size:13px;font-weight:700">Actual amount<input id="bbActualBankAmount" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount received" style="width:100%;margin-top:5px;padding:9px;border:1px solid #adc4db;border-radius:8px"></label></div>'+
  '<div id="bbRegisteredPayments" style="margin-top:11px;padding:10px;border:1px solid #d7e3ef;border-radius:9px;background:#fff"><div style="font-size:12px;color:#6a7d91">Available registered transfers (optional).</div></div>'+
- '<p style="margin:10px 0 0;font-size:12px;color:#5f748c">Optional: click Use only when this registered balance belongs to the current sale. Otherwise enter a different Transaction ID and bank transfer details manually. An unrelated registered balance will remain untouched.</p>';
+ '<p style="margin:10px 0 0;font-size:12px;color:#5f748c">Registered balances are optional. Click Use only when the payment belongs to this sale. Staff must ask Admin to register a different bank transfer before using it; only Admin can type a new Transaction ID. Unused registered balances remain untouched.</p>';
  anchor.insertAdjacentElement('afterend',fields);
  function visibility(){
    const show=['Bank','Partially Paid in Bank','Cash + Bank'].includes(method());
@@ -171,6 +183,33 @@ function inputUI(){
  $('paymentMethod')?.addEventListener('change',visibility);
  visibility();
  scheduleAvailablePayments();
+}
+async function installManualIdLock(){
+ const tx=$('transactionId');
+ if(!tx)return;
+ // Fail closed until Supabase confirms this user is an active Admin.
+ tx.readOnly=true;
+ tx.setAttribute('aria-readonly','true');
+ tx.placeholder='Select Use on a registered bank transfer';
+ let info=$('bbManualBankIdPolicy');
+ if(!info){
+  info=document.createElement('div');info.id='bbManualBankIdPolicy';
+  info.style.cssText='font-size:11px;color:#5c7089;margin-top:4px;line-height:1.4';
+  ($('transactionIdRow')||tx.parentElement)?.appendChild(info);
+ }
+ info.textContent='Staff: choose Use above. Manual Transaction ID entry is Admin-only.';
+ try{
+  adminMayTypeManualId=(await window.BBInvoiceBankRpc('bb_is_admin'))===true;
+ }catch(err){
+  adminMayTypeManualId=false;
+  console.warn('Admin ID permission check unavailable; keep manual field locked.',err);
+ }
+ tx.readOnly=!adminMayTypeManualId;
+ tx.setAttribute('aria-readonly',String(!adminMayTypeManualId));
+ if(adminMayTypeManualId){
+  tx.placeholder='Enter new Transaction ID or select Use';
+  info.textContent='Admin: manual Transaction ID allowed. Registered transfers are optional.';
+ }
 }
 function bankAmountFor(payload){
  return payload.paymentMethod==='Cash + Bank'?Number(payload.splitBankAmount):Number(payload.amountPaid);
@@ -187,7 +226,7 @@ async function validateBank(payload){
    p_exchange_rate:Number(payload.exchangeRate),p_equivalent_amount:bankAmountFor(payload)
   });
   if(good!==true){
-   throw new Error('Bank transaction ID is already registered but its details or remaining balance do not match. Choose Use for that transfer, or enter a different Transaction ID for a new transfer.');
+   throw new Error(adminMayTypeManualId?'Bank Transaction ID is unavailable or does not match a registered transfer. Check the customer and remaining balance.':'Staff must select Use on an available Admin-registered transfer. Manual bank Transaction IDs are Admin-only.');
   }
   return true;
  }catch(err){throw err;}
@@ -224,7 +263,7 @@ $('transactionId')?.addEventListener('input',()=>{
  }
  document.querySelectorAll('[data-bb-bank-use]').forEach(btn=>{
    const active=!!userSelectedRegisteredId&&btn.dataset.bbBankUse===userSelectedRegisteredId;
-   btn.textContent=active?'✓ Selected':'Use';
+   btn.textContent=active?'✓ Selected (Undo)':'Use';
    btn.style.background=active?'#198754':'#174979';
  });
 });
@@ -238,5 +277,6 @@ if(typeof originalClear==='function'){
 };
 }
 install();installSave();
-document.addEventListener('DOMContentLoaded',()=>{install();installSave();inputUI()},{once:true});
+if(document.readyState!=='loading'){inputUI();installManualIdLock();}
+document.addEventListener('DOMContentLoaded',()=>{install();installSave();inputUI();installManualIdLock()},{once:true});
 })();

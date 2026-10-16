@@ -9,6 +9,7 @@ let warned=null;
 let lastCustomer='';
 let isChecking=false;
 let availablePayments=[];
+let userSelectedRegisteredId='';
 let availableCustomerId='';
 let availableLoadSeq=0;
 let availableTimer=null;
@@ -64,6 +65,7 @@ function exactBankOption(name){
 }
 function applyRegisteredPayment(tx){
  if(!tx)return;
+ userSelectedRegisteredId=clean(tx.transaction_id);
  const id=$('transactionId');
  if(id){
    id.value=clean(tx.transaction_id);
@@ -76,7 +78,7 @@ function applyRegisteredPayment(tx){
  if(amt){amt.value=String(tx.amount??'');amt.dispatchEvent(new Event('input',{bubbles:true}))}
  exactBankOption(tx.bank_name);
  document.querySelectorAll('[data-bb-bank-use]').forEach(b=>{
-   const active=b.dataset.bbBankUse===clean(tx.transaction_id);
+   const active=userSelectedRegisteredId===b.dataset.bbBankUse;
    b.textContent=active?'✓ Selected':'Use';
    b.style.background=active?'#198754':'#174979';
  });
@@ -109,13 +111,21 @@ function renderAvailablePayments(){
  }).join('');
  box.querySelectorAll('[data-bb-bank-use]').forEach(btn=>{
    btn.onclick=()=>applyRegisteredPayment(availablePayments.find(x=>clean(x.transaction_id)===btn.dataset.bbBankUse));
+  const active=!!userSelectedRegisteredId&&btn.dataset.bbBankUse===userSelectedRegisteredId;
+  btn.textContent=active?'✓ Selected':'Use';
+  btn.style.background=active?'#198754':'#174979';
  });
- if(availablePayments.length===1)applyRegisteredPayment(availablePayments[0]);
+ // Never auto-select even when exactly one registered payment is available.
 }
 async function loadAvailablePayments(){
  const customer=window.bbGetSelectedCustomerForBank?.();
  const customerId=clean(customer?.customerId);
  const seq=++availableLoadSeq;
+ if(availableCustomerId&&availableCustomerId!==customerId&&userSelectedRegisteredId){
+   if(clean($('transactionId')?.value)===userSelectedRegisteredId)$('transactionId').value='';
+   if($('bbActualBankAmount'))$('bbActualBankAmount').value='';
+   userSelectedRegisteredId='';
+ }
  if(!customerId){
    availableCustomerId='';availablePayments=[];renderAvailablePayments();return;
  }
@@ -150,8 +160,8 @@ function inputUI(){
  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
  '<label style="font-size:13px;font-weight:700">Bank currency<select id="bbActualBankCurrency" style="width:100%;margin-top:5px;padding:9px;border:1px solid #adc4db;border-radius:8px"><option value="USD">USD</option><option value="KHR">KHR</option></select></label>'+
  '<label style="font-size:13px;font-weight:700">Actual amount<input id="bbActualBankAmount" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount received" style="width:100%;margin-top:5px;padding:9px;border:1px solid #adc4db;border-radius:8px"></label></div>'+
- '<div id="bbRegisteredPayments" style="margin-top:11px;padding:10px;border:1px solid #d7e3ef;border-radius:9px;background:#fff"><div style="font-size:12px;color:#6a7d91">Choose a customer to see verified bank payments.</div></div>'+
- '<p style="margin:10px 0 0;font-size:12px;color:#5f748c">Choose an Admin-verified payment above. Transaction ID, bank currency, amount and receiving bank will fill automatically. The server checks the exact customer and amount again when you save.</p>';
+ '<div id="bbRegisteredPayments" style="margin-top:11px;padding:10px;border:1px solid #d7e3ef;border-radius:9px;background:#fff"><div style="font-size:12px;color:#6a7d91">Available registered transfers (optional).</div></div>'+
+ '<p style="margin:10px 0 0;font-size:12px;color:#5f748c">Optional: click Use only when this registered balance belongs to the current sale. Otherwise enter a different Transaction ID and bank transfer details manually. An unrelated registered balance will remain untouched.</p>';
  anchor.insertAdjacentElement('afterend',fields);
  function visibility(){
    const show=['Bank','Partially Paid in Bank','Cash + Bank'].includes(method());
@@ -177,38 +187,14 @@ async function validateBank(payload){
    p_exchange_rate:Number(payload.exchangeRate),p_equivalent_amount:bankAmountFor(payload)
   });
   if(good!==true){
-   throw new Error('Bank transaction details do not match an available verified payment. Check customer, amount, currency and approved exchange rate.');
+   throw new Error('Bank transaction ID is already registered but its details or remaining balance do not match. Choose Use for that transfer, or enter a different Transaction ID for a new transfer.');
   }
   return true;
  }catch(err){throw err;}
 }
 function install(){
- inputUI();
- if(typeof window.bbConfirmInvoiceCompletion!=='function'||window.bbConfirmInvoiceCompletion.__bbBankV2)return;
- const original=window.bbConfirmInvoiceCompletion;
- window.bbConfirmInvoiceCompletion=async function(payload){
-  const customer=clean(payload.customerId),selected=method(),protectedMethod=selected==='Cash'||selected==='Credit';
-  if(!protectedMethod||!customer){warned=null;return original.apply(this,arguments);}
-  if(isChecking)return false;
-  isChecking=true;
-  let available=false;
-  try{available=await window.BBInvoiceBankRpc('bb_bank_customer_has_available',{p_customer_id:customer})}
-  catch(e){window.bbShowInvoiceSaveError?.(new Error('Could not check registered bank payments. Please reconnect and retry.'));isChecking=false;return false;}
-  isChecking=false;
-  if(available!==true){warned=null;return original.apply(this,arguments);}
-  const key=customer+'|'+selected;
-  if(warned!==key){
-    warned=key;
-    await popup('This customer has an available registered bank payment. Please double-check your payment method.',[['OK',true,true]]);
-    clearMethod();
-    return false;
-  }
-  const yes=await popup('Are you sure your payment method is correct?',[['No',false,false],['Yes',true,true]]);
-  if(!yes){clearMethod();return false;}
-  warned=null;
-  return true; // Yes authorizes this already-confirmed choice; do not show a third dialog.
- };
- window.bbConfirmInvoiceCompletion.__bbBankV2=true;
+ // Registered bank balances are optional: no Cash/Credit warning or forced selection.
+ // Keep the Invoice Generator's original confirmation flow unchanged.
 }
 function installSave(){
  if(typeof window.postSalesInvoiceBundle!=='function'||window.postSalesInvoiceBundle.__bbBankV2)return;
@@ -231,10 +217,21 @@ customer?.addEventListener('input',()=>{
  }
 });
 customer?.addEventListener('change',scheduleAvailablePayments);
+$('transactionId')?.addEventListener('input',()=>{
+ if(userSelectedRegisteredId&&clean($('transactionId').value)!==userSelectedRegisteredId){
+   userSelectedRegisteredId='';
+   if($('bbActualBankAmount'))$('bbActualBankAmount').value='';
+ }
+ document.querySelectorAll('[data-bb-bank-use]').forEach(btn=>{
+   const active=!!userSelectedRegisteredId&&btn.dataset.bbBankUse===userSelectedRegisteredId;
+   btn.textContent=active?'✓ Selected':'Use';
+   btn.style.background=active?'#198754':'#174979';
+ });
+});
 const originalClear=window.clearAllAfterSuccessfulSave;
 if(typeof originalClear==='function'){
  window.clearAllAfterSuccessfulSave=function(){
- warned=null;availablePayments=[];availableCustomerId='';
+ warned=null;availablePayments=[];availableCustomerId='';userSelectedRegisteredId='';
  if($('bbActualBankAmount'))$('bbActualBankAmount').value='';
  if($('bbRegisteredPayments'))$('bbRegisteredPayments').innerHTML='<div style="font-size:12px;color:#6a7d91">Choose a customer to see verified bank payments.</div>';
  return originalClear.apply(this,arguments)

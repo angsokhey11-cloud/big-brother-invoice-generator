@@ -57,7 +57,7 @@ function update(){
  if(!enabled)return;
  if(actual<=0){text.textContent='Enter the actual bank transfer amount.';info.textContent='';applyBtn.style.display='none';return;}
  if(!Number.isFinite(value)){text.textContent='Enter a valid exchange rate to calculate the equivalent.';info.textContent='';applyBtn.style.display='none';return;}
- text.textContent=money(actual,from)+' = '+money(value,to)+' (1 USD = '+r.toLocaleString()+' KHR)';
+ text.textContent=money(actual,from)+' = '+money(value,to)+(from===to?' (same currency)':' (1 USD = '+r.toLocaleString()+' KHR)');
  info.textContent=transfer?'Registered remaining: '+money(available,from)+' ≈ '+money(availableEquivalent,to):'Applied invoice amount stays in '+to+'. The bank amount is not changed.';
  applyBtn.style.display=Number.isFinite(availableEquivalent)&&availableEquivalent>0?'':'none';
 }

@@ -86,6 +86,7 @@ function applyRegisteredPayment(tx){
  const amt=$('bbActualBankAmount');
  if(amt){amt.value=String(tx.amount??'');amt.dispatchEvent(new Event('input',{bubbles:true}))}
  exactBankOption(tx.bank_name);
+ document.dispatchEvent(new CustomEvent('bb:registered-bank-selected',{detail:{transaction_id:clean(tx.transaction_id),remaining_amount:Number(tx.remaining_amount||0),currency:clean(tx.currency).toUpperCase()}}));
  document.querySelectorAll('[data-bb-bank-use]').forEach(b=>{
    const active=userSelectedRegisteredId===b.dataset.bbBankUse;
    b.textContent=active?'✓ Selected (Undo)':'Use';

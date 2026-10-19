@@ -41,38 +41,45 @@ function ensure(){
  $('bbBankEquivalentApply')?.addEventListener('click',()=>apply());
 }
 let selection=null;
+
+function context(){
+ const from=bankCurrency(),to=invoiceCurrency(),r=rate(),actual=number($('bbActualBankAmount')?.value);
+ const tx=selection&&selection.transaction_id===String($('transactionId')?.value||'').trim()?selection:null;
+ const available=tx?number(tx.remaining_amount):actual;
+ const converted=equivalent(available,from,to,r);
+ const method=String($('paymentMethod')?.value||'');
+ return {from,to,r,actual,tx,available,converted,method,total:getTotal()};
+}
 function update(){
  ensure();
- const panel=$('bbInvoiceBankEquivalentV1');
- if(!panel)return;
- const from=bankCurrency(),to=invoiceCurrency(),r=rate(),actual=number($('bbActualBankAmount')?.value);
- const value=equivalent(actual,from,to,r);
- const transfer=selection&&selection.transaction_id===String($('transactionId')?.value||'').trim()?selection:null;
- const available=transfer?number(transfer.remaining_amount):actual;
- const availableEquivalent=equivalent(available,from,to,r);
- const text=$('bbBankEquivalentText'),info=$('bbBankEquivalentAvailable'),applyBtn=$('bbBankEquivalentApply');
- const method=String($('paymentMethod')?.value||'');
+ const panel=$('bbInvoiceBankEquivalentV1');if(!panel)return;
+ const c=context(),{from,to,r,actual,tx,available,converted,method,total}=c;
  const enabled=['Cash + Bank','Bank','Partially Paid in Bank'].includes(method);
- panel.style.display=enabled?'':'none';
- if(!enabled)return;
- if(actual<=0){text.textContent='Enter the actual bank transfer amount.';info.textContent='';applyBtn.style.display='none';return;}
- if(!Number.isFinite(value)){text.textContent='Enter a valid exchange rate to calculate the equivalent.';info.textContent='';applyBtn.style.display='none';return;}
- text.textContent=money(actual,from)+' = '+money(value,to)+(from===to?' (same currency)':' (1 USD = '+r.toLocaleString()+' KHR)');
- info.textContent=transfer?'Registered remaining: '+money(available,from)+' ≈ '+money(availableEquivalent,to):'Applied invoice amount stays in '+to+'. The bank amount is not changed.';
- applyBtn.style.display=Number.isFinite(availableEquivalent)&&availableEquivalent>0?'':'none';
+ panel.style.display=enabled?'':'none';if(!enabled)return;
+ const label=$('bbBankEquivalentText'),info=$('bbBankEquivalentAvailable'),button=$('bbBankEquivalentApply');
+ const value=equivalent(actual,from,to,r);
+ if(actual<=0||!Number.isFinite(value)||!Number.isFinite(converted)){
+  label.textContent=actual<=0?'Enter the actual bank transfer amount.':'Enter a valid exchange rate.';
+  info.textContent='';button.style.display='none';return;
+ }
+ label.textContent=money(actual,from)+' = '+money(value,to)+(from===to?' (same currency)':' (1 USD = '+r.toLocaleString()+' KHR)');
+ if(method==='Bank'){
+  const ok=converted+(to==='USD'?0.005:0.5)>=total;
+  info.style.color=ok?'#198754':'#b42318';
+  info.textContent='Registered available: '+money(available,from)+' ≈ '+money(converted,to)+'. '+(ok?'✓ Covers full bank payment.':'Insufficient for full invoice. Select partial bank or a larger transfer.');
+  button.style.display='none';
+ }else{
+  info.style.color='#5b7088';
+  info.textContent=tx?'Registered remaining: '+money(available,from)+' ≈ '+money(converted,to):'Equivalent is calculated in invoice currency.';
+  button.style.display=converted>0?'':'none';
+  button.textContent=method==='Partially Paid in Bank'?'Apply to Amount Paid':'Apply equivalent to invoice';
+ }
 }
 function apply(){
- const from=bankCurrency(),to=invoiceCurrency(),r=rate();
- const tx=selection&&selection.transaction_id===String($('transactionId')?.value||'').trim()?selection:null;
- const original=number($('bbActualBankAmount')?.value);
- const available=tx?number(tx.remaining_amount):original;
- const converted=equivalent(available,from,to,r);
- if(!(converted>0))return;
- const method=String($('paymentMethod')?.value||'');
- const total=getTotal();
+ const {to,converted,method,total}=context();
+ if(method==='Bank'||!(converted>0))return update();
  const cash=method==='Cash + Bank'?number($('splitCashAmount')?.value):0;
- const due=Math.max(0,total-cash);
- const applied=safeFloor(Math.min(converted,due),to);
+ const applied=safeFloor(Math.min(converted,Math.max(0,total-cash)),to);
  const input=method==='Cash + Bank'?$('splitBankAmount'):$('amountPaid');
  if(!input||!applied)return;
  input.value=String(applied);
@@ -80,17 +87,23 @@ function apply(){
  input.dispatchEvent(new Event('change',{bubbles:true}));
  update();
 }
+function syncBank(){
+ if(String($('paymentMethod')?.value||'')==='Partially Paid in Bank')apply();
+ else update();
+}
 document.addEventListener('bb:registered-bank-selected',event=>{
  const tx=event.detail||null;
  selection=tx&&tx.transaction_id?tx:null;
  update();
- if(selection)apply();
+ if(selection)syncBank();
 });
 document.addEventListener('input',event=>{
- if(['bbActualBankAmount','splitCashAmount','splitBankAmount','amountPaid','exchangeRate','exchangeRateInput','transactionId'].includes(event.target?.id))update();
+ if(['bbActualBankAmount','exchangeRate','exchangeRateInput'].includes(event.target?.id))syncBank();
+ else if(['splitCashAmount','splitBankAmount','amountPaid','transactionId'].includes(event.target?.id))update();
 });
 document.addEventListener('change',event=>{
- if(['bbActualBankCurrency','currency','paymentMethod','exchangeRate','exchangeRateInput'].includes(event.target?.id))update();
+ if(['bbActualBankCurrency','currency','exchangeRate','exchangeRateInput'].includes(event.target?.id))syncBank();
+ else if(event.target?.id==='paymentMethod')update();
 });
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',update,{once:true});else update();
 setTimeout(update,350);

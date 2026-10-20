@@ -2,10 +2,8 @@
 (function(){
 'use strict';
 let customerId='',sequence=0,pending=false;
-const CACHE_PREFIX='bb-bank-balance-display-v1:';
-function cacheKey(id){return CACHE_PREFIX+String(id);}
-function readCache(id){try{return JSON.parse(localStorage.getItem(cacheKey(id))||'null');}catch(_){return null;}}
-function writeCache(id,rows){try{localStorage.setItem(cacheKey(id),JSON.stringify({rows,syncedAt:Date.now()}));}catch(_){}}
+const CACHE_PREFIX='bb-bank-balance-display-v2:';
+function readCache(id){try{return JSON.parse(localStorage.getItem(CACHE_PREFIX+String(id))||'null');}catch(_){return null;}}
 function renderRows(rows,syncedAt){
  rows=(Array.isArray(rows)?rows:[]).filter(x=>Number(x.remaining_amount)>0);
  const usd=rows.filter(x=>x.currency==='USD').reduce((s,x)=>s+Number(x.remaining_amount),0);
@@ -109,18 +107,25 @@ function show(value,hint,active){
  amount.style.borderColor='#c5d3e2';
  amount.style.setProperty('color','#174a91','important');
 }
-async function check(id){
- const token=++sequence;pending=true;
- show('Checking balance…','Reading verified remaining balance',false);
- try{
-  const list=await window.BBInvoiceBankRpc('bb_customer_bank_balance_list_v2',{p_customer_id:id});
-  if(token!==sequence)return;
-  writeCache(id,list);
-  renderRows(list,Date.now());
- }catch(err){
-  if(token===sequence)show('Balance unavailable','Please check connection or access',false);
- }finally{if(token===sequence)pending=false;}
+function check(id){
+ if(!id||pending)return;
+ pending=true;show('Syncing…','Downloading verified bank transactions',false);
+ document.dispatchEvent(new CustomEvent('bb:bank-sync-request',{detail:{customerId:id}}));
 }
+document.addEventListener('bb:bank-cache-updated',e=>{
+ if(String(e.detail?.customerId)!==customerId)return;
+ pending=false;
+ renderRows(e.detail.balances,e.detail.syncedAt);
+});
+document.addEventListener('bb:bank-cache-invalidated',e=>{
+ if(String(e.detail?.customerId)!==customerId)return;
+ show('Sync required','Balance changed after payment',false);
+});
+document.addEventListener('bb:bank-sync-status',e=>{
+ if(String(e.detail?.customerId)!==customerId||e.detail?.loading)return;
+ pending=false;
+ if(e.detail?.error)show('Sync failed','Please retry: '+e.detail.error,false);
+});
 function tick(){
  createPanel();
  if(typeof window.bbGetSelectedCustomerForBank!=='function')return;
@@ -130,19 +135,20 @@ function tick(){
  customerId=id;sequence++;pending=false;
  if(!id){show('Select customer','Select a customer to view saved balance',false);return;}
  const saved=readCache(id);
- if(saved)renderRows(saved.rows,saved.syncedAt);
+ if(saved)renderRows(saved.balances,saved.syncedAt);
  else show('Not synced','Press Sync Bank Balance to download',false);
 }
 function installSyncButton(){
  if(el('bbBankBalanceManualSync'))return;
  const panel=el('bbCustomerBalanceHeader');if(!panel)return;
- const button=document.createElement('button');button.id='bbBankBalanceManualSync';button.type='button';button.textContent='Sync Bank Balance';
+ const button=document.createElement('button');button.id='bbBankBalanceManualSync';button.type='button';button.textContent='Sync Bank';
  button.style.cssText='margin-top:3px;padding:3px 8px;border:1px solid #b5c7dc;border-radius:6px;background:#f4f8fc;color:#174a91;font:600 10px Arial,sans-serif;cursor:pointer';
  button.addEventListener('click',async()=>{
   tick();const id=customerId;
   if(!id||pending||typeof window.BBInvoiceBankRpc!=='function')return;
   button.disabled=true;
-  try{await check(id);}finally{button.disabled=false;}
+  check(id);
+  button.disabled=false;
  });
  panel.appendChild(button);
 }

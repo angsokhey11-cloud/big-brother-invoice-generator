@@ -853,73 +853,123 @@
     }
   };
 
-  window.loadCustomerPrices = async function loadCustomerPricesSupabase(customerName) {
+  /* Manual-only customer pricing. IndexedDB is scoped to the authenticated user
+     and Supabase project. No price RPC occurs on customer selection. */
+  const bbPriceDbName = 'BB_INVOICE_CUSTOMER_PRICE_CACHE_V1';
+  function bbPriceIdentity() {
+    const session = bbReadSession();
+    try {
+      const payload = JSON.parse(atob(String(session?.access_token || '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (!payload.sub) return '';
+      return BB_SUPABASE_URL + ':' + payload.sub;
+    } catch (_) { return ''; }
+  }
+  function bbPriceStore(mode, operation) {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) return reject(new Error('Device price storage is unavailable.'));
+      const request = indexedDB.open(bbPriceDbName, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('prices');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction('prices', mode);
+        const store = tx.objectStore('prices');
+        const task = operation(store);
+        task.onsuccess = () => resolve(task.result || null);
+        task.onerror = () => reject(task.error);
+        tx.oncomplete = () => db.close();
+        tx.onabort = () => { db.close(); reject(tx.error); };
+      };
+    });
+  }
+  function bbPriceKey(customerId) {
+    const identity = bbPriceIdentity();
+    if (!identity) throw new Error('Sign in before using customer prices.');
+    return identity + ':' + String(customerId);
+  }
+  function bbPriceButton() {
+    let button = document.getElementById('bbManualPriceSync');
+    if (button) return button;
+    const status = document.getElementById('customerStatus');
+    if (!status?.parentNode) return null;
+    button = document.createElement('button');
+    button.id = 'bbManualPriceSync';
+    button.type = 'button';
+    button.textContent = 'Sync Prices';
+    button.style.cssText = 'margin:6px 0 6px 8px;padding:7px 12px;border-radius:8px;border:1px solid #2b65a2;background:#edf5ff;color:#174678;font-weight:700;cursor:pointer;';
+    button.title = 'Download prices for the selected customer only';
+    status.insertAdjacentElement('afterend', button);
+    button.addEventListener('click', async () => {
+      const customer = bbFindSelectedCustomer();
+      if (!customer?.customerId) {
+        status.textContent = 'Select a customer before syncing prices.';
+        return;
+      }
+      const selectedId = customer.customerId;
+      button.disabled = true;
+      status.textContent = 'Syncing customer prices manually...';
+      try {
+        const data = await bbRpc('bb_sales_customer_prices', { p_customer_id: selectedId });
+        const prices = {};
+        const rows = data?.prices && typeof data.prices === 'object' ? data.prices : {};
+        Object.keys(rows).forEach(key => {
+          const row = rows[key] || {};
+          const code = String(row.productCode || key || '').trim();
+          const price = Number(row.priceUSD);
+          if (code && Number.isFinite(price)) prices[code] = price;
+        });
+        await bbPriceStore('readwrite', store => store.put({ prices, syncedAt: Date.now() }, bbPriceKey(selectedId)));
+        if (bbFindSelectedCustomer()?.customerId === selectedId) {
+          await window.loadCustomerPrices(customer.name);
+        }
+      } catch (error) {
+        bbShowDatabaseError(error);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    return button;
+  }
+  window.loadCustomerPrices = async function loadCustomerPricesLocal(customerName) {
     const name = String(customerName || '').trim();
     const status = document.getElementById('customerStatus');
     const token = ++customerPriceRequestToken;
-
     customerPrices = {};
     customerPriceCustomer = name;
     customerPriceLoaded = false;
-
+    bbPriceButton();
     if (!name) {
       bbSelectedCustomerId = '';
       applyCustomerPricesToProducts();
       return;
     }
-
     const customer = bbFindSelectedCustomer();
     if (!customer?.customerId) {
-      if (status) {
-        status.textContent = 'Select the customer from the list to load its prices.';
-        status.style.color = '#b7791f';
-      }
+      if (status) status.textContent = 'Select a customer from the list.';
       applyCustomerPricesToProducts();
       return;
     }
-
     bbSelectedCustomerId = customer.customerId;
-    if (status) {
-      status.textContent = 'Loading customer prices...';
-      status.style.color = '#718096';
-    }
-
     try {
-      const data = await bbRpc('bb_sales_customer_prices', {
-        p_customer_id: customer.customerId
-      });
-
+      const saved = await bbPriceStore('readonly', store => store.get(bbPriceKey(customer.customerId)));
       if (token !== customerPriceRequestToken) return;
-
-      const prices = data?.prices && typeof data.prices === 'object'
-        ? data.prices
-        : {};
-
-      Object.keys(prices).forEach(codeKey => {
-        const row = prices[codeKey] || {};
-        const code = String(row.productCode || codeKey || '').trim();
-        const price = Number(row.priceUSD);
-        if (code && Number.isFinite(price)) customerPrices[code] = price;
-      });
-
-      customerPriceLoaded = true;
-
+      customerPrices = saved?.prices || {};
+      customerPriceLoaded = !!saved;
       if (status) {
         const count = Object.keys(customerPrices).length;
-        const mismatch = bbCustomerLocationMismatch(customer);
-        status.textContent = (
-          count
-            ? 'Customer selected • ' + count + ' special price' + (count === 1 ? '' : 's') + ' loaded'
-            : 'Customer selected • using standard product prices'
-        ) + mismatch;
-        status.style.color = mismatch ? '#b7791f' : '#2f855a';
+        status.textContent = saved
+          ? 'Customer selected • ' + count + ' cached special prices • Last sync: ' + new Date(saved.syncedAt).toLocaleString()
+          : 'Customer prices NOT synced on this device • Standard prices only';
+        status.style.color = saved ? '#2f855a' : '#b7791f';
       }
-
-      applyCustomerPricesToProducts();
     } catch (error) {
       if (token !== customerPriceRequestToken) return;
-      bbShowDatabaseError(error);
+      if (status) {
+        status.textContent = 'Price storage unavailable • Standard prices only. ' + (error.message || '');
+        status.style.color = '#b42318';
+      }
     }
+    applyCustomerPricesToProducts();
   };
 
   /* -----------------------------

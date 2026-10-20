@@ -306,12 +306,6 @@
 
 
 
-      /* Fast next-invoice handoff: do not focus the old customer during save. */
-      html = html.replace(
-        '    clearAllAfterSuccessfulSave();\n\n  } catch (error) {',
-        '    clearAllAfterSuccessfulSave();\n    const nextCustomer = document.getElementById("customerName");\n    if (nextCustomer) {\n      nextCustomer.value = "";\n      document.getElementById("customerOptions")?.classList.remove("open");\n      setTimeout(() => {\n        if (document.activeElement && document.activeElement !== document.body && document.activeElement !== nextCustomer) return;\n        if (nextCustomer.value.trim()) return;\n        try { nextCustomer.focus({preventScroll:true}); } catch (_) { nextCustomer.focus(); }\n        document.getElementById("customerOptions")?.classList.remove("open");\n      }, 3000);\n    }\n\n  } catch (error) {'
-      );
-
       /* =======================================================
          SUPABASE OWNS STARTUP
          ======================================================= */

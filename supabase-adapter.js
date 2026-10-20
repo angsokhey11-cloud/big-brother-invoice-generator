@@ -918,7 +918,7 @@
           const price = Number(row.priceUSD);
           if (code && Number.isFinite(price)) prices[code] = price;
         });
-        await bbPriceStore('readwrite', store => store.put({ prices, syncedAt: Date.now() }, bbPriceKey(selectedId)));
+        await bbPriceStore('readwrite', store => store.put({ prices, rows, syncedAt: Date.now() }, bbPriceKey(selectedId)));
         if (bbFindSelectedCustomer()?.customerId === selectedId) {
           await window.loadCustomerPrices(customer.name);
         }
@@ -954,6 +954,20 @@
       const saved = await bbPriceStore('readonly', store => store.get(bbPriceKey(customer.customerId)));
       if (token !== customerPriceRequestToken) return;
       customerPrices = saved?.prices || {};
+      window.BB_INVOICE_DUAL_PRICES = {};
+      Object.entries(saved?.rows || {}).forEach(([key, row]) => {
+        const code = String(row?.productCode || key || '').trim();
+        if (!code) return;
+        window.BB_INVOICE_DUAL_PRICES[code] = {
+          priceUSD: Number(row.priceUSD) || 0,
+          priceKHR: Number(row.priceKHR) || 0,
+          defaultPriceUSD: Number(row.defaultPriceUSD) || 0,
+          defaultPriceKHR: Number(row.defaultPriceKHR) || 0,
+          isCustomPriceUSD: row.isCustomPriceUSD === true,
+          isCustomPriceKHR: row.isCustomPriceKHR === true,
+          isCustomPrice: row.isCustomPrice === true
+        };
+      });
       customerPriceLoaded = !!saved;
       if (status) {
         const count = Object.keys(customerPrices).length;

@@ -3670,7 +3670,7 @@ textarea:focus{
      </div>
      
     </div>
-    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.21" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.21</span>
+    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.22" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.22</span>
    </div>
 
    <div class="bb-desktop-workspace">
@@ -9150,7 +9150,25 @@ async function completeInvoice(event) {
       batchLocalResult
     );
 
+    // Clear first, then focus only after the next-invoice form is ready.
     clearAllAfterSuccessfulSave();
+    const nextCustomer = document.getElementById("customerName");
+    const suggestions = document.getElementById("customerOptions");
+    if (suggestions) {
+      suggestions.classList.remove("open");
+      suggestions.innerHTML = "";
+    }
+    if (nextCustomer) {
+      nextCustomer.value = "";
+      clearTimeout(window.bbNextInvoiceCustomerFocusTimer);
+      window.bbNextInvoiceCustomerFocusTimer = setTimeout(() => {
+        if (window.bbInvoiceSaving || nextCustomer.value.trim()) return;
+        if (document.activeElement !== document.body && document.activeElement !== nextCustomer) return;
+        try { nextCustomer.focus({ preventScroll: true }); }
+        catch (_) { nextCustomer.focus(); }
+        suggestions?.classList.remove("open");
+      }, 3000);
+    }
 
   } catch (error) {
     console.error("Fast invoice complete failed:", error);

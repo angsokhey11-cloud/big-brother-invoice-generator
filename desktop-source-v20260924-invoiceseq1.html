@@ -3670,7 +3670,7 @@ textarea:focus{
      </div>
      
     </div>
-    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.23" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.23</span>
+    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.24" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.24</span>
    </div>
 
    <div class="bb-desktop-workspace">
@@ -9416,6 +9416,13 @@ function clearAllAfterSuccessfulSave() {
   const nextInvoiceNo = incrementInvoiceNumber(document.getElementById("invoiceNumber")?.value || "");
   if (nextInvoiceNo) setInvoiceNumber(nextInvoiceNo);
   else loadNextInvoiceNumber();
+  // Close and erase the previous customer dropdown as part of the save reset.
+  const customerOptions = document.getElementById("customerOptions");
+  if (customerOptions) {
+    customerOptions.style.display = "none";
+    customerOptions.classList.remove("open");
+    customerOptions.replaceChildren();
+  }
   document.getElementById("customerName").value = "";
   document.getElementById("customerPhone").value = "";
   document.getElementById("customerAddress").value = "";

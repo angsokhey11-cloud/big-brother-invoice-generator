@@ -134,9 +134,9 @@ const bankCachePrefix='bb-bank-bulk-v1:';
 function bankIdentity(){
  const token=window.BBInvoiceBankAuthToken?.()||'';
  if(token){try{const claims=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));return claims.sub||'unknown';}catch(_){}}
- return 'current-user';
+ return '';
 }
-function bulkCacheKey(){return bankCachePrefix+bankIdentity();}
+function bulkCacheKey(){const id=bankIdentity();if(!id)throw Error('Please sign in before syncing bank balances');return bankCachePrefix+id;}
 function bulkRead(){try{return JSON.parse(localStorage.getItem(bulkCacheKey())||'null');}catch(_){return null;}}
 function bulkWrite(snapshot){localStorage.setItem(bulkCacheKey(),JSON.stringify(snapshot));}
 function customerCachedRows(id){return (bulkRead()?.rows||[]).filter(x=>clean(x.customer_id)===clean(id)&&Number(x.remaining_amount)>0);}

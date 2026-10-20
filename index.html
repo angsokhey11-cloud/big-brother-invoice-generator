@@ -220,13 +220,7 @@
           );
 
 
-      adapterJs =
-        window
-          .BBInvoiceDualCurrencyPatch
-          .patchAdapter(
-            adapterJs
-          );
-
+      // Manual pricing adapter already maintains USD/KHR cache; no legacy adapter rewrite.
 
       /* =======================================================
          DESKTOP-ONLY FAST ENTRY PATCHES

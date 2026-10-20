@@ -626,6 +626,14 @@
     if (!list) return;
 
     const q = String(query || '').trim().toLowerCase();
+    // Never show old/local customer suggestions when the next invoice field is blank.
+    if (!q) {
+      list.innerHTML = '';
+      list.style.display = 'none';
+      bbCustomerSearchToken++;
+      bbGlobalCustomers = [];
+      return;
+    }
 
     const localMatches = bbLocationCustomers
       .filter(customer => bbCustomerMatchesQuery(customer, q));

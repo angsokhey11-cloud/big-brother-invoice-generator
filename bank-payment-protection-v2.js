@@ -130,32 +130,46 @@ function renderAvailablePayments(){
  });
  // Never auto-select even when exactly one registered payment is available.
 }
-const bankCacheKey=id=>'bb-bank-balance-display-v2:'+clean(id);
-function bankCacheRead(id){try{return JSON.parse(localStorage.getItem(bankCacheKey(id))||'null');}catch(_){return null;}}
-function bankCacheWrite(id,transactions,balances){try{localStorage.setItem(bankCacheKey(id),JSON.stringify({transactions,balances,syncedAt:Date.now()}));}catch(_){}}
+const bankCachePrefix='bb-bank-bulk-v1:';
+function bankIdentity(){
+ const token=window.BBInvoiceBankAuthToken?.()||'';
+ if(token){try{const claims=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));return claims.sub||'unknown';}catch(_){}}
+ return 'current-user';
+}
+function bulkCacheKey(){return bankCachePrefix+bankIdentity();}
+function bulkRead(){try{return JSON.parse(localStorage.getItem(bulkCacheKey())||'null');}catch(_){return null;}}
+function bulkWrite(snapshot){localStorage.setItem(bulkCacheKey(),JSON.stringify(snapshot));}
+function customerCachedRows(id){return (bulkRead()?.rows||[]).filter(x=>clean(x.customer_id)===clean(id)&&Number(x.remaining_amount)>0);}
 function loadCachedPayments(id){
- const saved=bankCacheRead(id);
- availablePayments=(Array.isArray(saved?.transactions)?saved.transactions:[]).filter(x=>Number(x.remaining_amount)>0);
+ const rows=customerCachedRows(id);
+ availablePayments=rows;
  renderAvailablePayments();
- return saved;
+ return {transactions:rows};
 }
-async function loadAvailablePayments(){
+function invalidateUsedBankTransaction(customerId,transactionId){
+ const saved=bulkRead();if(!saved)return;
+ saved.rows=(saved.rows||[]).filter(x=>!(clean(x.customer_id)===clean(customerId)&&clean(x.transaction_id)===clean(transactionId)));
+ bulkWrite(saved);
+ document.dispatchEvent(new CustomEvent('bb:bank-cache-invalidated',{detail:{customerId}}));
+}
+document.addEventListener('bb:bank-sync-request',async()=>{
  const customerId=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
- if(!customerId)return false;
- const seq=++availableLoadSeq;
- const [rows,balances]=await Promise.all([
-  window.BBInvoiceBankRpc('bb_bank_customer_available_transactions',{p_customer_id:customerId}),
-  window.BBInvoiceBankRpc('bb_customer_bank_balance_list',{p_customer_id:customerId})
- ]);
- if(seq!==availableLoadSeq||customerId!==clean(window.bbGetSelectedCustomerForBank?.()?.customerId))return false;
- const byId=new Map((Array.isArray(balances)?balances:[]).map(x=>[clean(x.transaction_id),x]));
- const transactions=(Array.isArray(rows)?rows:[]).map(x=>({...x,...(byId.get(clean(x.transaction_id))||{})})).filter(x=>Number(x.remaining_amount)>0);
- bankCacheWrite(customerId,transactions,balances);
- availableCustomerId=customerId;availablePayments=transactions;
- renderAvailablePayments();
- document.dispatchEvent(new CustomEvent('bb:bank-cache-updated',{detail:{customerId,balances,transactions,syncedAt:Date.now()}}));
- return true;
-}
+ document.dispatchEvent(new CustomEvent('bb:bank-sync-status',{detail:{customerId,loading:true}}));
+ try{
+  const rows=await window.BBInvoiceBankRpc('bb_invoice_bank_bulk_sync',{});
+  if(!Array.isArray(rows))throw Error('Unexpected bank sync response');
+  const syncedAt=Date.now();
+  // Replace the complete snapshot, removing balances spent on other devices.
+  bulkWrite({rows,syncedAt});
+  const current=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
+  availableCustomerId=current;
+  loadCachedPayments(current);
+  document.dispatchEvent(new CustomEvent('bb:bank-cache-updated',{detail:{customerId:current,balances:customerCachedRows(current),transactions:availablePayments,syncedAt,count:rows.length}}));
+  document.dispatchEvent(new CustomEvent('bb:bank-sync-status',{detail:{customerId:current,loading:false,success:true,count:rows.length}}));
+ }catch(error){
+  document.dispatchEvent(new CustomEvent('bb:bank-sync-status',{detail:{customerId,loading:false,error:String(error?.message||error)}}));
+ }
+});
 function scheduleAvailablePayments(){
  clearTimeout(availableTimer);
  const id=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
@@ -256,8 +270,7 @@ function installSave(){
   const result=await original.apply(this,arguments);
   if(usedRegisteredId&&result!==false){
    const id=usedCustomerId;
-   try{localStorage.removeItem(bankCacheKey(id));}catch(_){}
-   document.dispatchEvent(new CustomEvent('bb:bank-cache-invalidated',{detail:{customerId:id}}));
+   invalidateUsedBankTransaction(id,usedRegisteredId);
   }
   return result;
  };

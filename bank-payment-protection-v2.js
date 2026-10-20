@@ -130,72 +130,48 @@ function renderAvailablePayments(){
  });
  // Never auto-select even when exactly one registered payment is available.
 }
+const bankCacheKey=id=>'bb-bank-balance-display-v2:'+clean(id);
+function bankCacheRead(id){try{return JSON.parse(localStorage.getItem(bankCacheKey(id))||'null');}catch(_){return null;}}
+function bankCacheWrite(id,transactions,balances){try{localStorage.setItem(bankCacheKey(id),JSON.stringify({transactions,balances,syncedAt:Date.now()}));}catch(_){}}
+function loadCachedPayments(id){
+ const saved=bankCacheRead(id);
+ availablePayments=(Array.isArray(saved?.transactions)?saved.transactions:[]).filter(x=>Number(x.remaining_amount)>0);
+ renderAvailablePayments();
+ return saved;
+}
 async function loadAvailablePayments(){
- const customer=window.bbGetSelectedCustomerForBank?.();
- const customerId=clean(customer?.customerId);
+ const customerId=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
+ if(!customerId)return false;
  const seq=++availableLoadSeq;
- if(availableCustomerId&&availableCustomerId!==customerId&&userSelectedRegisteredId){
-   if(clean($('transactionId')?.value)===userSelectedRegisteredId)$('transactionId').value='';
-   if($('bbActualBankAmount'))$('bbActualBankAmount').value='';
-   userSelectedRegisteredId='';
- }
- if(!customerId){
-   availableCustomerId='';availablePayments=[];renderAvailablePayments();return;
- }
- availableCustomerId=customerId;
- const box=$('bbRegisteredPayments');
- if(box)box.innerHTML='<div style="font-size:12px;color:#6a7d91">Checking verified bank payments…</div>';
- try{
-   const [rows,balances]=await Promise.all([
-     window.BBInvoiceBankRpc('bb_bank_customer_available_transactions',{p_customer_id:customerId}),
-     window.BBInvoiceBankRpc('bb_customer_bank_balance_list',{p_customer_id:customerId})
-   ]);
-   const byId=new Map((Array.isArray(balances)?balances:[]).map(x=>[String(x.transaction_id),x]));
-   if(seq!==availableLoadSeq)return;
-   availablePayments=(Array.isArray(rows)?rows:[]).map(x=>({...x,...(byId.get(String(x.transaction_id))||{})})).filter(x=>Number(x.remaining_amount)>0);
-   renderAvailablePayments();
- }catch(error){
-   if(seq!==availableLoadSeq)return;
-   availablePayments=[];
-   if(box)box.innerHTML='<div style="font-size:12px;color:#b42318">Could not load verified payments. '+clean(error?.message||error)+'</div>';
- }
+ const [rows,balances]=await Promise.all([
+  window.BBInvoiceBankRpc('bb_bank_customer_available_transactions',{p_customer_id:customerId}),
+  window.BBInvoiceBankRpc('bb_customer_bank_balance_list',{p_customer_id:customerId})
+ ]);
+ if(seq!==availableLoadSeq||customerId!==clean(window.bbGetSelectedCustomerForBank?.()?.customerId))return false;
+ const byId=new Map((Array.isArray(balances)?balances:[]).map(x=>[clean(x.transaction_id),x]));
+ const transactions=(Array.isArray(rows)?rows:[]).map(x=>({...x,...(byId.get(clean(x.transaction_id))||{})})).filter(x=>Number(x.remaining_amount)>0);
+ bankCacheWrite(customerId,transactions,balances);
+ availableCustomerId=customerId;availablePayments=transactions;
+ renderAvailablePayments();
+ document.dispatchEvent(new CustomEvent('bb:bank-cache-updated',{detail:{customerId,balances,transactions,syncedAt:Date.now()}}));
+ return true;
 }
 function scheduleAvailablePayments(){
- // Never contact Supabase automatically on customer selection or payment-method change.
  clearTimeout(availableTimer);
- const selected=window.bbGetSelectedCustomerForBank?.();
- const id=clean(selected?.customerId);
+ const id=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
  if(availableCustomerId!==id){
-  availableCustomerId=id;availablePayments=[];
-  if(userSelectedRegisteredId){
-   userSelectedRegisteredId='';
-   if($('transactionId'))$('transactionId').value='';
-   if($('bbActualBankAmount'))$('bbActualBankAmount').value='';
-  }
+  availableCustomerId=id;availableLoadSeq++;
+  if(userSelectedRegisteredId){userSelectedRegisteredId='';if($('transactionId'))$('transactionId').value='';if($('bbActualBankAmount'))$('bbActualBankAmount').value='';}
  }
- renderAvailablePayments();
- const note=$('bbBankSyncStatus');
- if(note)note.textContent=id?'Press Sync Bank to check current available transactions.':'Select a customer before syncing.';
+ if(id)loadCachedPayments(id);else{availablePayments=[];renderAvailablePayments();}
 }
-function installBankSync(){
- if($('bbManualBankSync'))return;
- const box=$('bbRegisteredPayments');if(!box)return;
- const button=document.createElement('button');button.id='bbManualBankSync';button.type='button';button.textContent='Sync Bank';
- button.style.cssText='padding:6px 12px;margin:0 0 8px;border:1px solid #8baed4;border-radius:7px;background:#fff;color:#17457a;font-weight:700;cursor:pointer';
- const status=document.createElement('div');status.id='bbBankSyncStatus';status.style.cssText='font-size:11px;color:#60768c;margin-bottom:5px';
- box.insertAdjacentElement('beforebegin',status);
- status.insertAdjacentElement('beforebegin',button);
- button.addEventListener('click',async()=>{
-  if(!clean(window.bbGetSelectedCustomerForBank?.()?.customerId)){
-   status.textContent='Select a customer first.';return;
-  }
-  button.disabled=true;status.textContent='Syncing verified bank transactions…';
-  try{await loadAvailablePayments();status.textContent='Bank transactions synced for selected customer.';}
-  catch(e){status.textContent='Sync failed. Please try again.';}
-  finally{button.disabled=false;}
- });
-}
-
+document.addEventListener('bb:bank-sync-request',async()=>{
+ const id=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
+ if(!id)return;
+ document.dispatchEvent(new CustomEvent('bb:bank-sync-status',{detail:{customerId:id,loading:true}}));
+ try{await loadAvailablePayments();document.dispatchEvent(new CustomEvent('bb:bank-sync-status',{detail:{customerId:id,loading:false,success:true}}));}
+ catch(error){document.dispatchEvent(new CustomEvent('bb:bank-sync-status',{detail:{customerId:id,loading:false,error:String(error?.message||error)}}));}
+});
 function inputUI(){
  const anchor=$('transactionIdRow')||$('paymentBankRow');
  if(!anchor||$('bbBankV2Fields'))return;
@@ -208,7 +184,6 @@ function inputUI(){
  '<div id="bbRegisteredPayments" style="margin-top:11px;padding:10px;border:1px solid #d7e3ef;border-radius:9px;background:#fff"><div style="font-size:12px;color:#6a7d91">Available registered transfers (optional).</div></div>'+
  '<p style="margin:10px 0 0;font-size:12px;color:#5f748c">Registered balances are optional. Click Use only when the payment belongs to this sale. Staff must ask Admin to register a different bank transfer before using it; only Admin can type a new Transaction ID. Unused registered balances remain untouched.</p>';
  anchor.insertAdjacentElement('afterend',fields);
- installBankSync();
  function visibility(){
    const show=['Bank','Partially Paid in Bank','Cash + Bank'].includes(method());
    fields.style.display=show?'':'none';
@@ -276,7 +251,13 @@ function installSave(){
   if(['Bank','Partially Paid in Bank','Cash + Bank'].includes(clean(invoice?.paymentMethod))){
    await validateBank(invoice);
   }
-  return original.apply(this,arguments);
+  const result=await original.apply(this,arguments);
+  if(userSelectedRegisteredId&&result!==false){
+   const id=availableCustomerId;
+   try{localStorage.removeItem(bankCacheKey(id));}catch(_){}
+   document.dispatchEvent(new CustomEvent('bb:bank-cache-invalidated',{detail:{customerId:id}}));
+  }
+  return result;
  };
  window.postSalesInvoiceBundle.__bbBankV2=true;
 }
@@ -285,7 +266,6 @@ customer?.addEventListener('input',()=>{
  if(lastCustomer!==customer.value){
    lastCustomer=customer.value;
    warned=null;
-   availablePayments=[];
    scheduleAvailablePayments();
  }
 });

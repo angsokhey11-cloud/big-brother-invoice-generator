@@ -9,7 +9,9 @@ function renderRows(rows,syncedAt){
  const usd=rows.filter(x=>x.currency==='USD').reduce((s,x)=>s+Number(x.remaining_amount),0);
  const khr=rows.filter(x=>x.currency==='KHR').reduce((s,x)=>s+Number(x.remaining_amount),0);
  const stamp=syncedAt?' · Synced '+new Date(syncedAt).toLocaleString():'';
- show(rows.length?'
+ show(rows.length?'$'+fmt(usd,2)+' | '+fmt(khr,0)+'៛':'No available balance',
+  rows.length?rows.length+' cached transaction(s)'+stamp:'No unused registered bank transfers'+stamp,rows.length>0);
+}
 const el=id=>document.getElementById(id);
 const fmt=(n,d)=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 function installLayout(){

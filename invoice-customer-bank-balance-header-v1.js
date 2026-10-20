@@ -2,8 +2,7 @@
 (function(){
 'use strict';
 let customerId='',sequence=0,pending=false;
-const CACHE_PREFIX='bb-bank-balance-display-v2:';
-function readCache(id){try{return JSON.parse(localStorage.getItem(CACHE_PREFIX+String(id))||'null');}catch(_){return null;}}
+function readCache(id){try{const key=Object.keys(localStorage).find(x=>x.startsWith('bb-bank-bulk-v1:'));const snapshot=key?JSON.parse(localStorage.getItem(key)):null;return snapshot?{balances:(snapshot.rows||[]).filter(x=>String(x.customer_id)===String(id)),syncedAt:snapshot.syncedAt}:null;}catch(_){return null;}}
 function renderRows(rows,syncedAt){
  rows=(Array.isArray(rows)?rows:[]).filter(x=>Number(x.remaining_amount)>0);
  const usd=rows.filter(x=>x.currency==='USD').reduce((s,x)=>s+Number(x.remaining_amount),0);
@@ -110,21 +109,22 @@ function show(value,hint,active){
  amount.style.setProperty('color','#174a91','important');
 }
 function check(id){
- if(!id||pending)return;
+ if(pending)return;
  pending=true;show('Syncing…','Downloading verified bank transactions',false);
  document.dispatchEvent(new CustomEvent('bb:bank-sync-request',{detail:{customerId:id}}));
 }
 document.addEventListener('bb:bank-cache-updated',e=>{
- if(String(e.detail?.customerId)!==customerId)return;
  pending=false;
- renderRows(e.detail.balances,e.detail.syncedAt);
+ const saved=customerId?readCache(customerId):null;
+ if(saved)renderRows(saved.balances,saved.syncedAt);
+ else show('Select customer','Bank balances synced for all customers',false);
 });
 document.addEventListener('bb:bank-cache-invalidated',e=>{
  if(String(e.detail?.customerId)!==customerId)return;
  show('Sync required','Balance changed after payment',false);
 });
 document.addEventListener('bb:bank-sync-status',e=>{
- if(String(e.detail?.customerId)!==customerId||e.detail?.loading)return;
+ if(e.detail?.loading)return;
  pending=false;
  if(e.detail?.error)show('Sync failed','Please retry: '+e.detail.error,false);
 });
@@ -138,7 +138,7 @@ function tick(){
  if(!id){show('Select customer','Select a customer to view saved balance',false);return;}
  const saved=readCache(id);
  if(saved)renderRows(saved.balances,saved.syncedAt);
- else show('Not synced','Press Sync Bank Balance to download',false);
+ else show('Not synced','Press Sync Bank to download all customer balances',false);
 }
 function installSyncButton(){
  if(el('bbBankBalanceManualSync'))return;
@@ -147,7 +147,7 @@ function installSyncButton(){
  button.style.cssText='margin-top:3px;padding:3px 8px;border:1px solid #b5c7dc;border-radius:6px;background:#f4f8fc;color:#174a91;font:600 10px Arial,sans-serif;cursor:pointer';
  button.addEventListener('click',async()=>{
   tick();const id=customerId;
-  if(!id||pending||typeof window.BBInvoiceBankRpc!=='function')return;
+  if(pending||typeof window.BBInvoiceBankRpc!=='function')return;
   button.disabled=true;
   check(id);
   button.disabled=false;

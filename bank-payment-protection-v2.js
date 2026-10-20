@@ -251,9 +251,11 @@ function installSave(){
   if(['Bank','Partially Paid in Bank','Cash + Bank'].includes(clean(invoice?.paymentMethod))){
    await validateBank(invoice);
   }
+  const usedRegisteredId=userSelectedRegisteredId;
+  const usedCustomerId=availableCustomerId;
   const result=await original.apply(this,arguments);
-  if(userSelectedRegisteredId&&result!==false){
-   const id=availableCustomerId;
+  if(usedRegisteredId&&result!==false){
+   const id=usedCustomerId;
    try{localStorage.removeItem(bankCacheKey(id));}catch(_){}
    document.dispatchEvent(new CustomEvent('bb:bank-cache-invalidated',{detail:{customerId:id}}));
   }

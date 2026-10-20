@@ -3670,7 +3670,7 @@ textarea:focus{
      </div>
      
     </div>
-    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.22" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.22</span>
+    <span id="bbInvoiceVersionBadge" title="BIG BROTHER Invoice Generator V3.5.23" style="font:700 11px Arial,sans-serif;color:#17457a;background:#eaf2fd;border-radius:6px;padding:4px 6px;white-space:nowrap">V3.5.23</span>
    </div>
 
    <div class="bb-desktop-workspace">
@@ -5637,6 +5637,13 @@ function showCustomerOptions() {
   if (!input || !list || !customers.length) return;
 
   const query = input.value.trim().toLowerCase();
+  // Empty customer search must never display the previous/all customers on focus.
+  if (!query) {
+    list.innerHTML = "";
+    list.style.display = "none";
+    list.classList.remove("open");
+    return;
+  }
 
   const matches = customers.filter(customer =>
     customer.name.toLowerCase().includes(query) ||
@@ -9156,6 +9163,7 @@ async function completeInvoice(event) {
     const suggestions = document.getElementById("customerOptions");
     if (suggestions) {
       suggestions.classList.remove("open");
+      suggestions.style.display = "none";
       suggestions.innerHTML = "";
     }
     if (nextCustomer) {
@@ -9167,6 +9175,7 @@ async function completeInvoice(event) {
         try { nextCustomer.focus({ preventScroll: true }); }
         catch (_) { nextCustomer.focus(); }
         suggestions?.classList.remove("open");
+        if (suggestions) suggestions.style.display = "none";
       }, 3000);
     }
 

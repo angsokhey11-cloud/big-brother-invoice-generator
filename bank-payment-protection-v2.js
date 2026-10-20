@@ -161,9 +161,41 @@ async function loadAvailablePayments(){
  }
 }
 function scheduleAvailablePayments(){
+ // Never contact Supabase automatically on customer selection or payment-method change.
  clearTimeout(availableTimer);
- availableTimer=setTimeout(loadAvailablePayments,180);
+ const selected=window.bbGetSelectedCustomerForBank?.();
+ const id=clean(selected?.customerId);
+ if(availableCustomerId!==id){
+  availableCustomerId=id;availablePayments=[];
+  if(userSelectedRegisteredId){
+   userSelectedRegisteredId='';
+   if($('transactionId'))$('transactionId').value='';
+   if($('bbActualBankAmount'))$('bbActualBankAmount').value='';
+  }
+ }
+ renderAvailablePayments();
+ const note=$('bbBankSyncStatus');
+ if(note)note.textContent=id?'Press Sync Bank to check current available transactions.':'Select a customer before syncing.';
 }
+function installBankSync(){
+ if($('bbManualBankSync'))return;
+ const box=$('bbRegisteredPayments');if(!box)return;
+ const button=document.createElement('button');button.id='bbManualBankSync';button.type='button';button.textContent='Sync Bank';
+ button.style.cssText='padding:6px 12px;margin:0 0 8px;border:1px solid #8baed4;border-radius:7px;background:#fff;color:#17457a;font-weight:700;cursor:pointer';
+ const status=document.createElement('div');status.id='bbBankSyncStatus';status.style.cssText='font-size:11px;color:#60768c;margin-bottom:5px';
+ box.insertAdjacentElement('beforebegin',status);
+ status.insertAdjacentElement('beforebegin',button);
+ button.addEventListener('click',async()=>{
+  if(!clean(window.bbGetSelectedCustomerForBank?.()?.customerId)){
+   status.textContent='Select a customer first.';return;
+  }
+  button.disabled=true;status.textContent='Syncing verified bank transactions…';
+  try{await loadAvailablePayments();status.textContent='Bank transactions synced for selected customer.';}
+  catch(e){status.textContent='Sync failed. Please try again.';}
+  finally{button.disabled=false;}
+ });
+}
+
 function inputUI(){
  const anchor=$('transactionIdRow')||$('paymentBankRow');
  if(!anchor||$('bbBankV2Fields'))return;
@@ -176,6 +208,7 @@ function inputUI(){
  '<div id="bbRegisteredPayments" style="margin-top:11px;padding:10px;border:1px solid #d7e3ef;border-radius:9px;background:#fff"><div style="font-size:12px;color:#6a7d91">Available registered transfers (optional).</div></div>'+
  '<p style="margin:10px 0 0;font-size:12px;color:#5f748c">Registered balances are optional. Click Use only when the payment belongs to this sale. Staff must ask Admin to register a different bank transfer before using it; only Admin can type a new Transaction ID. Unused registered balances remain untouched.</p>';
  anchor.insertAdjacentElement('afterend',fields);
+ installBankSync();
  function visibility(){
    const show=['Bank','Partially Paid in Bank','Cash + Bank'].includes(method());
    fields.style.display=show?'':'none';

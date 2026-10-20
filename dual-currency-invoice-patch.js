@@ -208,27 +208,11 @@ function getPriceForProduct(product) {
       '    customerPrices = {};\n    window.BB_INVOICE_DUAL_PRICES = {};\n    customerPriceCustomer = name;'
     );
 
-    const mapping=`        const price = Number(row.priceUSD);
-        if (code && Number.isFinite(price)) customerPrices[code] = price;`;
-    if(!out.includes(mapping))throw new Error('Invoice adapter customer-price mapping marker was not found.');
-    out=out.replace(
-      mapping,
-      `        const price = Number(row.priceUSD);
-        const priceKHR = Number(row.priceKHR);
-        if (code && Number.isFinite(price)) customerPrices[code] = price;
-        if (code) {
-          window.BB_INVOICE_DUAL_PRICES = window.BB_INVOICE_DUAL_PRICES || {};
-          window.BB_INVOICE_DUAL_PRICES[code] = {
-            priceUSD:Number.isFinite(price) ? price : 0,
-            priceKHR:Number.isFinite(priceKHR) ? priceKHR : 0,
-            defaultPriceUSD:Number(row.defaultPriceUSD) || 0,
-            defaultPriceKHR:Number(row.defaultPriceKHR) || 0,
-            isCustomPriceUSD:row.isCustomPriceUSD === true,
-            isCustomPriceKHR:row.isCustomPriceKHR === true,
-            isCustomPrice:row.isCustomPrice === true
-          };
-        }`
-    );
+    /* Manual price cache owns the USD/KHR mapping. The previous strict
+       source-text replacement applied only to the legacy RPC adapter. */
+    if (!out.includes('BB_INVOICE_DUAL_PRICES')) {
+      throw new Error('Invoice adapter dual-currency price cache marker was not found.');
+    }
 
     const countMarker=`        const count = Object.keys(customerPrices).length;
         status.textContent = count

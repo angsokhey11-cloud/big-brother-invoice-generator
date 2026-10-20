@@ -106,7 +106,7 @@
        * EXACT DESKTOP CORE PATCHING.
        */
       html=window.BBInvoiceDualCurrencyPatch.patchLegacy(html);
-      adapterJs=window.BBInvoiceDualCurrencyPatch.patchAdapter(adapterJs);
+      // Manual pricing adapter maintains USD/KHR cache without legacy rewriting.
 
       /*
        * Supabase owns startup, exactly like Desktop.

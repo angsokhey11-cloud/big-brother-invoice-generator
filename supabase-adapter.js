@@ -1452,4 +1452,5 @@
     };
   };
   window.BBInvoiceBankRpc = bbRpc;
+  window.BBInvoiceBankAuthToken = () => String(bbReadSession()?.access_token || '');
 })();

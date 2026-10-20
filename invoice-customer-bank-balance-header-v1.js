@@ -2,7 +2,15 @@
 (function(){
 'use strict';
 let customerId='',sequence=0,pending=false;
-function readCache(id){try{const key=Object.keys(localStorage).find(x=>x.startsWith('bb-bank-bulk-v1:'));const snapshot=key?JSON.parse(localStorage.getItem(key)):null;return snapshot?{balances:(snapshot.rows||[]).filter(x=>String(x.customer_id)===String(id)),syncedAt:snapshot.syncedAt}:null;}catch(_){return null;}}
+function readCache(id){
+ try{
+  const token=window.BBInvoiceBankAuthToken?.();if(!token)return null;
+  const sub=JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub;
+  if(!sub)return null;
+  const snapshot=JSON.parse(localStorage.getItem('bb-bank-bulk-v1:'+sub)||'null');
+  return snapshot?{balances:(snapshot.rows||[]).filter(x=>String(x.customer_id)===String(id)),syncedAt:snapshot.syncedAt}:null;
+ }catch(_){return null;}
+}
 function renderRows(rows,syncedAt){
  rows=(Array.isArray(rows)?rows:[]).filter(x=>Number(x.remaining_amount)>0);
  const usd=rows.filter(x=>x.currency==='USD').reduce((s,x)=>s+Number(x.remaining_amount),0);

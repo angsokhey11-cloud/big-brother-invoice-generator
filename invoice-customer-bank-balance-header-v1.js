@@ -62,7 +62,8 @@ function watchHeaderSpace(){
 function createPanel(){
  if(el('bbCustomerBalanceHeader'))return true;
  const range=el('bbInvoiceRangeDetector');
- if(!range||!range.parentElement)return false;
+ const header=range?.parentElement || document.querySelector('.header-main') || document.querySelector('.header-currency')?.parentElement;
+ if(!header)return false;
  const panel=document.createElement('div');panel.id='bbCustomerBalanceHeader';
  panel.className='no-print';
  panel.style.cssText='min-width:0;width:100%;max-width:none;align-self:end;box-sizing:border-box;background:transparent!important;border:0!important;box-shadow:none!important';
@@ -83,9 +84,10 @@ function createPanel(){
  hint.style.setProperty('display','block','important');
  hint.style.setProperty('text-align','left','important');
  panel.append(label,amount,hint);
- const currency=range.parentElement.querySelector('.header-currency');
+ const currency=header.querySelector('.header-currency');
  if(currency)currency.insertAdjacentElement('beforebegin',panel);
- else range.insertAdjacentElement('afterend',panel);
+ else if(range)range.insertAdjacentElement('afterend',panel);
+ else header.appendChild(panel);
  installLayout();
  watchHeaderSpace();
  return true;

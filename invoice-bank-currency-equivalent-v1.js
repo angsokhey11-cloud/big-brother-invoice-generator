@@ -43,43 +43,68 @@ function ensure(){
 let selection=null;
 
 function context(){
- const from=bankCurrency(),to=invoiceCurrency(),r=rate(),actual=number($('bbActualBankAmount')?.value);
+ const from=bankCurrency(),to=invoiceCurrency(),invoiceRate=rate(),actual=number($('bbActualBankAmount')?.value);
  const tx=selection&&selection.transaction_id===String($('transactionId')?.value||'').trim()?selection:null;
- const available=tx?number(tx.remaining_amount):actual;
- const converted=equivalent(available,from,to,r);
+ const approved=tx?number(tx.approved_exchange_rate):0;
+ const r=tx&&from!==to&&approved>1?approved:invoiceRate;
+ const mismatch=!!(tx&&from!==to&&approved>1&&invoiceRate>1&&Math.abs(approved-invoiceRate)>0.000001);
+ const available=tx?number(tx.remaining_amount):null;
+ const converted=tx?equivalent(available,from,to,r):null;
  const method=String($('paymentMethod')?.value||'');
- return {from,to,r,actual,tx,available,converted,method,total:getTotal()};
+ const total=getTotal();
+ const planned=method==='Cash + Bank'?number($('splitBankAmount')?.value):
+  method==='Partially Paid in Bank'?number($('amountPaid')?.value):
+  method==='Bank'?total:0;
+ const debit=equivalent(planned,to,from,r);
+ const remaining=tx?available-debit:null;
+ const over=tx&&Number.isFinite(debit)&&debit>available+(from==='KHR'?0.5:0.005);
+ return {from,to,r,actual,tx,available,converted,method,total,planned,debit,remaining,over,mismatch};
 }
 function update(){
  ensure();
  const panel=$('bbInvoiceBankEquivalentV1');if(!panel)return;
- const c=context(),{from,to,r,actual,tx,available,converted,method,total}=c;
+ const c=context(),{from,to,r,actual,tx,available,converted,method,total,planned,debit,remaining,over,mismatch}=c;
  const enabled=['Cash + Bank','Bank','Partially Paid in Bank'].includes(method);
  panel.style.display=enabled?'':'none';if(!enabled)return;
  const label=$('bbBankEquivalentText'),info=$('bbBankEquivalentAvailable'),button=$('bbBankEquivalentApply');
  const value=equivalent(actual,from,to,r);
- if(actual<=0||!Number.isFinite(value)||!Number.isFinite(converted)){
-  label.textContent=actual<=0?'Enter the actual bank transfer amount.':'Enter a valid exchange rate.';
+ if(actual<=0||!Number.isFinite(value)||!Number.isFinite(debit)){
+  label.textContent=actual<=0?'Enter the actual bank amount to use.':'Enter a valid exchange rate.';
   info.textContent='';button.style.display='none';return;
  }
  label.textContent=money(actual,from)+' = '+money(value,to)+(from===to?' (same currency)':' (1 USD = '+r.toLocaleString()+' KHR)');
- if(method==='Bank'){
-  const ok=converted+(to==='USD'?0.005:0.5)>=total;
-  info.style.color=ok?'#198754':'#b42318';
-  info.textContent='Registered available: '+money(available,from)+' ≈ '+money(converted,to)+'. '+(ok?'✓ Covers full bank payment.':'Insufficient for full invoice. Select partial bank or a larger transfer.');
-  button.style.display='none';
+ const bankEnough=value+(to==='KHR'?0.5:0.005)>=planned;
+ const after=tx?Math.max(0,remaining):0;
+ if(tx){
+  info.style.color=over||mismatch?'#b42318':'#198754';
+  info.textContent='Registered available: '+money(available,from)+
+   ' · This invoice uses: '+money(debit,from)+
+   ' · Remaining after saving: '+money(after,from)+
+   (over?' ⚠ Bank amount exceeds the remaining registered balance.':'')+
+   (mismatch?' ⚠ Invoice exchange rate differs from the registered approved rate.':'');
  }else{
   info.style.color='#5b7088';
-  info.textContent=tx?'Registered remaining: '+money(available,from)+' ≈ '+money(converted,to):'Equivalent is calculated in invoice currency.';
-  button.style.display=converted>0?'':'none';
-  button.textContent=method==='Partially Paid in Bank'?'Apply to Amount Paid':'Apply equivalent to invoice';
+  info.textContent='No registered transfer selected. This is an entered bank amount; a registered remaining balance is not confirmed.';
+ }
+ if(method==='Bank'){
+  if(tx&&!over&&!mismatch&&!bankEnough){
+   info.style.color='#b42318';
+   info.textContent+=' ⚠ Bank amount is insufficient for the full invoice.';
+  }
+  button.style.display='none';
+ }else{
+  button.style.display=actual>0&&!over&&!mismatch?'':'none';
+  button.textContent=method==='Partially Paid in Bank'?'Apply entered amount to Amount Paid':'Apply entered bank amount to invoice';
  }
 }
 function apply(){
- const {to,converted,method,total}=context();
- if(method==='Bank'||!(converted>0))return update();
+ const {to,from,r,actual,available,method,total,over,mismatch}=context();
+ if(method==='Bank'||actual<=0||over||mismatch)return update();
  const cash=method==='Cash + Bank'?number($('splitCashAmount')?.value):0;
- const applied=safeFloor(Math.min(converted,Math.max(0,total-cash)),to);
+ const intended=equivalent(actual,from,to,r);
+ if(!Number.isFinite(intended)||intended<=0)return update();
+ const cap=available===null?intended:Math.min(intended,equivalent(available,from,to,r));
+ const applied=safeFloor(Math.min(cap,Math.max(0,total-cash)),to);
  const input=method==='Cash + Bank'?$('splitBankAmount'):$('amountPaid');
  if(!input||!applied)return;
  input.value=String(applied);
@@ -88,9 +113,11 @@ function apply(){
  update();
 }
 function syncBank(){
- if(String($('paymentMethod')?.value||'')==='Partially Paid in Bank')apply();
- else update();
+ // Never overwrite an explicitly chosen partial amount on input/selection.
+ // Apply button alone transfers the available amount into payment fields.
+ update();
 }
+
 document.addEventListener('bb:registered-bank-selected',event=>{
  const tx=event.detail||null;
  selection=tx&&tx.transaction_id?tx:null;

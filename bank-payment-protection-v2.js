@@ -258,6 +258,52 @@ function install(){
  // Registered bank balances are optional: no Cash/Credit warning or forced selection.
  // Keep the Invoice Generator's original confirmation flow unchanged.
 }
+function installBankReuseDuplicateCheck(){
+ // The payments table stores one payment per invoice. A previously allocated
+ // registered transfer remains a valid reference while its REAL wallet still
+ // has funds. Only relax the early *UI* duplicate warning for an explicit
+ // customer-matched Use selection. The DB enforces locks, customer, balance,
+ // currency, and manual-ID uniqueness during the actual save.
+ const original=window.checkPaymentTransactionIdAvailable;
+ if(typeof original!=='function'||original.__bbRegisteredBalanceReuse)return;
+ const wrapped=async function(transactionId){
+  const result=await original.apply(this,arguments);
+  const currentCustomer=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
+  const selected=clean(userSelectedRegisteredId);
+  const matching=availablePayments.some(tx=>
+    clean(tx.transaction_id).toLowerCase()===selected.toLowerCase()&&
+    Number(tx.remaining_amount)>0&&
+    clean(tx.customer_id)===currentCustomer
+  );
+  if(result?.exists===true&&!result?.pending&&
+     selected&&selected.toLowerCase()===clean(transactionId).toLowerCase()&&
+     currentCustomer&&currentCustomer===availableCustomerId&&matching){
+    return {...result,exists:false,registeredBalanceReuse:true};
+  }
+  return result;
+ };
+ wrapped.__bbRegisteredBalanceReuse=true;
+ window.checkPaymentTransactionIdAvailable=wrapped;
+}
+async function refreshRemainingRegisteredBalances(){
+ // After a partial use, refresh remaining funds from Supabase rather than
+ // permanently removing the original transfer from the local dropdown.
+ try{
+  const rows=await window.BBInvoiceBankRpc('bb_invoice_bank_bulk_sync',{});
+  if(!Array.isArray(rows))return;
+  const syncedAt=Date.now();
+  bulkWrite({rows,syncedAt});
+  const customerId=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
+  availableCustomerId=customerId;
+  loadCachedPayments(customerId);
+  document.dispatchEvent(new CustomEvent('bb:bank-cache-updated',{
+    detail:{customerId,balances:customerCachedRows(customerId),
+      transactions:availablePayments,syncedAt,count:rows.length}
+  }));
+ }catch(error){
+  console.warn('Verified bank balance refresh after invoice:',error);
+ }
+}
 function installSave(){
  if(typeof window.postSalesInvoiceBundle!=='function'||window.postSalesInvoiceBundle.__bbBankV2)return;
  const original=window.postSalesInvoiceBundle;
@@ -269,8 +315,9 @@ function installSave(){
   const usedCustomerId=availableCustomerId;
   const result=await original.apply(this,arguments);
   if(usedRegisteredId&&result!==false){
-   const id=usedCustomerId;
-   invalidateUsedBankTransaction(id,usedRegisteredId);
+   invalidateUsedBankTransaction(usedCustomerId,usedRegisteredId);
+   // Invoice is already saved; do not make success depend on cache refresh.
+   void refreshRemainingRegisteredBalances();
   }
   return result;
  };
@@ -305,7 +352,7 @@ if(typeof originalClear==='function'){
  return originalClear.apply(this,arguments)
 };
 }
-install();installSave();
+install();installSave();installBankReuseDuplicateCheck();
 if(document.readyState!=='loading'){inputUI();installManualIdLock();}
-document.addEventListener('DOMContentLoaded',()=>{install();installSave();inputUI();installManualIdLock()},{once:true});
+document.addEventListener('DOMContentLoaded',()=>{install();installSave();installBankReuseDuplicateCheck();inputUI();installManualIdLock()},{once:true});
 })();

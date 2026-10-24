@@ -68,12 +68,12 @@
 
       const [sourceResponse,adapterResponse]=await Promise.all([
         fetch(
-          'desktop-source-v20260924-invoiceseq1.html?v=20261004-confirm-sku1',
-          {cache:'no-store'}
+          'desktop-source-v20260924-invoiceseq1.html?v=20261024-mobileperf1',
+          {cache:'default'}
         ),
         fetch(
-          'supabase-adapter.js?v=20261020-manual-price-fix2',
-          {cache:'no-store'}
+          'supabase-adapter.js?v=20261024-mobileperf1',
+          {cache:'default'}
         )
       ]);
 

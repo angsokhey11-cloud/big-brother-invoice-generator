@@ -121,8 +121,11 @@ function syncBank(){
 document.addEventListener('bb:registered-bank-selected',event=>{
  const tx=event.detail||null;
  selection=tx&&tx.transaction_id?tx:null;
- update();
- if(selection)syncBank();
+ // Keep the previous first-use convenience for Partial Bank: fill Amount
+ // Paid only when empty. Never overwrite an amount the accountant entered.
+ if(selection&&String($('paymentMethod')?.value||'')==='Partially Paid in Bank'
+    &&number($('amountPaid')?.value)<=0)apply();
+ else update();
 });
 document.addEventListener('input',event=>{
  if(['bbActualBankAmount','exchangeRate','exchangeRateInput'].includes(event.target?.id))syncBank();

@@ -86,7 +86,7 @@ function applyRegisteredPayment(tx){
  const amt=$('bbActualBankAmount');
  if(amt){amt.value=String(tx.amount??'');amt.dispatchEvent(new Event('input',{bubbles:true}))}
  exactBankOption(tx.bank_name);
- document.dispatchEvent(new CustomEvent('bb:registered-bank-selected',{detail:{transaction_id:clean(tx.transaction_id),remaining_amount:Number(tx.remaining_amount||0),currency:clean(tx.currency).toUpperCase()}}));
+ document.dispatchEvent(new CustomEvent('bb:registered-bank-selected',{detail:{transaction_id:clean(tx.transaction_id),original_amount:Number(tx.original_amount??tx.amount??0),remaining_amount:Number(tx.remaining_amount||0),approved_exchange_rate:Number(tx.approved_exchange_rate||1),currency:clean(tx.currency).toUpperCase(),invoice_currency:clean(tx.invoice_currency||tx.currency).toUpperCase()}}));
  document.querySelectorAll('[data-bb-bank-use]').forEach(b=>{
    const active=userSelectedRegisteredId===b.dataset.bbBankUse;
    b.textContent=active?'✓ Selected (Undo)':'Use';
@@ -107,7 +107,7 @@ function renderAvailablePayments(){
  box.innerHTML='<div style="font-size:12px;font-weight:900;color:#17457a;margin-bottom:8px">Admin-verified payments for this customer</div>'+
  availablePayments.map(tx=>{
    const inv=clean(tx.invoice_currency||tx.currency).toUpperCase();
-   const actual=bankMoney(tx.amount,tx.currency);
+   const actual=bankMoney(tx.original_amount??tx.amount,tx.currency);
    const equiv=bankMoney(tx.equivalent_amount,inv);
    return '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px 0;border-top:1px solid #dce7f2">'+
      '<div style="min-width:0"><div style="font-weight:900;color:#173d69;overflow-wrap:anywhere">'+

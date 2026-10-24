@@ -93,13 +93,13 @@ function update(){
   }
   button.style.display='none';
  }else{
-  button.style.display=actual>0&&!over&&!mismatch?'':'none';
+  button.style.display=actual>0&&!mismatch?'':'none';
   button.textContent=method==='Partially Paid in Bank'?'Apply entered amount to Amount Paid':'Apply entered bank amount to invoice';
  }
 }
 function apply(){
  const {to,from,r,actual,available,method,total,over,mismatch}=context();
- if(method==='Bank'||actual<=0||over||mismatch)return update();
+ if(method==='Bank'||actual<=0||mismatch)return update();
  const cash=method==='Cash + Bank'?number($('splitCashAmount')?.value):0;
  const intended=equivalent(actual,from,to,r);
  if(!Number.isFinite(intended)||intended<=0)return update();

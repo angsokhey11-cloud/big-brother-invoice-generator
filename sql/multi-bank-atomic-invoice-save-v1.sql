@@ -55,6 +55,10 @@ declare
   v_result jsonb;
 begin
   if v_actor is null then raise exception 'Sign-in required'; end if;
+  -- First deployment remains an admin-only pilot even if EXECUTE is later granted.
+  if not coalesce(public.bb_is_admin(),false) then
+    raise exception 'Multi-bank invoice pilot is Admin-only';
+  end if;
   if not public.bb_has_module_access('invoice_generator','create')
      or not public.bb_has_sales_write() then
     raise exception 'Invoice Generator create permission denied';

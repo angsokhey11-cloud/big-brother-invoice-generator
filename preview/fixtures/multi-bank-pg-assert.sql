@@ -33,4 +33,39 @@ begin
  if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-A')<>60 then raise exception 'First bank was deducted after rollback';end if;
  if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-B')<>140 then raise exception 'Second bank was deducted after rollback';end if;
  raise notice 'PASS rollback of invoice, first bank payment and both wallet balances';
+
+ -- Verify a retry with changed source amount never reuses prior settlement ID.
+ begin
+  perform public.bb_sales_save_invoice_multi_bank_v1(v_input,
+    jsonb_set(v_payment,'{settlement_sources,0,source_amount}',to_jsonb('41'::text)));
+  raise exception 'Unexpected changed-retry success';
+ exception when others then
+  get stacked diagnostics v_error=message_text;
+  if v_error not like '%already belongs to another payload%' then
+   raise exception 'Wrong changed-retry rejection: %',v_error;
+  end if;
+ end;
+ if (select count(*) from public.payments where invoice_id='T-OK')<>2 then
+  raise exception 'Duplicate payments after changed retry';
+ end if;
+ raise notice 'PASS changed settlement retry rejected';
+ -- Insufficient funds must reject the entire proposed invoice.
+ begin
+  perform public.bb_sales_save_invoice_multi_bank_v1(
+    jsonb_build_object('invoiceId','T-OVER','invoiceNo','T-OVER','locationCode','TK-01','customerId','C1','currency','USD','paymentMethod','Partially Paid in Bank','grandTotal',300,'amountPaid',250),
+    jsonb_build_object('settlement_request_id','33333333-3333-4333-8333-333333333333','settlement_sources',jsonb_build_array(
+      jsonb_build_object('kind','BANK_REGISTER','source_id','TX-A','source_currency','USD','source_amount','70','invoice_amount','70'),
+      jsonb_build_object('kind','BANK_REGISTER','source_id','TX-B','source_currency','USD','source_amount','180','invoice_amount','180'))));
+  raise exception 'Unexpected overdraft success';
+ exception when others then
+  get stacked diagnostics v_error=message_text;
+  if v_error not like '%Insufficient registered bank balance%' then
+   raise exception 'Wrong overdraft rejection: %',v_error;
+  end if;
+ end;
+ if exists(select 1 from public.invoices where invoice_id='T-OVER') then
+  raise exception 'Rejected overdraft saved an invoice';
+ end if;
+ raise notice 'PASS overspend rejected without invoice save';
+
 end $test$;

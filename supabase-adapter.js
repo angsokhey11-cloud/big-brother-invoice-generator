@@ -1259,6 +1259,10 @@
       // remain locked to their original ID until database verification.
       if(error.httpStatus>=400&&error.httpStatus<500&&
          error.httpStatus!==408&&error.httpStatus!==429){
+        // This is a confirmed server rejection, with no matching invoice in
+        // the database. Staff may correct the wallet amounts and retry.
+        // Keep the request UUID for uncertain/network failures instead.
+        if(multiBank)sessionStorage.removeItem('bb-multi-bank-request:'+invoiceId);
         bbWritePendingInvoice(null);
         throw error;
       }

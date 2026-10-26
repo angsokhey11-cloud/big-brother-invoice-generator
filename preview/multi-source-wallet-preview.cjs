@@ -33,7 +33,7 @@
     available:String(row.remaining_amount),date:String(row.received_date||'')
   })).filter(row=>{const key=row.kind+':'+row.id;if(ids.has(key))return false;ids.add(key);return true;});
   state.selected.clear();
-  for(const row of state.sources){const key=row.kind+':'+row.id;const previous=old.get(key);if(previous!==undefined){try{if(roundUnits(previous,row.currency)<=roundUnits(row.available,row.currency))state.selected.set(key,previous)}catch(_){}}}
+  for(const row of state.sources){const key=row.kind+':'+row.id;const previous=old.get(key);if(previous!==undefined){try{if(row.currency===state.currency&&roundUnits(previous,row.currency)<=roundUnits(row.available,row.currency))state.selected.set(key,previous)}catch(_){}}}
   return snapshot();
  }
  function choose(kind,id,amount){

@@ -68,6 +68,8 @@ jobs:
           python3 -m playwright install --with-deps chromium
       - name: Real Chromium bank wallet UI interactions
         run: python3 preview/fixtures/multi-bank-browser.smoke.py
+      - name: Real Invoice Generator adapter browser save and recovery
+        run: python3 preview/fixtures/multi-bank-adapter-browser.test.py
       - name: Concurrent wallet double-spend protection (two database sessions)
         env:
           PGPASSWORD: postgres

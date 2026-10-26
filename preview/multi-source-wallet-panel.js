@@ -19,7 +19,7 @@ function render(){
  const p=ensure();if(!p)return;
  const selected=wallet.snapshot();
  p.innerHTML='<div style="font-weight:900;font-size:15px;margin-bottom:4px">Multi-Source Wallet — Development Preview</div>'+
- '<div style="font-size:11px;color:#8a4a00;margin-bottom:10px">Preview only. Existing invoice Save cannot use multiple sources yet.</div>'+
+ '<div style="font-size:11px;color:#8a4a00;margin-bottom:10px">'+(window.BB_MULTI_BANK_SAVE_ENABLED===true?'ADMIN PILOT: This selection will allocate real registered bank balances if the server approves invoice Save.':'Preview only. Existing invoice Save cannot use multiple sources yet.')+'</div>'+
  (!rows.length?'<div>No registered balances loaded. Press Sync Bank first.</div>':
  rows.map(r=>{
  const key=r.kind+':'+r.id,used=selected.selected.find(x=>x.kind+':'+x.id===key);

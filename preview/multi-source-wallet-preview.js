@@ -24,7 +24,7 @@
   state.sources=[];state.selected.clear();
  }
  function loadBankRows({customerId,rows,currency}){
-  if(String(customerId||'')!==state.customerId)reset(customerId,currency||state.currency);
+  if(String(customerId||'')!==state.customerId || (currency && currency!==state.currency))reset(customerId,currency||state.currency);
   const old=new Map(state.selected),ids=new Set();
   state.sources=(Array.isArray(rows)?rows:[]).filter(row=>{
     return String(row.customer_id||'')===state.customerId&&Number(row.remaining_amount)>0;

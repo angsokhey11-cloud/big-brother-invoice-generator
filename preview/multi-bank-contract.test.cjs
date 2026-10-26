@@ -34,7 +34,7 @@ const tests=[
  ['wallet customer revalidated',()=>assert.match(panel,/customer!==activeCustomer/)],
  ['wallet currency revalidated',()=>assert.match(panel,/activeCurrency!==currency/)],
  ['invoice currency switch clears wallet immediately',()=>assert.match(panel,/event\.target\?\.id!=='currency'[\s\S]*wallet\.reset\(customer,currency\)/)],
- ['Sync Bank refresh keeps eligible selection',()=>assert.doesNotMatch(panel,/wallet\.reset\(customer,currency\)/)],
+ ['Sync Bank refresh keeps eligible selection',()=>{const refresh=panel.split("document.addEventListener('bb:bank-cache-updated'")[1]?.split('function clearMultiBankSelection')[0]||'';assert.match(refresh,/wallet\.loadBankRows/);assert.doesNotMatch(refresh,/wallet\.reset\(customer,currency\)/)}],
 ];
 for(const [name,fn] of tests){fn();console.log('PASS',name)}
 console.log(tests.length+' static contract checks passed. This does NOT validate SQL execution or concurrency.');

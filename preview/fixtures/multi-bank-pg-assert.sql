@@ -81,4 +81,16 @@ begin
  if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-B')<>110 then raise exception 'Full bank TX-B remaining incorrect';end if;
  raise notice 'PASS full bank invoice with two transfers';
 
+
+ -- Two registered KHR balances fund a partially paid KHR invoice.
+ v_response:=public.bb_sales_save_invoice_multi_bank_v1(
+  jsonb_build_object('invoiceId','T-KHR','invoiceNo','T-KHR','locationCode','TK-01','customerId','C1','currency','KHR','paymentMethod','Partially Paid in Bank','grandTotal',4000,'amountPaid',3000),
+  jsonb_build_object('settlement_request_id','55555555-5555-4555-8555-555555555555','settlement_sources',jsonb_build_array(
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-KHR-1','source_currency','KHR','source_amount','1000','invoice_amount','1000'),
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-KHR-2','source_currency','KHR','source_amount','2000','invoice_amount','2000'))));
+ if v_response->>'sourceCount'<>'2' then raise exception 'KHR payment source count wrong';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-KHR-1')<>250 then raise exception 'KHR source 1 balance wrong';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-KHR-2')<>750 then raise exception 'KHR source 2 balance wrong';end if;
+ raise notice 'PASS two-source KHR bank allocation';
+
 end $test$;

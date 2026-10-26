@@ -1141,6 +1141,15 @@
      Atomic writes
   ----------------------------- */
   window.postSalesInvoiceBundle = async function postSalesInvoiceBundleSupabase(invoicePayload, paymentPayload) {
+    const earlyMultiSources=paymentPayload?.settlement_sources;
+    if(Array.isArray(earlyMultiSources)&&earlyMultiSources.length>=2){
+      if(window.BB_MULTI_BANK_SAVE_ENABLED!==true)
+        throw new Error('Multi-source invoice saving is not enabled yet.');
+      if(!['Bank','Partially Paid in Bank'].includes(String(invoicePayload?.paymentMethod||'').trim()))
+        throw new Error('Multi-source Cash + Bank is not enabled yet.');
+      if(earlyMultiSources.some(x=>x?.kind!=='BANK_REGISTER'))
+        throw new Error('Customer Credit allocations are not enabled yet.');
+    }
     const fingerprint=bbInvoiceFingerprint(invoicePayload);
     let pending=bbReadPendingInvoice();
     if(pending){

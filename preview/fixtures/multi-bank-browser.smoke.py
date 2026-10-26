@@ -38,7 +38,7 @@ def main():
         <div id="bbRegisteredPayments"></div></body></html>""")
         page.evaluate("window.selectedCustomer='C1';window.bbGetSelectedCustomerForBank=()=>({customerId:window.selectedCustomer})")
         page.add_script_tag(path=str(SOURCE))
-        page.add_script_tag(path=str(PANEL))
+        page.evaluate("window.BB_MULTI_BANK_SAVE_ENABLED=true")\n        page.add_script_tag(path=str(PANEL))
         broadcast(page)
         assert page.locator("#bbMultiWalletPreview").count()==1, "Wallet panel never mounted"
         select_two(page,20,35)

@@ -69,8 +69,10 @@ begin
   if v_method not in ('Bank','Partially Paid in Bank') then
     raise exception 'This endpoint only supports Bank or Partially Paid in Bank';
   end if;
-  if jsonb_typeof(v_sources) is distinct from 'array'
-    or jsonb_array_length(v_sources) not between 2 and 30 then
+  if jsonb_typeof(v_sources) is distinct from 'array' then
+    raise exception 'settlement_sources must be an array';
+  end if;
+  if jsonb_array_length(v_sources) not between 2 and 30 then
     raise exception 'Select between 2 and 30 registered bank transactions';
   end if;
   v_precision := case when v_currency='USD' then 2 else 0 end;

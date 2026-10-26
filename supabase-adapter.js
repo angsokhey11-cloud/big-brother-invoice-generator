@@ -1140,6 +1140,23 @@
   /* -----------------------------
      Atomic writes
   ----------------------------- */
+  // crypto.randomUUID() is unavailable on non-secure HTTP LAN hosts (Local Brain).
+  // getRandomValues() still provides cryptographic randomness in these contexts.
+  // Never fall back to Math.random for a financial idempotency identifier.
+  function bbNewSettlementRequestId(){
+    const secureCrypto=window.crypto;
+    if(typeof secureCrypto?.randomUUID==='function')return secureCrypto.randomUUID();
+    if(typeof secureCrypto?.getRandomValues!=='function')
+      throw new Error('Secure random generation unavailable. Cannot save multi-bank invoice.');
+    const bytes=new Uint8Array(16);
+    secureCrypto.getRandomValues(bytes);
+    bytes[6]=(bytes[6]&15)|0x40;
+    bytes[8]=(bytes[8]&0x3f)|0x80;
+    const hex=Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
+    return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+
+           hex.slice(16,20)+'-'+hex.slice(20);
+  }
+
   window.postSalesInvoiceBundle = async function postSalesInvoiceBundleSupabase(invoicePayload, paymentPayload) {
     // Read the visible multi-source picker; never quietly ignore a selection.
     const selectedWallet=window.BBInvoiceMultiSourceSelection?.()||null;
@@ -1201,7 +1218,7 @@
       const requestKey='bb-multi-bank-request:'+invoiceId;
       let requestId=sessionStorage.getItem(requestKey);
       if(!requestId){
-        requestId=crypto.randomUUID();
+        requestId=bbNewSettlementRequestId();
         sessionStorage.setItem(requestKey,requestId);
       }
       paymentPayload={...paymentPayload,settlement_request_id:requestId};

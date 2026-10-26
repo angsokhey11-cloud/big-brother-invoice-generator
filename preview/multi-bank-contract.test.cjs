@@ -27,6 +27,7 @@ const tests=[
  ['invoice payment reconciled',()=>assert.match(sql,/Payment allocations do not equal the saved invoice amount/)],
  ['no auto privilege grant',()=>assert.match(sql,/revoke all on function public\.bb_sales_save_invoice_multi_bank_v1/)],
  ['feature disabled by default',()=>assert.match(adapter,/BB_MULTI_BANK_SAVE_ENABLED!==true/)],
+ ['secure Local Brain UUID fallback',()=>{const fallback=adapter.split('function bbNewSettlementRequestId()')[1]?.split('window.postSalesInvoiceBundle')[0]||'';assert.match(fallback,/getRandomValues\(bytes\)/);assert.doesNotMatch(fallback,/Math\.random\(/);assert.match(fallback,/bytes\[6\]/);assert.match(fallback,/bytes\[8\]/)}],
  ['definitive error clears multi-bank retry token',()=>assert.match(adapter,/if\(multiBank\)sessionStorage\.removeItem\('bb-multi-bank-request:'\+invoiceId\)/)],
  ['backend RPC route',()=>assert.match(adapter,/bb_sales_save_invoice_multi_bank_v1/)],
  ['picker-to-save payload connected',()=>assert.match(adapter,/settlement_sources:selectedWallet\.settlement_sources/)],

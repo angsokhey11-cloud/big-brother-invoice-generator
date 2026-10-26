@@ -1152,17 +1152,8 @@
         paymentPayload={};
       if(Array.isArray(paymentPayload.settlement_sources) && paymentPayload.settlement_sources.length)
         throw new Error('Conflicting multi-source payment allocations');
-      const requestKey='bb-multi-bank-request:'+String(invoicePayload.invoiceId||'');
-      if(!invoicePayload.invoiceId)
-        throw new Error('Invoice ID required for multi-source retry protection');
-      let requestId=sessionStorage.getItem(requestKey);
-      if(!requestId){
-        requestId=crypto.randomUUID();
-        sessionStorage.setItem(requestKey,requestId);
-      }
       paymentPayload={...paymentPayload,
-        settlement_sources:selectedWallet.settlement_sources,
-        settlement_request_id:requestId};
+        settlement_sources:selectedWallet.settlement_sources};
       // The amount paid used by the SQL must be consistent with sources.
       // This branch does not rewrite the user-entered invoice amount.
       const selected=Number(selectedWallet.selected_total);
@@ -1200,6 +1191,15 @@
     const invoiceId=pending?.invoiceId||invoicePayload.invoiceId;
     if(!invoiceId)throw new Error('Missing invoice ID. Invoice not sent.');
     invoicePayload.invoiceId=invoiceId;
+    if(Array.isArray(paymentPayload?.settlement_sources)&&paymentPayload.settlement_sources.length>=2){
+      const requestKey='bb-multi-bank-request:'+invoiceId;
+      let requestId=sessionStorage.getItem(requestKey);
+      if(!requestId){
+        requestId=crypto.randomUUID();
+        sessionStorage.setItem(requestKey,requestId);
+      }
+      paymentPayload={...paymentPayload,settlement_request_id:requestId};
+    }
     if(!pending){
       pending={invoiceId,invoiceNo:invoicePayload.invoiceNo,fingerprint,
         createdAt:Date.now(),confirmedSaved:false};

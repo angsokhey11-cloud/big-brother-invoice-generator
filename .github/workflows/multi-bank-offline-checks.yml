@@ -72,6 +72,8 @@ jobs:
         run: python3 preview/fixtures/multi-bank-adapter-browser.test.py
       - name: Desktop Complete Invoice end-to-end handoff in Chromium
         run: python3 preview/fixtures/multi-bank-legacy-complete.browser.test.py
+      - name: Full user-facing multi-bank workflow preview in Chromium
+        run: python3 preview/fixtures/multi-bank-workflow-demo.browser.test.py
       - name: Concurrent wallet double-spend protection (two database sessions)
         env:
           PGPASSWORD: postgres

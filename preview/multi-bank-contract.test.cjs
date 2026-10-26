@@ -32,6 +32,7 @@ const tests=[
  ['one-item preview cannot fall through',()=>assert.match(panel,/v\.selected\.length<2\)throw/)],
  ['wallet customer revalidated',()=>assert.match(panel,/customer!==activeCustomer/)],
  ['wallet currency revalidated',()=>assert.match(panel,/activeCurrency!==currency/)],
+ ['Sync Bank refresh keeps eligible selection',()=>assert.doesNotMatch(panel,/wallet\.reset\(customer,currency\)/)],
 ];
 for(const [name,fn] of tests){fn();console.log('PASS',name)}
 console.log(tests.length+' static contract checks passed. This does NOT validate SQL execution or concurrency.');

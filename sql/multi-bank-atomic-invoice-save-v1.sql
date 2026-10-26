@@ -45,6 +45,7 @@ declare
   v_count int;
   v_precision int;
   v_details jsonb := '[]'::jsonb;
+  v_first_bank text;
   v_ids text[];
   v_key text;
   v_invoice_result jsonb;
@@ -121,8 +122,104 @@ begin
     if v_amount<=0 or v_amount<>trunc(v_amount,v_precision)
        then raise exception 'Unsupported amount or precision for %',v_source_id; end if;
     if (v_item->>'source_currency') is distinct from v_currency
-       or (v_item ? 'invoice_amount' and (v_item->>'invoice_amount') is distinct from (v_item->>'source_amount')) then
+       then
        raise exception 'Source currency differs from invoice currency'; end if;
+    if v_item ? 'invoice_amount' then
+      if coalesce(v_item->>'invoice_amount','') !~ '^[0-9]+([.][0-9]+)?
+    select * into v_source from public.bb_verified_bank_transactions b
+      where upper(btrim(b.transaction_id))=v_source_id;
+    if v_amount>coalesce((select s.remaining_amount
+                       from public.bb_bank_balance_snapshot s
+                       where s.transaction_id=v_source.transaction_id),0) then
+       raise exception 'Insufficient registered bank balance for %',v_source_id; end if;
+    v_total:=v_total+v_amount;
+    v_details:=v_details||jsonb_build_array(
+      jsonb_build_object('source_id',v_source.transaction_id,
+                         'bank_name',v_source.bank_name,'amount',v_amount)
+    );
+  end loop;
+
+  select bank_name into v_first_bank
+  from public.bb_verified_bank_transactions
+  where upper(btrim(transaction_id))=v_ids[1];
+  if nullif(btrim(coalesce(v_first_bank,'')),'') is null then
+    raise exception 'Verified bank source has no receiving bank';
+  end if;
+  -- p_payment NULL prevents the legacy save from inserting an accidental
+  -- single bank payment; we insert one payment per bank source below.
+  -- The original function still creates stock lines and the invoice record.
+  v_invoice_result:=public.bb_sales_save_invoice_bundle_core_access_v1(
+     p_invoice||jsonb_build_object(
+        'transactionId',v_ids[1],
+        'paymentBank',v_first_bank,
+        'amountPaid',v_total
+     ),
+     null
+  );
+  select * into v_invoice from public.invoices i
+    where i.invoice_id=v_invoice_result->>'invoiceId' for update;
+  if not found then raise exception 'Invoice save returned missing invoice'; end if;
+  if v_method='Bank' and v_total<>v_invoice.grand_total then
+    raise exception 'Full Bank payment must cover entire invoice';
+  end if;
+  if v_method='Partially Paid in Bank' and v_total>=v_invoice.grand_total then
+    raise exception 'Partially paid invoice must have a positive outstanding balance';
+  end if;
+  if v_total<>v_invoice.amount_paid then
+    raise exception 'Payment allocations do not equal the saved invoice amount';
+  end if;
+
+  -- Each inserted payment automatically calls the bank guard trigger, which
+  -- locks the source and inserts bb_bank_balance_allocations.
+  for v_item in select value from jsonb_array_elements(v_details)
+  loop
+    v_payment_id:=public.bb_next_prefixed_id('public.payments'::regclass,'payment_id','PAY',4);
+    insert into public.payments (
+      payment_id,invoice_id,invoice_no_snapshot,payment_date,
+      customer_id,customer_name_snapshot,location_code,
+      salesperson_staff_id,salesperson_name_snapshot,
+      payment_method,bank_payment,bank_reference,currency,exchange_rate,
+      amount,note,transaction_id,payment_source
+    ) values (
+      v_payment_id,v_invoice.invoice_id,v_invoice.invoice_no,v_invoice.invoice_date,
+      v_invoice.customer_id,v_invoice.customer_name_snapshot,v_invoice.location_code,
+      v_invoice.salesperson_staff_id,v_invoice.salesperson_name_snapshot,
+      'Bank',nullif(v_item->>'bank_name',''),v_item->>'source_id',
+      v_currency,v_invoice.exchange_rate,(v_item->>'amount')::numeric,
+      'Initial invoice multi-source bank allocation',
+      v_item->>'source_id','Invoice'
+    );
+  end loop;
+
+  -- Fail closed unless every successful payment created its bank allocation.
+  select count(*) into v_count
+    from public.bb_bank_balance_allocations a
+    join public.payments p on p.payment_id=a.payment_id
+   where p.invoice_id=v_invoice.invoice_id
+     and p.payment_source='Invoice'
+     and a.reversed_at is null;
+  if v_count<>jsonb_array_length(v_sources) then
+    raise exception 'Missing bank allocation after invoice save';
+  end if;
+
+  v_result:=v_invoice_result||jsonb_build_object(
+     'multiSource',true,'sourceCount',v_count,
+     'allocatedBank',v_total,'settlementRequestId',v_req
+  );
+  insert into public.bb_invoice_multi_bank_requests
+   (request_id,actor_user_id,payload_fingerprint,invoice_id,response)
+  values(v_req,v_actor,v_fingerprint,v_invoice.invoice_id,v_result);
+  return v_result;
+end $fn$;
+
+-- Keep unavailable to clients until end-to-end and concurrency tests pass.
+revoke all on function public.bb_sales_save_invoice_multi_bank_v1(jsonb,jsonb)
+ from public,anon,authenticated;
+commit;
+
+         or (v_item->>'invoice_amount')::numeric<>v_amount then
+        raise exception 'Same-currency invoice allocation mismatch'; end if;
+    end if;
     select * into v_source from public.bb_verified_bank_transactions b
       where upper(btrim(b.transaction_id))=v_source_id;
     if v_amount>coalesce((select s.remaining_amount

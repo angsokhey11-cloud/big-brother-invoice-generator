@@ -1,4 +1,6 @@
 -- Disposable PostgreSQL integration fixture. NEVER run against BIG BROTHER production.
+create role anon nologin;
+create role authenticated nologin;
 create schema if not exists auth;
 create function auth.uid() returns uuid language sql stable as $$select '00000000-0000-4000-8000-000000000001'::uuid$$;
 create table public.customers(customer_id text primary key,active boolean default true);

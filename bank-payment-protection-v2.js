@@ -308,7 +308,14 @@ function installSave(){
  if(typeof window.postSalesInvoiceBundle!=='function'||window.postSalesInvoiceBundle.__bbBankV2)return;
  const original=window.postSalesInvoiceBundle;
  window.postSalesInvoiceBundle=async function(invoice,payment){
-  if(['Bank','Partially Paid in Bank','Cash + Bank'].includes(clean(invoice?.paymentMethod))){
+  // The multi-bank endpoint validates every source on the server. Running
+  // the legacy single-transaction check here would reject valid multi-source
+  // payments; keep it unchanged for all ordinary payments.
+  const wallet=window.BBInvoiceMultiSourceSelection?.();
+  const multiBank=wallet?.settlement_sources?.length>=2;
+  if(multiBank&&window.BB_MULTI_BANK_SAVE_ENABLED!==true)
+    throw new Error('Multi-bank payment saving has not been enabled.');
+  if(!multiBank&&['Bank','Partially Paid in Bank','Cash + Bank'].includes(clean(invoice?.paymentMethod))){
    await validateBank(invoice);
   }
   const usedRegisteredId=userSelectedRegisteredId;

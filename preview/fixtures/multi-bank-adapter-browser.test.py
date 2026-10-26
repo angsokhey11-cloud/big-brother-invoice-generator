@@ -82,7 +82,14 @@ def setup(browser,pilot=False):
       access_token:"FAKE_TEST_ONLY",expires_at:4102444800,user:{id:"00000000-0000-4000-8000-000000000099"}
     }))""",SESSION_KEY)
     page.add_script_tag(path=str(ROOT/"preview/multi-source-wallet-preview.js"))
+    if not pilot:
+        # In real operation the panel must remain absent unless admin opted in.
+        assert page.locator("#bbMultiWalletPreview").count()==0
+        page.evaluate("window.BB_MULTI_BANK_SAVE_ENABLED=true")
     page.add_script_tag(path=str(ROOT/"preview/multi-source-wallet-panel.js"))
+    if not pilot:
+        # Keep a test-only picker present while exercising the disabled Save gate.
+        page.evaluate("window.BB_MULTI_BANK_SAVE_ENABLED=false")
     page.evaluate("""() => document.dispatchEvent(new CustomEvent("bb:bank-cache-updated",{
       detail:{customerId:"C1",balances:[
         {customer_id:"C1",transaction_id:"TX-A",currency:"USD",remaining_amount:100},

@@ -16,9 +16,29 @@ function ensure(){
  }
  return panel;
 }
+function syncLegacyBankReference(selected){
+ // When two transfers are chosen, their real transaction IDs travel in
+ // settlement_sources. The old single-reference text field is irrelevant.
+ const method=document.getElementById('paymentMethod')?.value||'';
+ const bankMethod=method==='Bank'||method==='Partially Paid in Bank';
+ const usingWallet=bankMethod&&selected.selected.length>=2;
+ const row=document.getElementById('transactionIdRow');
+ if(!row)return;
+ row.style.display=bankMethod&&!usingWallet?'':'none';
+ let note=document.getElementById('bbMultiWalletReferencesNotice');
+ if(!note){
+  note=document.createElement('div');
+  note.id='bbMultiWalletReferencesNotice';
+  note.style.cssText='font-size:11px;color:#17613d;font-weight:700;margin:4px 0 10px';
+  row.insertAdjacentElement('afterend',note);
+ }
+ note.style.display=usingWallet?'block':'none';
+ note.textContent='Using '+selected.selected.length+' selected registered bank transaction IDs automatically. No manual Transaction ID required.';
+}
 function render(){
  const p=ensure();if(!p)return;
  const selected=wallet.snapshot();
+ syncLegacyBankReference(selected);
  p.innerHTML='<div style="font-weight:900;font-size:15px;margin-bottom:4px">Multi-Source Wallet — Development Preview</div>'+
  '<div style="font-size:11px;color:#8a4a00;margin-bottom:10px">'+(window.BB_MULTI_BANK_SAVE_ENABLED===true?'ADMIN PILOT: This selection will allocate real registered bank balances if the server approves invoice Save.':'Preview only. Existing invoice Save cannot use multiple sources yet.')+'</div>'+
  (!rows.length?'<div>No registered balances loaded. Press Sync Bank first.</div>':
@@ -102,5 +122,6 @@ document.addEventListener('change',event=>{
  }))});
  render();
 });
+document.getElementById('paymentMethod')?.addEventListener('change',()=>render());
 document.addEventListener('DOMContentLoaded',()=>{render()},{once:true});
 })();

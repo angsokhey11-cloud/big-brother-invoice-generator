@@ -14,6 +14,20 @@ jobs:
   offline-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: multibank_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d multibank_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,3 +53,11 @@ jobs:
           assert sql.count('\ncommit;') == 1, 'Unexpected duplicate migration block'
           print('Basic SQL structural checks passed (not a PostgreSQL parse).')
           PY
+
+      - name: Real PostgreSQL atomic invoice tests
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d multibank_test -f preview/fixtures/multi-bank-pg-setup.sql
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d multibank_test -f sql/multi-bank-atomic-invoice-save-v1.sql
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d multibank_test -f preview/fixtures/multi-bank-pg-assert.sql

@@ -141,7 +141,7 @@ begin
   v_invoice_result:=public.bb_sales_save_invoice_bundle_core_access_v1(
      p_invoice||jsonb_build_object(
         'transactionId',v_ids[1],
-        'paymentBank',(v_details->0->>'bank_name'),
+        'paymentBank',(select b.bank_name from public.bb_verified_bank_transactions b where upper(btrim(b.transaction_id))=v_ids[1]),
         'amountPaid',v_total
      ),
      null

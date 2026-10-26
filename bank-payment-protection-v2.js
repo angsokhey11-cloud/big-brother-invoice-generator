@@ -321,9 +321,14 @@ function installSave(){
   const usedRegisteredId=userSelectedRegisteredId;
   const usedCustomerId=availableCustomerId;
   const result=await original.apply(this,arguments);
-  if(usedRegisteredId&&result!==false){
+  if(result!==false && multiBank){
+   // Multiple sources can each retain a partial balance. Never remove one
+   // selected transaction as if it were the only funding source.
+   // The database save has already committed; refresh is best-effort.
+   void refreshRemainingRegisteredBalances();
+  } else if(usedRegisteredId&&result!==false){
    invalidateUsedBankTransaction(usedCustomerId,usedRegisteredId);
-   // Invoice is already saved; do not make success depend on cache refresh.
+   // Preserve the existing single-bank refresh behavior.
    void refreshRemainingRegisteredBalances();
   }
   return result;

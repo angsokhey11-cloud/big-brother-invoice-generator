@@ -1074,9 +1074,34 @@
     );
   };
 
+  // The legacy Complete handler still reads one transactionId. During the
+  // admin-only multi-bank pilot, expose the first REAL selected source as its
+  // compatibility reference. All selected sources are still passed to the
+  // atomic multi-bank endpoint and checked again by the database.
+  function bbPilotMultiBankSelection(customerId, currency, method) {
+    if(window.BB_MULTI_BANK_SAVE_ENABLED!==true ||
+       !['Bank','Partially Paid in Bank'].includes(method))return null;
+    const selection=window.BBInvoiceMultiSourceSelection?.()||null;
+    if(!selection || !Array.isArray(selection.settlement_sources) ||
+       selection.settlement_sources.length<2)return null;
+    if(selection.customer_id!==customerId ||
+       selection.currency!==String(currency||'').toUpperCase())return null;
+    if(selection.settlement_sources.some(s=>s.kind!=='BANK_REGISTER'||
+       !String(s.source_id||'').trim()))return null;
+    return selection;
+  }
+
   window.checkPaymentTransactionIdAvailable = async function checkPaymentTransactionIdAvailableSupabase(transactionId) {
     const requested = String(transactionId || '').trim();
     if (!requested) throw new Error('Transaction ID is required for Bank payment.');
+    const customerId=String(bbFindSelectedCustomer()?.customerId||bbSelectedCustomerId||'').trim();
+    const currency=String(document.getElementById('currency')?.value||'');
+    const method=String(document.getElementById('paymentMethod')?.value||'');
+    const wallet=bbPilotMultiBankSelection(customerId,currency,method);
+    // This one-ID duplicate preflight is invalid for a reused registered
+    // wallet transfer. Server atomically verifies every source and balance.
+    if(wallet && requested===String(wallet.settlement_sources[0].source_id))
+      return {success:true,exists:false,pending:false,multiBankVerifiedByServer:true};
     return bbRpc('bb_sales_check_transaction_id', { p_transaction_id: requested });
   };
 
@@ -1089,6 +1114,17 @@
     const customer = bbFindSelectedCustomer();
     payload.customerId = customer?.customerId || bbSelectedCustomerId || '';
     payload.salespersonStaffId = bbSalespersonStaffId();
+    const wallet=bbPilotMultiBankSelection(
+      String(payload.customerId||'').trim(), payload.currency,
+      String(payload.paymentMethod||'').trim()
+    );
+    if(wallet && String(payload.paymentBank||'').trim() &&
+       Number(wallet.selected_total)===Number(payload.amountPaid)){
+      // Satisfies any still-cached single-ID UI validator without changing
+      // the form or creating a manual bank transaction.
+      payload.transactionId=String(wallet.settlement_sources[0].source_id);
+      payload.bankReference=payload.transactionId;
+    }
     return payload;
   };
 

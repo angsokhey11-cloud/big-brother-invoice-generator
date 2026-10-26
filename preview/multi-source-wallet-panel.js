@@ -53,7 +53,8 @@ document.addEventListener('bb:bank-cache-updated',event=>{
 window.BBInvoiceMultiSourceSelection=function(){
  const v=wallet.snapshot();
  if(!customer || v.customerId!==customer)throw Error('Customer wallet selection is stale. Sync Bank again.');
- if(v.selected.length<2)return null;
+ if(v.selected.length===0)return null;
+ if(v.selected.length<2)throw Error('Select at least two bank transactions or clear this wallet preview before saving.');
  if(v.selected.some(x=>x.currency!==currency))throw Error('Currency mismatch in selected bank sources');
  return {
   settlement_sources:v.selected.map(x=>({

@@ -1169,9 +1169,25 @@
     }
     const splitPayment=
       String(invoicePayload?.paymentMethod||'').trim()==='Cash + Bank';
+    const multiSources=paymentPayload?.settlement_sources;
+    const multiBank=Array.isArray(multiSources)&&multiSources.length>=2;
+    if(multiBank){
+      // Fail closed: the new endpoint must be deployed AND explicitly enabled.
+      // Never silently send a multi-source request to the legacy one-bank save.
+      if(window.BB_MULTI_BANK_SAVE_ENABLED!==true){
+        throw new Error('Multi-source invoice saving is not enabled yet. Do not submit these sources individually.');
+      }
+      if(!['Bank','Partially Paid in Bank'].includes(String(invoicePayload?.paymentMethod||'').trim())){
+        throw new Error('Multi-source Bank + Cash is not available in this version.');
+      }
+      if(multiSources.some(x=>x?.kind!=='BANK_REGISTER')){
+        throw new Error('Customer credit sources are not enabled yet.');
+      }
+    }
     try{
       const result=await bbRpc(
-        splitPayment?'bb_sales_save_invoice_split_payment':'bb_sales_save_invoice_bundle',
+        multiBank?'bb_sales_save_invoice_multi_bank_v1':
+          splitPayment?'bb_sales_save_invoice_split_payment':'bb_sales_save_invoice_bundle',
         {p_invoice:invoicePayload,p_payment:paymentPayload||null}
       );
       // Keep the saved ID until the whole invoice-completion flow clears the form.

@@ -1141,6 +1141,35 @@
      Atomic writes
   ----------------------------- */
   window.postSalesInvoiceBundle = async function postSalesInvoiceBundleSupabase(invoicePayload, paymentPayload) {
+    // Read the visible multi-source picker; never quietly ignore a selection.
+    const selectedWallet=window.BBInvoiceMultiSourceSelection?.()||null;
+    if(selectedWallet){
+      if(String(invoicePayload?.customerId||'').trim()!==selectedWallet.customer_id)
+        throw new Error('Selected bank balance belongs to another customer');
+      if(String(invoicePayload?.currency||'').trim().toUpperCase()!==selectedWallet.currency)
+        throw new Error('Selected bank balance currency does not match invoice');
+      if(!paymentPayload||typeof paymentPayload!=='object')
+        paymentPayload={};
+      if(Array.isArray(paymentPayload.settlement_sources) && paymentPayload.settlement_sources.length)
+        throw new Error('Conflicting multi-source payment allocations');
+      const requestKey='bb-multi-bank-request:'+String(invoicePayload.invoiceId||'');
+      if(!invoicePayload.invoiceId)
+        throw new Error('Invoice ID required for multi-source retry protection');
+      let requestId=sessionStorage.getItem(requestKey);
+      if(!requestId){
+        requestId=crypto.randomUUID();
+        sessionStorage.setItem(requestKey,requestId);
+      }
+      paymentPayload={...paymentPayload,
+        settlement_sources:selectedWallet.settlement_sources,
+        settlement_request_id:requestId};
+      // The amount paid used by the SQL must be consistent with sources.
+      // This branch does not rewrite the user-entered invoice amount.
+      const selected=Number(selectedWallet.selected_total);
+      const paid=Number(invoicePayload.amountPaid);
+      if(!Number.isFinite(paid)||Math.abs(paid-selected)>0.000001)
+        throw new Error('Invoice amount paid must equal the selected bank balance total');
+    }
     const earlyMultiSources=paymentPayload?.settlement_sources;
     if(Array.isArray(earlyMultiSources)&&earlyMultiSources.length>=2){
       if(window.BB_MULTI_BANK_SAVE_ENABLED!==true)

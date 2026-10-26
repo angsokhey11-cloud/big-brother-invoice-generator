@@ -33,4 +33,18 @@ a.equal(w.snapshot().total,'1000');
 w.reset('C2','USD');
 a.equal(w.snapshot().selected.length,0);
 
+
+ // Currency switch for same customer must invalidate every prior selection.
+w.reset('C1','USD');
+w.loadBankRows({customerId:'C1',currency:'USD',rows});
+w.choose('BANK_REGISTER','BANK-1','10.00');
+const khrRows=[{customer_id:'C1',transaction_id:'KHR-2',currency:'KHR',remaining_amount:9000}];
+const afterCurrencyChange=w.loadBankRows({customerId:'C1',currency:'KHR',rows:khrRows});
+a.equal(afterCurrencyChange.currency,'KHR');
+a.equal(afterCurrencyChange.selected.length,0);
+a.equal(afterCurrencyChange.total,'0');
+a.throws(()=>w.choose('BANK_REGISTER','BANK-1','10'),/not found/);
+w.choose('BANK_REGISTER','KHR-2','5000');
+a.equal(w.snapshot().total,'5000');
+
 console.log('Wallet preview regression tests passed');

@@ -1140,6 +1140,13 @@
   /* -----------------------------
      Atomic writes
   ----------------------------- */
+  // Optional, explicit pilot URL switch: ?bbMultiBankPilot=1.
+  // This is only a UI route selector, NEVER a security boundary.
+  // The server SQL remains admin-only and must be explicitly deployed/granted.
+  if(new URLSearchParams(window.location.search).get('bbMultiBankPilot')==='1'){
+    window.BB_MULTI_BANK_SAVE_ENABLED=true;
+  }
+
   // crypto.randomUUID() is unavailable on non-secure HTTP LAN hosts (Local Brain).
   // getRandomValues() still provides cryptographic randomness in these contexts.
   // Never fall back to Math.random for a financial idempotency identifier.

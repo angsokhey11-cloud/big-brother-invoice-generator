@@ -33,6 +33,7 @@ const tests=[
  ['one-item preview cannot fall through',()=>assert.match(panel,/v\.selected\.length<2\)throw/)],
  ['wallet customer revalidated',()=>assert.match(panel,/customer!==activeCustomer/)],
  ['wallet currency revalidated',()=>assert.match(panel,/activeCurrency!==currency/)],
+ ['invoice currency switch clears wallet immediately',()=>assert.match(panel,/event\.target\?\.id!=='currency'[\s\S]*wallet\.reset\(customer,currency\)/)],
  ['Sync Bank refresh keeps eligible selection',()=>assert.doesNotMatch(panel,/wallet\.reset\(customer,currency\)/)],
 ];
 for(const [name,fn] of tests){fn();console.log('PASS',name)}

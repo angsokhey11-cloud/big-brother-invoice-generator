@@ -1,0 +1,36 @@
+-- Must run only in a disposable test DB after fixture + implementation.
+do $test$
+declare
+ v_input jsonb := jsonb_build_object('invoiceId','T-OK','invoiceNo','T-OK','locationCode','TK-01','customerId','C1','currency','USD','paymentMethod','Partially Paid in Bank','grandTotal',150,'amountPaid',100);
+ v_payment jsonb := jsonb_build_object('settlement_request_id','11111111-1111-4111-8111-111111111111','settlement_sources',jsonb_build_array(
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-A','source_currency','USD','source_amount','40','invoice_amount','40'),
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-B','source_currency','USD','source_amount','60','invoice_amount','60')));
+ v_response jsonb;v_retry jsonb;v_error text;v_allocated numeric;
+begin
+ v_response:=public.bb_sales_save_invoice_multi_bank_v1(v_input,v_payment);
+ if v_response->>'sourceCount'<>'2' or jsonb_array_length(v_response->'paymentIds')<>2 then raise exception 'Incorrect payment response %',v_response;end if;
+ v_retry:=public.bb_sales_save_invoice_multi_bank_v1(v_input,v_payment);
+ if v_retry<>v_response then raise exception 'Idempotent retry changed response';end if;
+ if (select count(*) from public.payments where invoice_id='T-OK')<>2 then raise exception 'Retry created duplicate payments';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-A')<>60 then raise exception 'Incorrect TX-A remaining';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-B')<>140 then raise exception 'Incorrect TX-B remaining';end if;
+ raise notice 'PASS successful allocations and idempotent retry';
+ -- Simulate second bank trigger failure AFTER the invoice and first payment insert.
+ begin
+  perform public.bb_sales_save_invoice_multi_bank_v1(
+   jsonb_build_object('invoiceId','T-FAIL','invoiceNo','T-FAIL','locationCode','TK-01','customerId','C1','currency','USD','paymentMethod','Partially Paid in Bank','grandTotal',100,'amountPaid',85),
+   jsonb_build_object('settlement_request_id','22222222-2222-4222-8222-222222222222','settlement_sources',jsonb_build_array(
+    jsonb_build_object('kind','BANK_REGISTER','source_id','TX-A','source_currency','USD','source_amount','30','invoice_amount','30'),
+    jsonb_build_object('kind','BANK_REGISTER','source_id','TX-B','source_currency','USD','source_amount','55','invoice_amount','55'))));
+  raise exception 'FAILED: injected second payment unexpectedly succeeded';
+ exception when others then
+  get stacked diagnostics v_error=message_text;
+  if v_error not like '%Injected second-bank failure%' then raise exception 'Unexpected rejection: %',v_error;end if;
+ end;
+ if exists(select 1 from public.invoices where invoice_id='T-FAIL') then raise exception 'Failed invoice was not rolled back';end if;
+ if exists(select 1 from public.payments where invoice_id='T-FAIL') then raise exception 'First payment was not rolled back';end if;
+ if exists(select 1 from public.bb_invoice_multi_bank_requests where invoice_id='T-FAIL') then raise exception 'Failed request was not rolled back';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-A')<>60 then raise exception 'First bank was deducted after rollback';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-B')<>140 then raise exception 'Second bank was deducted after rollback';end if;
+ raise notice 'PASS rollback of invoice, first bank payment and both wallet balances';
+end $test$;

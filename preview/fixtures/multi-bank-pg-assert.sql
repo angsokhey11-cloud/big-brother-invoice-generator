@@ -7,6 +7,18 @@ declare
    jsonb_build_object('kind','BANK_REGISTER','source_id','TX-B','source_currency','USD','source_amount','60','invoice_amount','60')));
  v_response jsonb;v_retry jsonb;v_error text;v_allocated numeric;
 begin
+ -- Admin-only pilot: authenticated nonadmins cannot create new settlements.
+ perform set_config('bb_test.is_admin','off',true);
+ begin
+  perform public.bb_sales_save_invoice_multi_bank_v1(v_input,v_payment);
+  raise exception 'Nonadmin unexpectedly saved invoice';
+ exception when others then
+  get stacked diagnostics v_error=message_text;
+  if v_error not like '%Admin-only%' then raise exception 'Incorrect admin rejection: %',v_error;end if;
+ end;
+ perform set_config('bb_test.is_admin','on',true);
+ if exists(select 1 from public.invoices where invoice_id='T-OK') then raise exception 'Admin rejection wrote invoice';end if;
+ raise notice 'PASS admin-only pilot restriction';
  v_response:=public.bb_sales_save_invoice_multi_bank_v1(v_input,v_payment);
  if v_response->>'sourceCount'<>'2' or jsonb_array_length(v_response->'paymentIds')<>2 then raise exception 'Incorrect payment response %',v_response;end if;
  v_retry:=public.bb_sales_save_invoice_multi_bank_v1(v_input,v_payment);

@@ -35,6 +35,8 @@ def main():
         page = browser.new_page()
         page.set_content("""<!doctype html><html><body>
         <select id="currency"><option value="USD">USD</option><option value="KHR">KHR</option></select>
+        <select id="paymentMethod"><option value="Bank">Bank</option><option value="Partially Paid in Bank">Partially Paid in Bank</option></select>
+        <div id="transactionIdRow"><input id="transactionId" placeholder="Transaction ID"></div>
         <div id="bbRegisteredPayments"></div></body></html>""")
         page.evaluate("window.selectedCustomer='C1';window.bbGetSelectedCustomerForBank=()=>({customerId:window.selectedCustomer})")
         page.add_script_tag(path=str(SOURCE))
@@ -46,6 +48,9 @@ def main():
         got=selection(page)
         assert got["selected_total"]=="55.00",got
         assert [x["source_id"] for x in got["settlement_sources"]]==["TX-A","TX-B"],got
+        assert not page.locator("#transactionIdRow").is_visible(), "Old manual Transaction ID still shown for two-bank wallet"
+        assert page.locator("#bbMultiWalletReferencesNotice").is_visible()
+        print("PASS Chromium: two-bank wallet hides obsolete Transaction ID entry")
         print("PASS Chromium: panel, checkbox allocations and save payload")
 
         broadcast(page)
@@ -61,6 +66,7 @@ def main():
             assert "at least two" in str(e),e
         else:
             raise AssertionError("Single remaining source allowed")
+        assert page.locator("#transactionIdRow").is_visible(), "Single-bank Transaction ID should return"
         print("PASS Chromium: reduced balance removed; single allocation blocked")
 
         page.evaluate("window.selectedCustomer='C2'")

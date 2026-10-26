@@ -17,7 +17,7 @@ class FakeDatabase:
         self.saved=False
     def respond(self,route):
         req=route.request
-        if req.url==BASE:
+        if req.url.split('?')[0]==BASE:
             route.fulfill(status=200,content_type="text/html",body="""<!doctype html>
               <select id="currency"><option value="USD">USD</option><option value="KHR">KHR</option></select>
               <input id="customerName" value="Test Customer">
@@ -66,12 +66,12 @@ def ids(db):
     return [c["body"]["p_payment"]["settlement_request_id"] for c in db.calls
             if c["rpc"]=="bb_sales_save_invoice_multi_bank_v1"]
 
-def setup(browser):
+def setup(browser,pilot=False):
     ctx=browser.new_context()
     db=FakeDatabase()
     ctx.route("**/*",db.respond)
     page=ctx.new_page()
-    page.goto(BASE)
+    page.goto(BASE+('?bbMultiBankPilot=1' if pilot else ''))
     page.evaluate("""() => {
       window.customers=[{customerId:"C1",name:"Test Customer",locationCode:"TK-01"}];
       window.locations=[];window.selectedProducts=[];window.clearAll=()=>{};
@@ -103,6 +103,14 @@ def main():
         assert not out["ok"] and "not enabled" in out["error"],out
         assert not db.calls,db.calls
         print("PASS Chromium adapter: disabled feature makes no bank RPC")
+        ctx.close()
+
+        # Admin pilot is opt-in by URL; server-side SQL independently checks admin rights.
+        ctx,page,db=setup(browser,pilot=True)
+        assert page.evaluate("window.BB_MULTI_BANK_SAVE_ENABLED") is True
+        result=attempt(page,draft("MOCK-PILOT"))
+        assert result["ok"] and [c["rpc"] for c in db.calls]==["bb_sales_save_invoice_multi_bank_v1"],(result,db.calls)
+        print("PASS Chromium adapter: explicit admin-pilot URL enables guarded route")
         ctx.close()
 
         ctx,page,db=setup(browser)

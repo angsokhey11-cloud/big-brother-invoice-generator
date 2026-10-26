@@ -50,6 +50,25 @@ document.addEventListener('bb:bank-cache-updated',event=>{
  rows=(Array.isArray(d.balances)?d.balances:[]).filter(x=>String(x.customer_id)===customer&&Number(x.remaining_amount)>0).map(x=>({kind:'BANK_REGISTER',id:String(x.transaction_id),currency:String(x.currency||'').toUpperCase(),available:String(x.remaining_amount)}));
  render();
 });
+function clearMultiBankSelection(){
+  customer='';rows=[];currency='USD';
+  wallet.reset('','USD');
+  document.getElementById('bbMultiWalletPreview')?.remove();
+}
+const originalClearAfterSuccess=window.clearAllAfterSuccessfulSave;
+if(typeof originalClearAfterSuccess==='function'){
+ window.clearAllAfterSuccessfulSave=function(){
+  clearMultiBankSelection();
+  return originalClearAfterSuccess.apply(this,arguments);
+ };
+}
+const originalClearAll=window.clearAll;
+if(typeof originalClearAll==='function'){
+ window.clearAll=function(){
+  clearMultiBankSelection();
+  return originalClearAll.apply(this,arguments);
+ };
+}
 window.BBInvoiceMultiSourceSelection=function(){
  const v=wallet.snapshot();
  if(v.selected.length===0)return null;

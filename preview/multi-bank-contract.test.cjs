@@ -17,6 +17,7 @@ const tests=[
  ['source ID locks ordered',()=>assert.match(sql,/array_agg\(distinct upper/)],
  ['bank allocation trigger reused',()=>assert.match(sql,/insert into public\.payments/)],
  ['all allocations verified',()=>assert.match(sql,/Missing bank allocation after invoice save/)],
+ ['exact source and amount verified',()=>assert.match(sql,/Multi-bank allocation source or amount mismatch/)],
  ['all bank payment IDs returned',()=>assert.match(sql,/'paymentIds',v_payment_ids/)],
  ['legacy paymentId compatibility',()=>assert.match(sql,/'paymentId',v_payment_ids->>0/)],
  ['idempotency keyed by UUID',()=>assert.match(sql,/request_id uuid primary key/)],

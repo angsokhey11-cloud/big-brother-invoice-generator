@@ -93,4 +93,30 @@ begin
  if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-KHR-2')<>750 then raise exception 'KHR source 2 balance wrong';end if;
  raise notice 'PASS two-source KHR bank allocation';
 
+
+ -- A fully paid KHR invoice must consume exactly its total.
+ v_response:=public.bb_sales_save_invoice_multi_bank_v1(
+  jsonb_build_object('invoiceId','T-KHR-FULL','invoiceNo','T-KHR-FULL','locationCode','TK-01','customerId','C1','currency','KHR','paymentMethod','Bank','grandTotal',500,'amountPaid',500),
+  jsonb_build_object('settlement_request_id','66666666-6666-4666-8666-666666666666','settlement_sources',jsonb_build_array(
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-KHR-1','source_currency','KHR','source_amount','200','invoice_amount','200'),
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-KHR-2','source_currency','KHR','source_amount','300','invoice_amount','300'))));
+ if (select sum(amount) from public.payments where invoice_id='T-KHR-FULL')<>500 then raise exception 'Fully paid KHR amount mismatch';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-KHR-1')<>50 then raise exception 'Fully paid KHR source 1 mismatch';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-KHR-2')<>450 then raise exception 'Fully paid KHR source 2 mismatch';end if;
+ raise notice 'PASS full KHR bank invoice with two transfers';
+ -- V1 deliberately rejects cross-currency settlement rather than applying an unverified FX conversion.
+ begin
+  perform public.bb_sales_save_invoice_multi_bank_v1(
+   jsonb_build_object('invoiceId','T-MIX','invoiceNo','T-MIX','locationCode','TK-01','customerId','C1','currency','USD','paymentMethod','Partially Paid in Bank','grandTotal',100,'amountPaid',40),
+   jsonb_build_object('settlement_request_id','77777777-7777-4777-8777-777777777777','settlement_sources',jsonb_build_array(
+    jsonb_build_object('kind','BANK_REGISTER','source_id','TX-A','source_currency','USD','source_amount','20','invoice_amount','20'),
+    jsonb_build_object('kind','BANK_REGISTER','source_id','TX-KHR-1','source_currency','KHR','source_amount','20','invoice_amount','20'))));
+  raise exception 'Unexpected mixed-currency settlement success';
+ exception when others then
+  get stacked diagnostics v_error=message_text;
+  if v_error not like '%wrong customer or currency%' then raise exception 'Unexpected mixed currency rejection: %',v_error;end if;
+ end;
+ if exists(select 1 from public.invoices where invoice_id='T-MIX') then raise exception 'Mixed-currency rejection persisted invoice';end if;
+ raise notice 'PASS mixed-currency allocation safely rejected';
+
 end $test$;

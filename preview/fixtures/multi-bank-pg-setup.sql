@@ -37,4 +37,4 @@ end $$;
 create trigger test_guard before insert on public.payments for each row execute function public.test_bank_guard();
 insert into public.customers values('C1',true);
 insert into public.bb_verified_bank_transactions(transaction_id,customer_id,bank_name,currency,status,amount)
- values('TX-A','C1','ABA','USD','AVAILABLE',100),('TX-B','C1','ABA','USD','AVAILABLE',200);
+ values('TX-A','C1','ABA','USD','AVAILABLE',100),('TX-B','C1','ABA','USD','AVAILABLE',200),('TX-KHR-1','C1','ABA','KHR','AVAILABLE',1250),('TX-KHR-2','C1','ABA','KHR','AVAILABLE',2750);

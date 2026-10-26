@@ -18,7 +18,7 @@ window.alert=(message)=>window.calls.push(['alert',String(message)]);
 window.bbInvoiceSaving=false;
 window.invoiceDraft=()=>{
   return {invoiceId:'MOCK-1',invoiceNo:'MOCK-1',invoiceDate:'2026-10-27',
-    locationCode:'TK-01',customer:'Demo',customerId:'C1',currency:'USD',
+    locationCode:'TK-01',customer:'Demo',currency:'USD',
     salesperson:'Salesperson',paymentMethod:'Partially Paid in Bank',
     amountPaid:55,grandTotal:100,paymentBank:'',transactionId:'',
     items:[{productCode:'P1',qty:1,unitPrice:100}]};
@@ -30,6 +30,7 @@ window.bbInvoiceMultiSelection={
   {kind:'BANK_REGISTER',source_id:'TX-B',source_amount:'35.00'}]
 };
 window.BBInvoiceMultiSourceSelection=()=>window.bbInvoiceMultiSelection;
+window.bbGetSelectedCustomerForBank=()=>({customerId:'C1'});
 window.bbConfirmInvoiceCompletion=async()=>true;
 window.checkInvoiceNumberAvailable=async()=>({exists:false});
 window.checkPaymentTransactionIdAvailable=async(id)=>{
@@ -67,6 +68,8 @@ def main():
     page.evaluate("window.calls=[];window.BB_MULTI_BANK_SAVE_ENABLED=true")
     result=page.evaluate(async_call)
     assert any(x[0]=="submitted" for x in result),result
+    submitted=next(x[1] for x in result if x[0]=="submitted")
+    assert submitted["customerId"]=="C1",submitted
     assert not any(x[0]=="legacy-unique-tx-check" for x in result),result
     assert any(x[0]=="success" for x in result),result
     print("PASS Desktop Complete: two-bank wallet skips obsolete single-transaction requirements")

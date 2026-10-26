@@ -59,6 +59,7 @@ jobs:
           PGPASSWORD: postgres
         run: |
           psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d multibank_test -f preview/fixtures/multi-bank-pg-setup.sql
+          psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d multibank_test -f preview/fixtures/multi-bank-production-guard.sql
           psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d multibank_test -f sql/multi-bank-atomic-invoice-save-v1.sql
           psql -v ON_ERROR_STOP=1 -h localhost -U postgres -d multibank_test -f preview/fixtures/multi-bank-pg-assert.sql
 

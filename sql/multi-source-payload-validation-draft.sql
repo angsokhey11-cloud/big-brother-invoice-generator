@@ -51,8 +51,8 @@ begin
     v_key:=v_kind||':'||v_id;
     if v_key=any(v_seen) then raise exception 'Duplicate source identity';end if;
     v_seen:=array_append(v_seen,v_key);
-    if coalesce(v_item->>'source_amount','') !~ '^([0-9]+)(\\.[0-9]+)?$'
-       or coalesce(v_item->>'invoice_amount','') !~ '^([0-9]+)(\\.[0-9]+)?$' then
+    if coalesce(v_item->>'source_amount','') !~ '^([0-9]+)([.][0-9]+)?$'
+       or coalesce(v_item->>'invoice_amount','') !~ '^([0-9]+)([.][0-9]+)?$' then
       raise exception 'Invalid source allocation amount';
     end if;
     v_source_amount:=(v_item->>'source_amount')::numeric;

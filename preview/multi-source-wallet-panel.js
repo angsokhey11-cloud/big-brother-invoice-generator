@@ -45,7 +45,8 @@ function render(){
 document.addEventListener('bb:bank-cache-updated',event=>{
  const d=event.detail||{};customer=String(d.customerId||'');
  currency=document.getElementById('currency')?.value==='KHR'?'KHR':'USD';
- wallet.reset(customer,currency);
+ // Preserve eligible selections on same-customer refresh; the wallet engine
+ // invalidates changed customer/currency and insufficient source balances.
  wallet.loadBankRows({customerId:customer,currency,rows:d.balances||[]});
  rows=(Array.isArray(d.balances)?d.balances:[]).filter(x=>String(x.customer_id)===customer&&Number(x.remaining_amount)>0).map(x=>({kind:'BANK_REGISTER',id:String(x.transaction_id),currency:String(x.currency||'').toUpperCase(),available:String(x.remaining_amount)}));
  render();

@@ -121,11 +121,15 @@ begin
     v_amount:=(v_item->>'source_amount')::numeric;
     if v_amount<=0 or v_amount<>trunc(v_amount,v_precision)
        then raise exception 'Unsupported amount or precision for %',v_source_id; end if;
-    if (v_item->>'source_currency') is distinct from v_currency
-       then
-       raise exception 'Source currency differs from invoice currency'; end if;
+    if (v_item->>'source_currency') is distinct from v_currency then
+      raise exception 'Source currency differs from invoice currency';
+    end if;
     if v_item ? 'invoice_amount' then
-      if coalesce(v_item->>'invoice_amount','') !~ '^[0-9]+([.][0-9]+)?
+      if coalesce(v_item->>'invoice_amount','') !~ '^[0-9]+([.][0-9]+)?$'
+         or (v_item->>'invoice_amount')::numeric <> v_amount then
+        raise exception 'Same-currency invoice allocation mismatch';
+      end if;
+    end if;
     select * into v_source from public.bb_verified_bank_transactions b
       where upper(btrim(b.transaction_id))=v_source_id;
     if v_amount>coalesce((select s.remaining_amount

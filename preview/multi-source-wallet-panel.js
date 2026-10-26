@@ -47,9 +47,21 @@ document.addEventListener('bb:bank-cache-updated',event=>{
  currency=document.getElementById('currency')?.value==='KHR'?'KHR':'USD';
  wallet.reset(customer,currency);
  wallet.loadBankRows({customerId:customer,currency,rows:d.balances||[]});
- rows=wallet.snapshot().selected; // built below from authoritative event, not browser selections
  rows=(Array.isArray(d.balances)?d.balances:[]).filter(x=>String(x.customer_id)===customer&&Number(x.remaining_amount)>0).map(x=>({kind:'BANK_REGISTER',id:String(x.transaction_id),currency:String(x.currency||'').toUpperCase(),available:String(x.remaining_amount)}));
  render();
 });
+window.BBInvoiceMultiSourceSelection=function(){
+ const v=wallet.snapshot();
+ if(!customer || v.customerId!==customer)throw Error('Customer wallet selection is stale. Sync Bank again.');
+ if(v.selected.length<2)return null;
+ if(v.selected.some(x=>x.currency!==currency))throw Error('Currency mismatch in selected bank sources');
+ return {
+  settlement_sources:v.selected.map(x=>({
+   kind:'BANK_REGISTER',source_id:x.id,source_currency:x.currency,
+   source_amount:x.useAmount,invoice_amount:x.useAmount
+  })),
+  selected_total:v.total,currency:v.currency,customer_id:v.customerId
+ };
+};
 document.addEventListener('DOMContentLoaded',()=>{render()},{once:true});
 })();

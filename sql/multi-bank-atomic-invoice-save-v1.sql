@@ -46,6 +46,9 @@ declare
   v_precision int;
   v_details jsonb := '[]'::jsonb;
   v_first_bank text;
+  -- Older registered payments may have no saved receiving-bank name.
+  -- Use the admin's explicit Payment Bank selection only for those rows.
+  v_fallback_bank text := nullif(btrim(coalesce(p_invoice->>'paymentBank','')),'');
   v_ids text[];
   v_key text;
   v_invoice_result jsonb;
@@ -143,18 +146,23 @@ begin
                        from public.bb_bank_balance_snapshot s
                        where s.transaction_id=v_source.transaction_id),0) then
        raise exception 'Insufficient registered bank balance for %',v_source_id; end if;
+    if nullif(btrim(coalesce(v_source.bank_name,'')),'') is null
+       and (v_fallback_bank is null or upper(v_fallback_bank)='OTHER') then
+      raise exception 'Select the actual receiving Payment Bank for registered transfer %',v_source_id;
+    end if;
     v_total:=v_total+v_amount;
     v_details:=v_details||jsonb_build_array(
       jsonb_build_object('source_id',v_source.transaction_id,
-                         'bank_name',v_source.bank_name,'amount',v_amount)
+                         'bank_name',coalesce(nullif(btrim(v_source.bank_name),''),v_fallback_bank),'amount',v_amount)
     );
   end loop;
 
   select bank_name into v_first_bank
   from public.bb_verified_bank_transactions
   where upper(btrim(transaction_id))=v_ids[1];
-  if nullif(btrim(coalesce(v_first_bank,'')),'') is null then
-    raise exception 'Verified bank source has no receiving bank';
+  v_first_bank:=coalesce(nullif(btrim(coalesce(v_first_bank,'')),''),v_fallback_bank);
+  if v_first_bank is null or upper(v_first_bank)='OTHER' then
+    raise exception 'Select an actual receiving Payment Bank for the invoice';
   end if;
   -- p_payment NULL prevents the legacy save from inserting an accidental
   -- single bank payment; we insert one payment per bank source below.

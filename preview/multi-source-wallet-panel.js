@@ -88,5 +88,18 @@ window.BBInvoiceMultiSourceSelection=function(){
   selected_total:v.total,currency:v.currency,customer_id:v.customerId
  };
 };
+// A currency switch invalidates previous payment selections immediately.
+// Keep cached rows visible, but require fresh selections in the new currency.
+document.addEventListener('change',event=>{
+ if(event.target?.id!=='currency')return;
+ const nextCurrency=event.target.value==='KHR'?'KHR':'USD';
+ if(nextCurrency===currency)return;
+ currency=nextCurrency;
+ wallet.reset(customer,currency);
+ wallet.loadBankRows({customerId:customer,currency,rows:rows.map(r=>({
+  customer_id:customer,transaction_id:r.id,currency:r.currency,remaining_amount:r.available
+ }))});
+ render();
+});
 document.addEventListener('DOMContentLoaded',()=>{render()},{once:true});
 })();

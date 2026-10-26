@@ -47,4 +47,12 @@ a.throws(()=>w.choose('BANK_REGISTER','BANK-1','10'),/not found/);
 w.choose('BANK_REGISTER','KHR-2','5000');
 a.equal(w.snapshot().total,'5000');
 
+// A changed bank-currency field must not preserve a prior allocation.
+w.reset('C1','USD');
+w.loadBankRows({customerId:'C1',currency:'USD',rows});
+w.choose('BANK_REGISTER','BANK-1','10.00');
+const switchedSource=rows.map(r=>r.transaction_id==='BANK-1'?{...r,currency:'KHR'}:r);
+a.equal(w.loadBankRows({customerId:'C1',currency:'USD',rows:switchedSource}).selected.length,0);
+a.throws(()=>w.choose('BANK_REGISTER','BANK-1','10'),/Currency conversion/);
+
 console.log('Wallet preview regression tests passed');

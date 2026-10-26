@@ -2,7 +2,8 @@
 (function(){
 'use strict';
 const wallet=window.BBMultiSourceWalletPreview;
-if(!wallet)return;
+// Admin pilot must be explicitly opted in. Hide the unfinished picker from staff.
+if(!wallet || window.BB_MULTI_BANK_SAVE_ENABLED!==true)return;
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let rows=[],customer='',currency='USD';
 function ensure(){

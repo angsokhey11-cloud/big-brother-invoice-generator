@@ -22,6 +22,8 @@ const tests=[
  ['legacy paymentId compatibility',()=>assert.match(sql,/'paymentId',v_payment_ids->>0/)],
  ['idempotency keyed by UUID',()=>assert.match(sql,/request_id uuid primary key/)],
  ['same-currency bank-only restriction',()=>assert.match(sql,/Source currency differs from invoice currency/)],
+ ['full bank invoice guarded',()=>assert.match(sql,/Full Bank payment must cover entire invoice/)],
+ ['partial bank invoice guarded',()=>assert.match(sql,/Partially paid invoice must have a positive outstanding balance/)],
  ['invoice payment reconciled',()=>assert.match(sql,/Payment allocations do not equal the saved invoice amount/)],
  ['no auto privilege grant',()=>assert.match(sql,/revoke all on function public\.bb_sales_save_invoice_multi_bank_v1/)],
  ['feature disabled by default',()=>assert.match(adapter,/BB_MULTI_BANK_SAVE_ENABLED!==true/)],

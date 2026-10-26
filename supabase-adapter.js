@@ -1170,7 +1170,13 @@
       if(earlyMultiSources.some(x=>x?.kind!=='BANK_REGISTER'))
         throw new Error('Customer Credit allocations are not enabled yet.');
     }
-    const fingerprint=bbInvoiceFingerprint(invoicePayload);
+    // Include selected allocations in the recovery fingerprint. The legacy
+    // invoice fingerprint alone cannot distinguish changes to wallet sources.
+    const fingerprint=bbInvoiceFingerprint(invoicePayload)+
+      (Array.isArray(paymentPayload?.settlement_sources)&&paymentPayload.settlement_sources.length>=2
+        ? '|MULTI_BANK:'+JSON.stringify(paymentPayload.settlement_sources.map(x=>[
+            x.kind,x.source_id,x.source_currency,String(x.source_amount),String(x.invoice_amount)
+          ])) : '');
     let pending=bbReadPendingInvoice();
     if(pending){
       let verification;

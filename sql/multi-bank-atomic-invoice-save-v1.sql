@@ -209,6 +209,26 @@ begin
   if v_count<>jsonb_array_length(v_sources) then
     raise exception 'Missing bank allocation after invoice save';
   end if;
+  -- Also verify the exact bank transfers and amounts. A matching row count
+  -- alone is insufficient evidence that the intended wallet was debited.
+  if exists (
+    select 1 from jsonb_array_elements(v_details) d
+    where not exists (
+      select 1
+      from public.bb_bank_balance_allocations a
+      join public.payments p on p.payment_id=a.payment_id
+      where p.invoice_id=v_invoice.invoice_id
+        and p.payment_source='Invoice'
+        and a.reversed_at is null
+        and a.transaction_id=d->>'source_id'
+        and p.transaction_id=d->>'source_id'
+        and a.applied_bank_amount=(d->>'amount')::numeric
+        and a.applied_invoice_amount=(d->>'amount')::numeric
+        and p.amount=(d->>'amount')::numeric
+    )
+  ) then
+    raise exception 'Multi-bank allocation source or amount mismatch';
+  end if;
 
   v_result:=v_invoice_result||jsonb_build_object(
      'multiSource',true,'sourceCount',v_count,

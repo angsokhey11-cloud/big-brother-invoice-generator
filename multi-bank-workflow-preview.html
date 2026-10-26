@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; form-action 'none'">
+<title>BIG BROTHER | Multi-Bank Payment Flow Preview</title>
+<style>
+:root{--navy:#102a4a;--blue:#164a7d;--muted:#62768a;--border:#dce5ef;--bg:#f3f6fa;--good:#0d7358;--warn:#966416}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#152e49;font:14px/1.5 "Segoe UI",Arial,sans-serif}
+header{background:linear-gradient(125deg,#102a4a,#17558c);color:white;padding:25px max(24px,calc((100vw - 1190px)/2))}
+header h1{font-size:25px;letter-spacing:.04em;margin:3px 0}header p{margin:4px 0 0;color:#c2daf1}
+.top{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap}
+.tag{font-size:11px;letter-spacing:.06em;border:1px solid #b8d7f4;background:#e6f1fc;color:#174b79;padding:6px 10px;border-radius:99px;font-weight:800}
+header .tag{background:#e5f2ff;color:#0c436c;border:0}
+main{max-width:1238px;margin:0 auto;padding:22px 24px 36px}
+.notice{border:1px solid #dfd2b4;background:#fffaf0;color:#75541f;padding:13px 17px;border-radius:12px;margin-bottom:18px}
+.flow{display:flex;flex-wrap:wrap;gap:9px;margin:16px 0 21px}.flow span{flex:1;min-width:150px;padding:11px 14px;border:1px solid var(--border);background:white;border-radius:10px;color:#597085;font-weight:700}.flow span.active{color:#0c5381;border-color:#9cc7e9;background:#ecf7ff}
+.layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(305px,.8fr);gap:20px}.stack{display:grid;gap:18px}
+.card{background:white;border:1px solid var(--border);border-radius:16px;box-shadow:0 2px 12px #1c42620a;padding:21px}
+.card h2{font-size:17px;margin:0 0 13px;color:var(--navy)}.card h3{font-size:14px;margin:18px 0 10px}
+.sub{font-size:12px;color:var(--muted);margin:-7px 0 14px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:13px}label.field{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#58718a}
+input,select{font:inherit;min-width:0;width:100%;padding:11px;border:1px solid #cad9e7;border-radius:9px;background:white;color:#102c49}
+input:focus,select:focus{outline:2px solid #a6d4fa;border-color:#5ca0da}
+button{border:0;background:var(--blue);color:white;border-radius:9px;padding:10px 15px;font:700 13px "Segoe UI",Arial;cursor:pointer}
+button.secondary{background:#eef4fa;border:1px solid #c9dbe9;color:#175080}button:disabled{cursor:not-allowed;opacity:.55}
+.btnrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:17px}
+.transfer{display:grid;grid-template-columns:25px 1fr 130px;gap:11px;align-items:center;padding:12px 0;border-top:1px solid #e8eef4}
+.transfer input[type=checkbox]{width:19px;height:19px;accent-color:#17609a}.transfer strong{display:block;font-size:13px}
+.transfer small{display:block;color:var(--muted);font-size:11px}
+.transfer input[type=number]{padding:9px;text-align:right}
+.transfer.disabled{opacity:.46}
+.total{display:flex;justify-content:space-between;padding:12px 0;border-top:1px solid #e7edf4;gap:14px;font-size:13px}
+.total b{font-variant-numeric:tabular-nums}.total.strong{font-size:18px;color:#103d65;border-top:2px solid #cbdce8}
+.result{padding:12px 14px;background:#f2f8fe;border:1px solid #d5e8f7;border-radius:10px;color:#254965;font-size:13px}
+.feedback{margin-top:12px;padding:11px 13px;border-radius:10px;font-weight:600;display:none}
+.feedback.bad{display:block;color:#9d3131;border:1px solid #e7c5c5;background:#fff5f5}
+.feedback.ok{display:block;color:#086449;border:1px solid #b7e1d0;background:#effbf5}
+.ledger{width:100%;border-collapse:collapse;font-size:12px} .ledger th{text-align:left;color:#6e8090;background:#f3f7fa}
+.ledger td,.ledger th{padding:10px 9px;border-bottom:1px solid #e5edf5}.ledger td:last-child,.ledger th:last-child{text-align:right}
+.placeholder{border:1px dashed #cbdae6;border-radius:11px;padding:25px;text-align:center;color:#8294a4}
+.note{font-size:12px;color:#60758a;margin-top:10px}
+.amount{font-size:25px;font-weight:900;color:#123c63;font-variant-numeric:tabular-nums}
+.paid{color:#087251;font-weight:800}.partial{color:#9a6810;font-weight:800}
+section#invoiceReceipt{display:none}
+ul.checks{margin:12px 0;padding-left:21px;color:#4a647c;line-height:1.9}
+@media(max-width:830px){.layout{grid-template-columns:1fr}header{padding:22px 20px}main{padding:16px}.card{padding:17px}}
+@media(max-width:480px){.fields{grid-template-columns:1fr}.transfer{grid-template-columns:25px 1fr 105px}.flow span{min-width:135px}}
+</style>
+</head>
+<body>
+<header><div class="top"><div><div style="font-size:12px;letter-spacing:.15em;opacity:.76">BIG BROTHER ACCOUNTING SYSTEMS</div><h1>Multi-Bank Invoice Payment</h1><p>Interactive workflow preview · Registered balances → Invoice → Payment history → A/R</p></div><span class="tag">SAFE DEMO · NO LIVE DATABASE</span></div></header>
+<main>
+<div class="notice"><strong>Demonstration only.</strong> All customers, invoices and balances below are fictional. Save performs a browser-only simulation; no Supabase, Local Brain, bank, stock, or accounting records are read or changed. Current development supports two or more registered bank transfers of the <strong>same currency</strong>; Cash + Bank and customer credits are not enabled yet.</div>
+<div class="flow"><span class="active" id="step1">01 · Invoice details</span><span class="active" id="step2">02 · Select bank balances</span><span id="step3">03 · Atomic save</span><span id="step4">04 · Payment &amp; A/R</span></div>
+<div class="layout">
+<div class="stack">
+<section class="card"><h2>01 · Invoice Information</h2><p class="sub">Choose a sample customer and the invoice total.</p>
+<div class="fields">
+<label class="field">Customer<select id="customer"><option value="C1">Sample Customer A — TK-01</option><option value="C2">Sample Customer B — SR-01</option></select></label>
+<label class="field">Invoice No.<input id="invoiceNo" value="DEMO-0001" readonly></label>
+<label class="field">Currency<select id="currency"><option value="USD">USD · US Dollars</option><option value="KHR">KHR · Cambodian Riel</option></select></label>
+<label class="field">Payment Method<select id="method"><option value="Partially Paid in Bank">Partially Paid in Bank</option><option value="Bank">Bank — Fully Paid</option><option disabled>Cash + Bank — Later</option><option disabled>Customer Credit — Later</option></select></label>
+<label class="field">Grand Total<input id="grand" type="number" min="1" step="0.01" value="150"></label>
+<label class="field">Invoice Date<input id="date" type="date" value="2026-10-27"></label></div></section>
+<section class="card"><div class="top"><h2 style="margin:0">02 · Registered Bank Balances</h2><button id="sync" class="secondary" type="button">↻ Sync Bank (demo)</button></div>
+<p class="sub" style="margin:9px 0">Select at least two registered transfers. Enter how much to use from each one; remaining amounts carry forward to the next invoice.</p>
+<div id="wallet"></div><div class="total strong"><span>Selected bank amount</span><b id="selected">USD 0.00</b></div>
+<div class="btnrow"><button id="save" type="button">✓ Simulate Atomic Save</button><button id="newInvoice" class="secondary" type="button">New Invoice</button><button id="reset" class="secondary" type="button">Reset Demo</button></div><div id="feedback" class="feedback" role="status"></div></section>
+</div>
+<div class="stack">
+<section class="card"><h2>Payment Preview</h2><p class="sub">Amounts recalculate automatically before saving.</p>
+<div class="total"><span>Invoice total</span><b id="totalText">USD 150.00</b></div>
+<div class="total"><span>Registered bank allocations</span><b id="allocatedText">USD 0.00</b></div>
+<div class="total strong"><span>Outstanding A/R</span><b id="outstandingText">USD 150.00</b></div>
+<div id="methodHint" class="result">For a partially paid invoice, use less than the grand total. The remaining amount becomes A/R.</div>
+<h3>Save checks</h3><ul class="checks"><li>Customer and currency match</li><li>At least two distinct verified transfers</li><li>Never spend beyond remaining bank balance</li><li>All payments and invoice succeed together</li><li>Duplicate invoice save blocked</li></ul></section>
+<section class="card" id="invoiceReceipt"><div class="top"><h2 style="margin:0">03 · Saved Invoice (Simulation)</h2><span class="tag">BROWSER ONLY</span></div>
+<div id="receipt"></div></section>
+<section class="card"><h2>04 · Invoice Payment History / Receivable</h2><p class="sub">After saving, each bank transaction becomes its own payment record while the invoice keeps one combined Paid amount.</p><div id="history" class="placeholder">Create a demo invoice to display two payment records and the outstanding balance.</div></section>
+</div></div>
+<p class="note" style="text-align:center;margin:22px">BIG BROTHER development preview · This demo has no network requests or stored customer data.</p>
+</main>
+<script>
+"use strict";
+(function(){
+var initial={
+ C1:{USD:[{id:"ABA-DEMO-1001",bank:"ABA",balance:100},{id:"ACLEDA-DEMO-2002",bank:"ACLEDA",balance:120}],KHR:[{id:"ABA-KHR-DEMO-1",bank:"ABA",balance:300000},{id:"ACLEDA-KHR-DEMO-2",bank:"ACLEDA",balance:550000}]},
+ C2:{USD:[{id:"ABA-DEMO-3003",bank:"ABA",balance:80},{id:"ACLEDA-DEMO-4004",bank:"ACLEDA",balance:95}],KHR:[{id:"ABA-KHR-DEMO-3",bank:"ABA",balance:240000},{id:"ACLEDA-KHR-DEMO-4",bank:"ACLEDA",balance:390000}]}
+};
+var balances,alloc={},invoiceCount=1,saved=null,history=[];
+var el=id=>document.getElementById(id);
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function money(v){var currency=el("currency").value;return currency+" "+Number(v).toLocaleString("en-US",{minimumFractionDigits:currency==="USD"?2:0,maximumFractionDigits:currency==="USD"?2:0})}
+function precise(v){var cur=el("currency").value;return Math.round(Number(v)*(cur==="USD"?100:1))/(cur==="USD"?100:1)}
+function getRows(){return balances[el("customer").value][el("currency").value]}
+function selectedEntries(){return getRows().filter(r=>Number(alloc[r.id])>0).map(r=>({id:r.id,bank:r.bank,amount:precise(alloc[r.id])}))}
+function chosenTotal(){return precise(selectedEntries().reduce((sum,r)=>sum+r.amount,0))}
+function signal(message,kind){var e=el("feedback");e.className="feedback "+kind;e.textContent=message}
+function clearSignal(){el("feedback").className="feedback";el("feedback").textContent=""}
+function renderWallet(){
+ var wallet=el("wallet");wallet.textContent="";
+ getRows().forEach(function(r){
+  var row=document.createElement("div");row.className="transfer"+(r.balance<=0?" disabled":"");
+  var check=document.createElement("input");check.type="checkbox";check.checked=Number(alloc[r.id])>0;check.disabled=r.balance<=0;check.setAttribute("aria-label","Use "+r.id);
+  var detail=document.createElement("div");var name=document.createElement("strong");name.textContent=r.bank+" · "+r.id;var small=document.createElement("small");small.textContent="Available: "+money(r.balance);detail.append(name,small);
+  var input=document.createElement("input");input.type="number";input.min="0";input.step=el("currency").value==="USD"?"0.01":"1";input.placeholder="Use amount";input.value=alloc[r.id]===undefined?"":alloc[r.id];input.disabled=r.balance<=0;input.setAttribute("aria-label","Amount for "+r.id);
+  check.addEventListener("change",function(){if(check.checked){var val=Number(input.value);if(!val)val=r.balance;input.value=String(val);alloc[r.id]=val}else{delete alloc[r.id]}renderWallet();renderNumbers()});
+  input.addEventListener("change",function(){if(!check.checked)return;var val=Number(input.value);if(val>0)alloc[r.id]=val;else delete alloc[r.id];renderWallet();renderNumbers()});
+  row.append(check,detail,input);wallet.appendChild(row);
+ });
+}
+function renderNumbers(){
+ var grand=Number(el("grand").value)||0;var sum=chosenTotal(),out=precise(Math.max(0,grand-sum));el("selected").textContent=money(sum);el("totalText").textContent=money(grand);
+ el("allocatedText").textContent=money(sum);el("outstandingText").textContent=money(out);
+ el("methodHint").textContent=el("method").value==="Bank"?"Fully paid Bank invoices must allocate exactly "+money(grand)+" using at least two transfers.":"Partial Bank invoices leave an A/R outstanding amount. Select less than "+money(grand)+".";
+}
+function render(){renderWallet();renderNumbers();el("save").disabled=!!saved}
+function resetDraft(){alloc={};saved=null;el("invoiceNo").value="DEMO-"+String(invoiceCount).padStart(4,"0");el("invoiceReceipt").style.display="none";clearSignal();render()}
+function resetAll(){balances=clone(initial);invoiceCount=1;history=[];el("customer").value="C1";el("currency").value="USD";el("method").value="Partially Paid in Bank";el("grand").value=150;el("history").className="placeholder";el("history").textContent="Create a demo invoice to display two payment records and the outstanding balance.";resetDraft()}
+function showHistory(){
+ var wrap=el("history");wrap.className="";wrap.textContent="";
+ if(!history.length)return;
+ history.forEach(function(item){
+  var heading=document.createElement("div");heading.style.cssText="margin-top:12px;font-weight:800";heading.textContent=item.id+" · "+item.customer+" · "+item.status;wrap.appendChild(heading);
+  var table=document.createElement("table");table.className="ledger";
+  var thead=document.createElement("thead");thead.innerHTML="<tr><th>Bank transfer</th><th>Payment amount</th></tr>";table.appendChild(thead);
+  var body=document.createElement("tbody");item.entries.forEach(function(r){var tr=document.createElement("tr"),a=document.createElement("td"),b=document.createElement("td");a.textContent=r.bank+" · "+r.id;b.textContent=item.currency+" "+r.amount.toLocaleString("en-US");tr.append(a,b);body.appendChild(tr)});table.appendChild(body);wrap.appendChild(table);
+  var subtotal=document.createElement("div");subtotal.className="total";subtotal.textContent="Combined paid: "+item.currency+" "+item.paid.toLocaleString("en-US")+" · Outstanding A/R: "+item.currency+" "+item.outstanding.toLocaleString("en-US");wrap.appendChild(subtotal);
+ });
+}
+function save(){
+ clearSignal();
+ if(saved){signal("Duplicate save blocked. Choose New Invoice first.","bad");return}
+ var currency=el("currency").value,grand=Number(el("grand").value),rows=getRows(),entries=selectedEntries(),paid=chosenTotal();
+ if(!(grand>0)||!Number.isFinite(grand)){signal("Enter a positive grand total.","bad");return}
+ if(precise(grand)!==grand){signal("Invoice total has invalid currency decimal precision.","bad");return}
+ if(entries.length<2){signal("Select at least two registered bank transfers.","bad");return}
+ for(var i=0;i<entries.length;i++){
+  var entry=entries[i],bank=rows.find(r=>r.id===entry.id);
+  if(!bank||!(entry.amount>0)||entry.amount>bank.balance||precise(entry.amount)!==entry.amount){
+   signal("Invalid or insufficient balance for "+entry.id+". Nothing was saved.","bad");return}
+ }
+ if(paid>grand){signal("Bank allocations cannot exceed the invoice total.","bad");return}
+ if(el("method").value==="Bank"&&paid!==grand){signal("Fully Paid in Bank must cover the exact invoice total.","bad");return}
+ if(el("method").value!=="Bank"&&paid>=grand){signal("Partially Paid in Bank must have a positive outstanding balance.","bad");return}
+ // One atomic, browser-only simulation: checks finish before ANY balance changes.
+ var record={id:el("invoiceNo").value,customer:el("customer").options[el("customer").selectedIndex].text,currency:currency,total:grand,paid:paid,
+ outstanding:precise(grand-paid),status:grand===paid?"Paid":"Processing",entries:entries};
+ entries.forEach(function(entry){rows.find(r=>r.id===entry.id).balance=precise(rows.find(r=>r.id===entry.id).balance-entry.amount)});
+ saved=record;history.unshift(record);history=history.slice(0,4);
+ el("invoiceReceipt").style.display="block";el("step3").classList.add("active");el("step4").classList.add("active");
+ var receipt=el("receipt");receipt.textContent="";
+ var amt=document.createElement("div");amt.className="amount";amt.textContent=money(record.paid);receipt.appendChild(amt);
+ var status=document.createElement("p");status.className=record.status==="Paid"?"paid":"partial";status.textContent="Invoice "+record.id+" · "+record.status;receipt.appendChild(status);
+ var text=document.createElement("p");text.textContent=entries.length+" registered transfers recorded; "+money(record.outstanding)+" outstanding.";receipt.appendChild(text);
+ render();showHistory();signal("SIMULATED SAVE COMPLETED — "+entries.length+" payment rows, one invoice, remaining bank balances updated. No live data touched.","ok");
+}
+el("save").addEventListener("click",save);
+el("newInvoice").addEventListener("click",function(){invoiceCount++;resetDraft();el("step3").classList.remove("active");el("step4").classList.remove("active")});
+el("reset").addEventListener("click",resetAll);
+el("sync").addEventListener("click",function(){render();signal("Demo Sync Bank complete. Valid selected amounts were preserved.","ok")});
+el("customer").addEventListener("change",resetDraft);
+el("currency").addEventListener("change",function(){el("grand").value=el("currency").value==="USD"?"150":"500000";resetDraft()});
+el("method").addEventListener("change",function(){if(saved){resetDraft()}else{renderNumbers();clearSignal()}});
+el("grand").addEventListener("input",renderNumbers);
+resetAll();
+})();
+</script></body></html>

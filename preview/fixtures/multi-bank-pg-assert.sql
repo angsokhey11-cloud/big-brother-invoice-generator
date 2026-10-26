@@ -131,4 +131,38 @@ begin
  if exists(select 1 from public.invoices where invoice_id='T-MIX') then raise exception 'Mixed-currency rejection persisted invoice';end if;
  raise notice 'PASS mixed-currency allocation safely rejected';
 
+ -- Legacy verified bank rows may have blank receiving-bank names. Admin must
+ -- explicitly pick a concrete Payment Bank; no guessed or silent backfill.
+ begin
+  perform public.bb_sales_save_invoice_multi_bank_v1(
+   jsonb_build_object('invoiceId','T-BANK-BLANK','invoiceNo','T-BANK-BLANK','locationCode','TK-01','customerId','C1','currency','USD','paymentMethod','Partially Paid in Bank','grandTotal',100,'amountPaid',55),
+   jsonb_build_object('settlement_request_id','88888888-8888-4888-8888-888888888888','settlement_sources',jsonb_build_array(
+    jsonb_build_object('kind','BANK_REGISTER','source_id','TX-OLD-A','source_currency','USD','source_amount','20','invoice_amount','20'),
+    jsonb_build_object('kind','BANK_REGISTER','source_id','TX-OLD-B','source_currency','USD','source_amount','35','invoice_amount','35'))));
+  raise exception 'Blank receiving bank unexpectedly allowed';
+ exception when others then
+  get stacked diagnostics v_error=message_text;
+  if v_error not like '%Select the actual receiving Payment Bank%' then
+   raise exception 'Wrong blank-bank rejection: %',v_error;
+  end if;
+ end;
+ if exists(select 1 from public.invoices where invoice_id='T-BANK-BLANK') then
+  raise exception 'Blank-bank rejection committed invoice';
+ end if;
+
+ v_response:=public.bb_sales_save_invoice_multi_bank_v1(
+  jsonb_build_object('invoiceId','T-BANK-BLANK','invoiceNo','T-BANK-BLANK','locationCode','TK-01','customerId','C1','currency','USD','paymentMethod','Partially Paid in Bank','paymentBank','ABA','grandTotal',100,'amountPaid',55),
+  jsonb_build_object('settlement_request_id','88888888-8888-4888-8888-888888888888','settlement_sources',jsonb_build_array(
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-OLD-A','source_currency','USD','source_amount','20','invoice_amount','20'),
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-OLD-B','source_currency','USD','source_amount','35','invoice_amount','35'))));
+ if v_response->>'sourceCount'<>'2' then raise exception 'Legacy bank payments not saved';end if;
+ if (select count(*) from public.payments where invoice_id='T-BANK-BLANK' and bank_payment='ABA')<>2 then
+  raise exception 'Explicit admin-selected bank not on both payments';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-OLD-A')<>80 then
+  raise exception 'Old bank A remaining amount incorrect';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-OLD-B')<>115 then
+  raise exception 'Old bank B remaining amount incorrect';end if;
+ raise notice 'PASS legacy null bank names with explicit admin Payment Bank and both allocations';
+
+
 end $test$;

@@ -1,0 +1,41 @@
+name: Multi-bank offline safety checks
+
+on:
+  push:
+    branches:
+      - feature/multi-source-wallet-20261026
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify wallet calculations
+        run: node preview/multi-source-wallet-preview.test.cjs
+      - name: Verify bank-save source contract
+        run: node preview/multi-bank-contract.test.cjs
+      - name: Parse browser scripts
+        run: |
+          node --check preview/multi-source-wallet-preview.js
+          node --check preview/multi-source-wallet-panel.js
+          node --check bank-payment-protection-v2.js
+          node --check supabase-adapter.js
+      - name: Validate SQL syntax without connecting to a database
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          sql=pathlib.Path('sql/multi-bank-atomic-invoice-save-v1.sql').read_text()
+          assert sql.count('$fn$') == 2, 'PL/pgSQL body delimiters damaged'
+          assert sql.rstrip().endswith('commit;'), 'SQL must end with COMMIT'
+          assert sql.count('\ncommit;') == 1, 'Unexpected duplicate migration block'
+          print('Basic SQL structural checks passed (not a PostgreSQL parse).')
+          PY

@@ -51,6 +51,7 @@ declare
   v_invoice_result jsonb;
   v_invoice public.invoices%rowtype;
   v_payment_id text;
+  v_payment_ids jsonb := '[]'::jsonb;
   v_result jsonb;
 begin
   if v_actor is null then raise exception 'Sign-in required'; end if;
@@ -195,6 +196,7 @@ begin
       'Initial invoice multi-source bank allocation',
       v_item->>'source_id','Invoice'
     );
+    v_payment_ids:=v_payment_ids||jsonb_build_array(v_payment_id);
   end loop;
 
   -- Fail closed unless every successful payment created its bank allocation.
@@ -210,6 +212,7 @@ begin
 
   v_result:=v_invoice_result||jsonb_build_object(
      'multiSource',true,'sourceCount',v_count,
+     'paymentId',v_payment_ids->>0,'paymentIds',v_payment_ids,
      'allocatedBank',v_total,'settlementRequestId',v_req
   );
   insert into public.bb_invoice_multi_bank_requests

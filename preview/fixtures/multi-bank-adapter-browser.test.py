@@ -22,6 +22,9 @@ class FakeDatabase:
               <select id="currency"><option value="USD">USD</option><option value="KHR">KHR</option></select>
               <input id="customerName" value="Test Customer">
               <input id="invoiceNumber" value="MOCK-1">
+              <select id="paymentMethod"><option value="Partially Paid in Bank">Partially Paid in Bank</option><option value="Cash">Cash</option></select>
+              <select id="paymentBank"><option value="ABA">ABA</option></select>
+              <input id="transactionId" value="">
               <div id="bbRegisteredPayments"></div>""")
             return
         if "/rest/v1/rpc/" not in req.url:
@@ -74,8 +77,16 @@ def setup(browser,pilot=False):
     page.goto(BASE+('?bbMultiBankPilot=1' if pilot else ''))
     page.evaluate("""() => {
       window.customers=[{customerId:"C1",name:"Test Customer",locationCode:"TK-01"}];
-      window.locations=[];window.selectedProducts=[];window.clearAll=()=>{};
-      window.clearAllAfterSuccessfulSave=()=>{};
+      window.locations=[];window.currentLocationCode='';window.selectedProducts=[];
+      window.clearAll=()=>{};window.clearAllAfterSuccessfulSave=()=>{};
+      // Real historical form builder: the manual Transaction ID is empty.
+      window.buildSalesInvoicePayload=()=>({...window.legacyDraft,
+        customerId:undefined,transactionId:'',bankReference:''});
+      window.legacyDraft={
+        invoiceId:'MOCK-LEGACY',invoiceNo:'MOCK-LEGACY',customer:'Test Customer',
+        currency:'USD',paymentMethod:'Partially Paid in Bank',paymentBank:'ABA',
+        grandTotal:100,amountPaid:55,locationCode:'TK-01',salesperson:'Test Sales'
+      };
     }""")
     page.add_script_tag(path=str(ROOT/"supabase-adapter.js"))
     page.evaluate("""key => localStorage.setItem(key,JSON.stringify({
@@ -118,6 +129,22 @@ def main():
         result=attempt(page,draft("MOCK-PILOT"))
         assert result["ok"] and [c["rpc"] for c in db.calls]==["bb_sales_save_invoice_multi_bank_v1"],(result,db.calls)
         print("PASS Chromium adapter: explicit admin-pilot URL enables guarded route")
+        # Regression: older Complete handlers insist on a single transaction ID
+        # and preflight uniqueness even though two wallet sources were chosen.
+        # The adapter must bridge that old validation without a database call.
+        legacy=page.evaluate("""async () => {
+          const payload=window.buildSalesInvoicePayload();
+          const check=payload.transactionId
+            ? await window.checkPaymentTransactionIdAvailable(payload.transactionId)
+            : null;
+          return {payload,check};
+        }""")
+        assert legacy["payload"]["customerId"]=="C1",legacy
+        assert legacy["payload"]["transactionId"]=="TX-A",legacy
+        assert legacy["check"]["multiBankVerifiedByServer"] is True,legacy
+        assert [x["rpc"] for x in db.calls]==["bb_sales_save_invoice_multi_bank_v1"],db.calls
+        print("PASS Chromium adapter: old one-ID Complete preflight accepts selected wallet source without another RPC")
+
         ctx.close()
 
         ctx,page,db=setup(browser)

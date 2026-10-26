@@ -27,6 +27,7 @@ begin
  if not found or v_bank.status<>'AVAILABLE' or v_bank.customer_id<>new.customer_id or v_bank.currency<>new.currency then raise exception 'Invalid bank';end if;
  select remaining_amount into v_remaining from public.bb_bank_balance_snapshot where transaction_id=new.transaction_id;
  if new.amount<=0 or new.amount>v_remaining then raise exception 'Insufficient bank balance';end if;
+ if new.transaction_id='TX-B' and new.amount=55 then raise exception 'Injected second-bank failure';end if;
  insert into public.bb_bank_balance_allocations values(new.transaction_id,new.payment_id,'INVOICE',new.amount,new.amount,new.currency,null);
  if new.amount=v_remaining then update public.bb_verified_bank_transactions set status='USED' where transaction_id=new.transaction_id;end if;
  return new;

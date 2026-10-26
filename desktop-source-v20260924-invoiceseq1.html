@@ -9070,11 +9070,17 @@ async function completeInvoice(event) {
       alert("Multi-bank balances can only be used with Bank or Partially Paid in Bank.");
       return;
     }
-    if (String(selectedMultiBank.customer_id) !== String(payload.customerId || "")
+    // The legacy payload has a customer name but no customerId field.
+    // Resolve the exact selected customer before using any registered balance.
+    const verifiedCustomerId = String(
+      window.bbGetSelectedCustomerForBank?.()?.customerId || ""
+    ).trim();
+    if (!verifiedCustomerId || String(selectedMultiBank.customer_id) !== verifiedCustomerId
         || String(selectedMultiBank.currency) !== String(payload.currency || "").toUpperCase()) {
       alert("Selected wallet customer or currency does not match the invoice.");
       return;
     }
+    payload.customerId = verifiedCustomerId;
     if (Math.abs(Number(selectedMultiBank.selected_total) - Number(payload.amountPaid)) > 0.000001) {
       alert("Amount Paid must equal the selected multi-bank total.");
       return;

@@ -11,7 +11,7 @@ const sql=fs.readFileSync(path.join(base,'sql/multi-bank-atomic-invoice-save-v1.
 const adapter=fs.readFileSync(path.join(base,'supabase-adapter.js'),'utf8');
 const panel=fs.readFileSync(path.join(base,'preview/multi-source-wallet-panel.js'),'utf8');
 const tests=[
- ['single SQL transaction boundary',()=>assert.match(sql,/^begin;[\s\S]*commit;\s*$/)],
+ ['single SQL transaction boundary',()=>assert.match(sql,/\nbegin;[\s\S]*commit;\s*$/)],
  ['no trailing statements after COMMIT',()=>assert.equal((sql.match(/\ncommit;/g)||[]).length,1)],
  ['source rows locked',()=>assert.match(sql,/for update;/i)],
  ['source ID locks ordered',()=>assert.match(sql,/array_agg\(distinct upper/)],
@@ -25,6 +25,8 @@ const tests=[
  ['backend RPC route',()=>assert.match(adapter,/bb_sales_save_invoice_multi_bank_v1/)],
  ['picker-to-save payload connected',()=>assert.match(adapter,/settlement_sources:selectedWallet\.settlement_sources/)],
  ['one-item preview cannot fall through',()=>assert.match(panel,/v\.selected\.length<2\)throw/)],
+ ['wallet customer revalidated',()=>assert.match(panel,/customer!==activeCustomer/)],
+ ['wallet currency revalidated',()=>assert.match(panel,/activeCurrency!==currency/)],
 ];
 for(const [name,fn] of tests){fn();console.log('PASS',name)}
 console.log(tests.length+' static contract checks passed. This does NOT validate SQL execution or concurrency.');

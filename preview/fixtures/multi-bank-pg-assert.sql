@@ -68,4 +68,17 @@ begin
  end if;
  raise notice 'PASS overspend rejected without invoice save';
 
+
+ -- Full Bank payment should settle exactly the grand total using two transfers.
+ v_response:=public.bb_sales_save_invoice_multi_bank_v1(
+  jsonb_build_object('invoiceId','T-FULL','invoiceNo','T-FULL','locationCode','TK-01','customerId','C1','currency','USD','paymentMethod','Bank','grandTotal',50,'amountPaid',50),
+  jsonb_build_object('settlement_request_id','44444444-4444-4444-8444-444444444444','settlement_sources',jsonb_build_array(
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-A','source_currency','USD','source_amount','20','invoice_amount','20'),
+   jsonb_build_object('kind','BANK_REGISTER','source_id','TX-B','source_currency','USD','source_amount','30','invoice_amount','30'))));
+ if v_response->>'sourceCount'<>'2' then raise exception 'Full bank invoice missing allocations';end if;
+ if (select sum(amount) from public.payments where invoice_id='T-FULL')<>50 then raise exception 'Full bank paid amount mismatch';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-A')<>40 then raise exception 'Full bank TX-A remaining incorrect';end if;
+ if (select remaining_amount from public.bb_bank_balance_snapshot where transaction_id='TX-B')<>110 then raise exception 'Full bank TX-B remaining incorrect';end if;
+ raise notice 'PASS full bank invoice with two transfers';
+
 end $test$;

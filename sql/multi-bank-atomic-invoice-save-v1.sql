@@ -96,7 +96,7 @@ begin
     from jsonb_array_elements(v_sources) x;
   if coalesce(array_length(v_ids,1),0)<>jsonb_array_length(v_sources)
     or exists(select 1 from jsonb_array_elements(v_sources) x
-       where x->>'kind'<>'BANK_REGISTER'
+       where (x->>'kind') is distinct from 'BANK_REGISTER'
           or nullif(btrim(x->>'source_id'),'') is null) then
     raise exception 'Duplicate or invalid registered bank source';
   end if;
@@ -120,7 +120,8 @@ begin
     v_amount:=(v_item->>'source_amount')::numeric;
     if v_amount<=0 or v_amount<>trunc(v_amount,v_precision)
        then raise exception 'Unsupported amount or precision for %',v_source_id; end if;
-    if (v_item->>'source_currency') is distinct from v_currency then
+    if (v_item->>'source_currency') is distinct from v_currency
+       or (v_item ? 'invoice_amount' and (v_item->>'invoice_amount') is distinct from (v_item->>'source_amount')) then
        raise exception 'Source currency differs from invoice currency'; end if;
     select * into v_source from public.bb_verified_bank_transactions b
       where upper(btrim(b.transaction_id))=v_source_id;

@@ -1140,8 +1140,67 @@
   /* -----------------------------
      Atomic writes
   ----------------------------- */
+  // Optional, explicit pilot URL switch: ?bbMultiBankPilot=1.
+  // This is only a UI route selector, NEVER a security boundary.
+  // The server SQL remains admin-only and must be explicitly deployed/granted.
+  if(new URLSearchParams(window.location.search).get('bbMultiBankPilot')==='1'){
+    window.BB_MULTI_BANK_SAVE_ENABLED=true;
+  }
+
+  // crypto.randomUUID() is unavailable on non-secure HTTP LAN hosts (Local Brain).
+  // getRandomValues() still provides cryptographic randomness in these contexts.
+  // Never fall back to Math.random for a financial idempotency identifier.
+  function bbNewSettlementRequestId(){
+    const secureCrypto=window.crypto;
+    if(typeof secureCrypto?.randomUUID==='function')return secureCrypto.randomUUID();
+    if(typeof secureCrypto?.getRandomValues!=='function')
+      throw new Error('Secure random generation unavailable. Cannot save multi-bank invoice.');
+    const bytes=new Uint8Array(16);
+    secureCrypto.getRandomValues(bytes);
+    bytes[6]=(bytes[6]&15)|0x40;
+    bytes[8]=(bytes[8]&0x3f)|0x80;
+    const hex=Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
+    return hex.slice(0,8)+'-'+hex.slice(8,12)+'-'+hex.slice(12,16)+'-'+
+           hex.slice(16,20)+'-'+hex.slice(20);
+  }
+
   window.postSalesInvoiceBundle = async function postSalesInvoiceBundleSupabase(invoicePayload, paymentPayload) {
-    const fingerprint=bbInvoiceFingerprint(invoicePayload);
+    // Read the visible multi-source picker; never quietly ignore a selection.
+    const selectedWallet=window.BBInvoiceMultiSourceSelection?.()||null;
+    if(selectedWallet){
+      if(String(invoicePayload?.customerId||'').trim()!==selectedWallet.customer_id)
+        throw new Error('Selected bank balance belongs to another customer');
+      if(String(invoicePayload?.currency||'').trim().toUpperCase()!==selectedWallet.currency)
+        throw new Error('Selected bank balance currency does not match invoice');
+      if(!paymentPayload||typeof paymentPayload!=='object')
+        paymentPayload={};
+      if(Array.isArray(paymentPayload.settlement_sources) && paymentPayload.settlement_sources.length)
+        throw new Error('Conflicting multi-source payment allocations');
+      paymentPayload={...paymentPayload,
+        settlement_sources:selectedWallet.settlement_sources};
+      // The amount paid used by the SQL must be consistent with sources.
+      // This branch does not rewrite the user-entered invoice amount.
+      const selected=Number(selectedWallet.selected_total);
+      const paid=Number(invoicePayload.amountPaid);
+      if(!Number.isFinite(paid)||Math.abs(paid-selected)>0.000001)
+        throw new Error('Invoice amount paid must equal the selected bank balance total');
+    }
+    const earlyMultiSources=paymentPayload?.settlement_sources;
+    if(Array.isArray(earlyMultiSources)&&earlyMultiSources.length>=2){
+      if(window.BB_MULTI_BANK_SAVE_ENABLED!==true)
+        throw new Error('Multi-source invoice saving is not enabled yet.');
+      if(!['Bank','Partially Paid in Bank'].includes(String(invoicePayload?.paymentMethod||'').trim()))
+        throw new Error('Multi-source Cash + Bank is not enabled yet.');
+      if(earlyMultiSources.some(x=>x?.kind!=='BANK_REGISTER'))
+        throw new Error('Customer Credit allocations are not enabled yet.');
+    }
+    // Include selected allocations in the recovery fingerprint. The legacy
+    // invoice fingerprint alone cannot distinguish changes to wallet sources.
+    const fingerprint=bbInvoiceFingerprint(invoicePayload)+
+      (Array.isArray(paymentPayload?.settlement_sources)&&paymentPayload.settlement_sources.length>=2
+        ? '|MULTI_BANK:'+JSON.stringify(paymentPayload.settlement_sources.map(x=>[
+            x.kind,x.source_id,x.source_currency,String(x.source_amount),String(x.invoice_amount)
+          ])) : '');
     let pending=bbReadPendingInvoice();
     if(pending){
       let verification;
@@ -1162,6 +1221,15 @@
     const invoiceId=pending?.invoiceId||invoicePayload.invoiceId;
     if(!invoiceId)throw new Error('Missing invoice ID. Invoice not sent.');
     invoicePayload.invoiceId=invoiceId;
+    if(Array.isArray(paymentPayload?.settlement_sources)&&paymentPayload.settlement_sources.length>=2){
+      const requestKey='bb-multi-bank-request:'+invoiceId;
+      let requestId=sessionStorage.getItem(requestKey);
+      if(!requestId){
+        requestId=bbNewSettlementRequestId();
+        sessionStorage.setItem(requestKey,requestId);
+      }
+      paymentPayload={...paymentPayload,settlement_request_id:requestId};
+    }
     if(!pending){
       pending={invoiceId,invoiceNo:invoicePayload.invoiceNo,fingerprint,
         createdAt:Date.now(),confirmedSaved:false};
@@ -1169,9 +1237,25 @@
     }
     const splitPayment=
       String(invoicePayload?.paymentMethod||'').trim()==='Cash + Bank';
+    const multiSources=paymentPayload?.settlement_sources;
+    const multiBank=Array.isArray(multiSources)&&multiSources.length>=2;
+    if(multiBank){
+      // Fail closed: the new endpoint must be deployed AND explicitly enabled.
+      // Never silently send a multi-source request to the legacy one-bank save.
+      if(window.BB_MULTI_BANK_SAVE_ENABLED!==true){
+        throw new Error('Multi-source invoice saving is not enabled yet. Do not submit these sources individually.');
+      }
+      if(!['Bank','Partially Paid in Bank'].includes(String(invoicePayload?.paymentMethod||'').trim())){
+        throw new Error('Multi-source Bank + Cash is not available in this version.');
+      }
+      if(multiSources.some(x=>x?.kind!=='BANK_REGISTER')){
+        throw new Error('Customer credit sources are not enabled yet.');
+      }
+    }
     try{
       const result=await bbRpc(
-        splitPayment?'bb_sales_save_invoice_split_payment':'bb_sales_save_invoice_bundle',
+        multiBank?'bb_sales_save_invoice_multi_bank_v1':
+          splitPayment?'bb_sales_save_invoice_split_payment':'bb_sales_save_invoice_bundle',
         {p_invoice:invoicePayload,p_payment:paymentPayload||null}
       );
       // Keep the saved ID until the whole invoice-completion flow clears the form.
@@ -1199,6 +1283,10 @@
       // remain locked to their original ID until database verification.
       if(error.httpStatus>=400&&error.httpStatus<500&&
          error.httpStatus!==408&&error.httpStatus!==429){
+        // This is a confirmed server rejection, with no matching invoice in
+        // the database. Staff may correct the wallet amounts and retry.
+        // Keep the request UUID for uncertain/network failures instead.
+        if(multiBank)sessionStorage.removeItem('bb-multi-bank-request:'+invoiceId);
         bbWritePendingInvoice(null);
         throw error;
       }

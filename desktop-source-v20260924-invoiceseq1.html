@@ -9049,12 +9049,49 @@ async function completeInvoice(event) {
     payload.paymentMethod === "Bank" ||
     payload.paymentMethod === "Partially Paid in Bank";
 
-  if (invoiceNeedsBank && !payload.paymentBank) {
+  // The multi-bank wallet selects and validates every registered transfer.
+  // Its atomic SQL endpoint provides the first bank/transaction to the legacy
+  // invoice core. Never demand an unrelated manually entered bank reference.
+  let selectedMultiBank = null;
+  try {
+    selectedMultiBank = window.BBInvoiceMultiSourceSelection?.() || null;
+  } catch (error) {
+    alert(error?.message || String(error));
+    return;
+  }
+  const hasMultiBank = Array.isArray(selectedMultiBank?.settlement_sources)
+    && selectedMultiBank.settlement_sources.length >= 2;
+  if (hasMultiBank) {
+    if (window.BB_MULTI_BANK_SAVE_ENABLED !== true) {
+      alert("Multi-bank invoice saving is not enabled yet.");
+      return;
+    }
+    if (!invoiceNeedsBank) {
+      alert("Multi-bank balances can only be used with Bank or Partially Paid in Bank.");
+      return;
+    }
+    // The legacy payload has a customer name but no customerId field.
+    // Resolve the exact selected customer before using any registered balance.
+    const verifiedCustomerId = String(
+      window.bbGetSelectedCustomerForBank?.()?.customerId || ""
+    ).trim();
+    if (!verifiedCustomerId || String(selectedMultiBank.customer_id) !== verifiedCustomerId
+        || String(selectedMultiBank.currency) !== String(payload.currency || "").toUpperCase()) {
+      alert("Selected wallet customer or currency does not match the invoice.");
+      return;
+    }
+    payload.customerId = verifiedCustomerId;
+    if (Math.abs(Number(selectedMultiBank.selected_total) - Number(payload.amountPaid)) > 0.000001) {
+      alert("Amount Paid must equal the selected multi-bank total.");
+      return;
+    }
+  }
+  if (invoiceNeedsBank && !hasMultiBank && !payload.paymentBank) {
     alert("Please select a Payment Bank before completing the invoice.");
     return;
   }
 
-  if (invoiceNeedsBank && !payload.transactionId) {
+  if (invoiceNeedsBank && !hasMultiBank && !payload.transactionId) {
     alert("Transaction ID is required for Bank payment.");
     document.getElementById("transactionId")?.focus();
     return;
@@ -9100,7 +9137,7 @@ async function completeInvoice(event) {
       checkInvoiceNumberAvailable(payload.invoiceNo);
 
     const txPromise =
-      invoiceNeedsBank
+      invoiceNeedsBank && !hasMultiBank
         ? checkPaymentTransactionIdAvailable(payload.transactionId)
         : Promise.resolve({ success: true, exists: false, pending: false });
 
@@ -9116,7 +9153,7 @@ async function completeInvoice(event) {
       return;
     }
 
-    if (invoiceNeedsBank && (txCheck.exists || txCheck.pending)) {
+    if (invoiceNeedsBank && !hasMultiBank && (txCheck.exists || txCheck.pending)) {
       alert(
         "Transaction ID already exists.\n\n" +
         "Transaction ID: " + payload.transactionId + "\n" +

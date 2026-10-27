@@ -42,6 +42,7 @@ jobs:
           node --check preview/multi-source-wallet-preview.js
           node --check preview/multi-source-wallet-panel.js
           node --check bank-payment-protection-v2.js
+          node --check invoice-bank-currency-equivalent-v1.js
           node --check supabase-adapter.js
       - name: Validate SQL syntax without connecting to a database
         run: |
@@ -69,6 +70,8 @@ jobs:
           python3 -m playwright install --with-deps chromium
       - name: Real Chromium bank wallet UI interactions
         run: python3 preview/fixtures/multi-bank-browser.smoke.py
+      - name: Actual bank equivalent reset when switching customers
+        run: python3 preview/fixtures/bank-equivalent-customer-reset.browser.py
       - name: Real Invoice Generator adapter browser save and recovery
         run: python3 preview/fixtures/multi-bank-adapter-browser.test.py
       - name: Desktop Complete Invoice end-to-end handoff in Chromium

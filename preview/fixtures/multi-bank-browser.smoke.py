@@ -101,6 +101,7 @@ def main():
         # A late cache event from the prior customer must also be ignored.
         broadcast(page, customer="C1",first=25.2,second=200)
         assert page.locator("input[data-wallet-id]").count()==0, "Stale prior-customer cache restored wallet"
+        assert page.evaluate("BBMultiSourceWalletPreview.snapshot().customerId")=="C2", "Previous customer regained wallet engine ownership"
         # Fresh matching event must contain ONLY balances from the new customer.
         broadcast(page, customer="C2",first=50,second=60,ids=("TX-C","TX-D"))
         assert page.locator('input[data-wallet-id="TX-C"]').count()==1

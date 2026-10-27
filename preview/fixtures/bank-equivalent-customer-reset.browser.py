@@ -11,6 +11,12 @@ def main():
  with sync_playwright() as p:
   browser=p.chromium.launch(headless=True,args=["--no-sandbox"])
   page=browser.new_page()
+  # Give mocked browser storage a proper origin; about:blank cannot persist the
+  # same localStorage cache used by our actual Sync Bank implementation.
+  page.route("http://bb-bank-reset-fixture.test/**",
+      lambda route: route.fulfill(status=200,content_type="text/html",
+                                  body="<!doctype html><html><body></body></html>"))
+  page.goto("http://bb-bank-reset-fixture.test/")
   page.set_content("""<!doctype html><html><body>
    <select id="currency"><option value="USD">USD</option><option value="KHR">KHR</option></select>
    <input id="customerName" value="Customer One">

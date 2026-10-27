@@ -64,12 +64,27 @@ function exactBankOption(name){
  select.value=option.value;
  select.dispatchEvent(new Event('change',{bubbles:true}));
 }
-function clearRegisteredSelection(){
+function resetPreviousBankPayment(reason){
+ // Never retain a previous customer's selected transfer, manual reference
+ // or calculated bank-equivalent amount in the next invoice/customer context.
  userSelectedRegisteredId='';
- const field=$('transactionId');
- if(field){field.value='';field.dispatchEvent(new Event('input',{bubbles:true}));}
- const amt=$('bbActualBankAmount');if(amt)amt.value='';
- const bank=$('paymentBank');if(bank){bank.value='';bank.dispatchEvent(new Event('change',{bubbles:true}));}
+ const id=$('transactionId');
+ if(id){id.value='';id.dispatchEvent(new Event('input',{bubbles:true}));}
+ const amount=$('bbActualBankAmount');
+ if(amount){amount.value='';amount.dispatchEvent(new Event('input',{bubbles:true}));}
+ const currency=$('bbActualBankCurrency');
+ if(currency){
+  currency.value=clean($('currency')?.value).toUpperCase()==='KHR'?'KHR':'USD';
+  currency.dispatchEvent(new Event('change',{bubbles:true}));
+ }
+ const bank=$('paymentBank');
+ if(bank){bank.value='';bank.dispatchEvent(new Event('change',{bubbles:true}));}
+ document.dispatchEvent(new CustomEvent('bb:registered-bank-cleared',{
+  detail:{reason:reason||'customer-change',customerId:clean(window.bbGetSelectedCustomerForBank?.()?.customerId)}
+ }));
+}
+function clearRegisteredSelection(){
+ resetPreviousBankPayment('registered-selection-undo');
  renderAvailablePayments();
 }
 function applyRegisteredPayment(tx){
@@ -86,7 +101,7 @@ function applyRegisteredPayment(tx){
  const amt=$('bbActualBankAmount');
  if(amt){amt.value=String(tx.amount??'');amt.dispatchEvent(new Event('input',{bubbles:true}))}
  exactBankOption(tx.bank_name);
- document.dispatchEvent(new CustomEvent('bb:registered-bank-selected',{detail:{transaction_id:clean(tx.transaction_id),original_amount:Number(tx.original_amount??tx.amount??0),remaining_amount:Number(tx.remaining_amount||0),approved_exchange_rate:Number(tx.approved_exchange_rate||1),currency:clean(tx.currency).toUpperCase(),invoice_currency:clean(tx.invoice_currency||tx.currency).toUpperCase()}}));
+ document.dispatchEvent(new CustomEvent('bb:registered-bank-selected',{detail:{customer_id:availableCustomerId,transaction_id:clean(tx.transaction_id),original_amount:Number(tx.original_amount??tx.amount??0),remaining_amount:Number(tx.remaining_amount||0),approved_exchange_rate:Number(tx.approved_exchange_rate||1),currency:clean(tx.currency).toUpperCase(),invoice_currency:clean(tx.invoice_currency||tx.currency).toUpperCase()}}));
  document.querySelectorAll('[data-bb-bank-use]').forEach(b=>{
    const active=userSelectedRegisteredId===b.dataset.bbBankUse;
    b.textContent=active?'✓ Selected (Undo)':'Use';
@@ -175,8 +190,9 @@ function scheduleAvailablePayments(){
  const id=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
  const changed=availableCustomerId!==id;
  if(changed){
+  const hadPreviousCustomer=!!availableCustomerId;
   availableCustomerId=id;availableLoadSeq++;
-  if(userSelectedRegisteredId){userSelectedRegisteredId='';if($('transactionId'))$('transactionId').value='';if($('bbActualBankAmount'))$('bbActualBankAmount').value='';}
+  if(hadPreviousCustomer)resetPreviousBankPayment('customer-change');
  }
  if(id)loadCachedPayments(id);else{availablePayments=[];renderAvailablePayments();}
  if(changed){
@@ -358,6 +374,9 @@ $('transactionId')?.addEventListener('input',()=>{
  if(userSelectedRegisteredId&&clean($('transactionId').value)!==userSelectedRegisteredId){
    userSelectedRegisteredId='';
    if($('bbActualBankAmount'))$('bbActualBankAmount').value='';
+   document.dispatchEvent(new CustomEvent('bb:registered-bank-cleared',{
+    detail:{reason:'transaction-id-edited',customerId:availableCustomerId}
+   }));
  }
  document.querySelectorAll('[data-bb-bank-use]').forEach(btn=>{
    const active=!!userSelectedRegisteredId&&btn.dataset.bbBankUse===userSelectedRegisteredId;
@@ -368,11 +387,22 @@ $('transactionId')?.addEventListener('input',()=>{
 const originalClear=window.clearAllAfterSuccessfulSave;
 if(typeof originalClear==='function'){
  window.clearAllAfterSuccessfulSave=function(){
- warned=null;availablePayments=[];availableCustomerId='';userSelectedRegisteredId='';
- if($('bbActualBankAmount'))$('bbActualBankAmount').value='';
- if($('bbRegisteredPayments'))$('bbRegisteredPayments').innerHTML='<div style="font-size:12px;color:#6a7d91">Choose a customer to see verified bank payments.</div>';
- return originalClear.apply(this,arguments)
-};
+  const result=originalClear.apply(this,arguments);
+  warned=null;availablePayments=[];availableCustomerId='';
+  resetPreviousBankPayment('invoice-save-cleared');
+  if($('bbRegisteredPayments'))$('bbRegisteredPayments').innerHTML='<div style="font-size:12px;color:#6a7d91">Choose a customer to see verified bank payments.</div>';
+  return result;
+ };
+}
+const originalClearAll=window.clearAll;
+if(typeof originalClearAll==='function'){
+ window.clearAll=function(){
+  const result=originalClearAll.apply(this,arguments);
+  warned=null;availablePayments=[];availableCustomerId='';
+  resetPreviousBankPayment('invoice-cleared');
+  if($('bbRegisteredPayments'))$('bbRegisteredPayments').innerHTML='<div style="font-size:12px;color:#6a7d91">Choose a customer to see verified bank payments.</div>';
+  return result;
+ };
 }
 install();installSave();installBankReuseDuplicateCheck();
 if(document.readyState!=='loading'){inputUI();installManualIdLock();}

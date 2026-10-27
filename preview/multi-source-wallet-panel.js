@@ -6,6 +6,24 @@ const wallet=window.BBMultiSourceWalletPreview;
 if(!wallet || window.BB_MULTI_BANK_SAVE_ENABLED!==true)return;
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let rows=[],customer='',currency='USD';
+// Customer identity, not a typed name or the previous Sync Bank response,
+// owns every visible wallet balance and checkbox.
+function activeCustomerId(){
+ return String(window.bbGetSelectedCustomerForBank?.()?.customerId||'').trim();
+}
+function reconcileCustomer(){
+ const current=activeCustomerId();
+ // The low-level preview engine also listens to cache events. A late event
+ // could otherwise restore its previous-customer state before this panel
+ // rejects the event, so reconcile BOTH the displayed and engine IDs.
+ if(current!==customer || wallet.snapshot().customerId!==current){
+  customer=current;
+  rows=[];
+  currency=document.getElementById('currency')?.value==='KHR'?'KHR':'USD';
+  wallet.reset(customer,currency);
+ }
+ return current;
+}
 function ensure(){
  const anchor=document.getElementById('bbRegisteredPayments');if(!anchor)return null;
  let panel=document.getElementById('bbMultiWalletPreview');
@@ -39,6 +57,9 @@ function syncLegacyBankReference(selected){
  note.textContent='Using '+selected.selected.length+' selected registered bank transaction IDs automatically. No manual Transaction ID required.';
 }
 function render(){
+ // Never render an old customer's cached rows, even if no new Sync Bank
+ // event was emitted after the selected customer changed.
+ reconcileCustomer();
  const p=ensure();if(!p)return;
  const method=document.getElementById('paymentMethod')?.value||'';
  const bankMethod=method==='Bank'||method==='Partially Paid in Bank';
@@ -80,12 +101,24 @@ function render(){
  }));
 }
 document.addEventListener('bb:bank-cache-updated',event=>{
- const d=event.detail||{};customer=String(d.customerId||'');
+ const d=event.detail||{};
+ const active=reconcileCustomer();
+ // Ignore an old/late bank-sync event for a previous customer. No external
+ // event is allowed to replace the current customer's wallet context.
+ if(!active||String(d.customerId||'').trim()!==active){
+  render();
+  return;
+ }
  currency=document.getElementById('currency')?.value==='KHR'?'KHR':'USD';
- // Preserve eligible selections on same-customer refresh; the wallet engine
- // invalidates changed customer/currency and insufficient source balances.
- wallet.loadBankRows({customerId:customer,currency,rows:d.balances||[]});
- rows=(Array.isArray(d.balances)?d.balances:[]).filter(x=>String(x.customer_id)===customer&&Number(x.remaining_amount)>0).map(x=>({kind:'BANK_REGISTER',id:String(x.transaction_id),currency:String(x.currency||'').toUpperCase(),available:String(x.remaining_amount)}));
+ const eligible=(Array.isArray(d.balances)?d.balances:[]).filter(x=>
+  String(x.customer_id||'').trim()===active&&
+  String(x.transaction_id||'').trim()&&
+  Number.isFinite(Number(x.remaining_amount))&&Number(x.remaining_amount)>0
+ );
+ // Preserve amounts only for unchanged, eligible sources belonging to this
+ // customer; the selector clears outdated/insufficient allocations.
+ wallet.loadBankRows({customerId:active,currency,rows:eligible});
+ rows=eligible.map(x=>({kind:'BANK_REGISTER',id:String(x.transaction_id),currency:String(x.currency||'').toUpperCase(),available:String(x.remaining_amount)}));
  render();
 });
 function clearMultiBankSelection(){
@@ -108,6 +141,17 @@ if(typeof originalClearAll==='function'){
  };
 }
 window.BBInvoiceMultiSourceSelection=function(){
+ // Fail closed for any stale customer, even if the app changed selection
+ // programmatically without firing an input/change event.
+ const active=activeCustomerId();
+ if(active!==customer) {
+  const hadOldSelections=wallet.snapshot().selected.length>0;
+  reconcileCustomer();
+  render();
+  if(hadOldSelections)
+   throw Error('Customer wallet selection changed. Choose this customer\'s bank balances again.');
+  return null;
+ }
  const method=document.getElementById('paymentMethod')?.value||'';
  if(method!=='Bank'&&method!=='Partially Paid in Bank')return null;
  const v=wallet.snapshot();
@@ -141,5 +185,12 @@ document.addEventListener('change',event=>{
  render();
 });
 document.getElementById('paymentMethod')?.addEventListener('change',()=>render());
+// A customer switch must invalidate visible transfers immediately; Sync Bank
+// is not required to clear a previous customer's balance or selections.
+function onCustomerChanged(){
+ if(activeCustomerId()!==customer)render();
+}
+document.getElementById('customerName')?.addEventListener('input',onCustomerChanged);
+document.getElementById('customerName')?.addEventListener('change',onCustomerChanged);
 document.addEventListener('DOMContentLoaded',()=>{render()},{once:true});
 })();

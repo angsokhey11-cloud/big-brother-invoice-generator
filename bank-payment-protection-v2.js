@@ -173,11 +173,21 @@ document.addEventListener('bb:bank-sync-request',async()=>{
 function scheduleAvailablePayments(){
  clearTimeout(availableTimer);
  const id=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
- if(availableCustomerId!==id){
+ const changed=availableCustomerId!==id;
+ if(changed){
   availableCustomerId=id;availableLoadSeq++;
   if(userSelectedRegisteredId){userSelectedRegisteredId='';if($('transactionId'))$('transactionId').value='';if($('bbActualBankAmount'))$('bbActualBankAmount').value='';}
  }
  if(id)loadCachedPayments(id);else{availablePayments=[];renderAvailablePayments();}
+ if(changed){
+  // Keep the multi-bank wallet aligned with this same customer's cached
+  // transfers, even when the user switches customers without Sync Bank.
+  // Never dispatch all-customer cache rows to the wallet.
+  document.dispatchEvent(new CustomEvent('bb:bank-cache-updated',{
+   detail:{customerId:id,balances:availablePayments.slice(),
+    syncedAt:bulkRead()?.syncedAt||null}
+  }));
+ }
 }
 document.addEventListener('bb:bank-sync-request',async()=>{
  const id=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);

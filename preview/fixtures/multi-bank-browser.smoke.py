@@ -9,10 +9,10 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / "preview" / "multi-source-wallet-preview.js"
 PANEL = ROOT / "preview" / "multi-source-wallet-panel.js"
 
-def broadcast(page, *, customer="C1", first=100, second=200, currency="USD"):
+def broadcast(page, *, customer="C1", first=100, second=200, currency="USD", ids=("TX-A","TX-B")):
     rows = [
-        {"customer_id":customer,"transaction_id":"TX-A","currency":currency,"remaining_amount":first},
-        {"customer_id":customer,"transaction_id":"TX-B","currency":currency,"remaining_amount":second}
+        {"customer_id":customer,"transaction_id":ids[0],"currency":currency,"remaining_amount":first},
+        {"customer_id":customer,"transaction_id":ids[1],"currency":currency,"remaining_amount":second}
     ]
     page.evaluate("""data => document.dispatchEvent(new CustomEvent('bb:bank-cache-updated', {
       detail: {customerId: data.customer, balances: data.rows}
@@ -34,6 +34,7 @@ def main():
         browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
         page = browser.new_page()
         page.set_content("""<!doctype html><html><body>
+        <input id="customerName" value="Customer C1">
         <select id="currency"><option value="USD">USD</option><option value="KHR">KHR</option></select>
         <select id="paymentMethod"><option value="Bank">Bank</option><option value="Partially Paid in Bank">Partially Paid in Bank</option><option value="Cash + Bank">Cash + Bank</option><option value="Cash">Cash</option></select>
         <div id="transactionIdRow"><input id="transactionId" placeholder="Transaction ID"></div>
@@ -89,15 +90,31 @@ def main():
         assert page.locator("#transactionIdRow").is_visible(), "Single-bank Transaction ID should return"
         print("PASS Chromium: reduced balance removed; single allocation blocked")
 
+        # Reproduce the bug: prior C1 transfer is partially used ($25.20
+        # remaining), but the user has moved to C2. No new Sync Bank click.
         page.evaluate("window.selectedCustomer='C2'")
-        try:
-            selection(page)
-        except Exception as e:
-            assert "customer" in str(e).lower(),e
-        else:
-            raise AssertionError("Stale customer selection accepted")
+        page.locator("#customerName").fill("Customer C2")
+        assert page.locator("input[data-wallet-id]").count()==0, "Previous customer's transfers remain visible"
+        assert selection(page) is None, "Old customer wallet selection persisted"
+        assert page.locator("#transactionIdRow").is_visible(), "Old two-bank selection still hides manual ID"
+        assert "No registered balances loaded" in page.locator("#bbMultiWalletPreview").inner_text()
+        # A late cache event from the prior customer must also be ignored.
+        broadcast(page, customer="C1",first=25.2,second=200)
+        assert page.locator("input[data-wallet-id]").count()==0, "Stale prior-customer cache restored wallet"
+        assert page.evaluate("BBMultiSourceWalletPreview.snapshot().customerId")=="C2", "Previous customer regained wallet engine ownership"
+        # Fresh matching event must contain ONLY balances from the new customer.
+        broadcast(page, customer="C2",first=50,second=60,ids=("TX-C","TX-D"))
+        assert page.locator('input[data-wallet-id="TX-C"]').count()==1
+        assert page.locator('input[data-wallet-id="TX-D"]').count()==1
+        assert page.locator('input[data-wallet-id="TX-A"]').count()==0
+        assert page.locator('input[data-wallet-id="TX-B"]').count()==0
+        print("PASS Chromium: switching customers immediately clears stale partial balances; late old-customer sync rejected")
+
         page.evaluate("window.selectedCustomer='C1'")
-        print("PASS Chromium: wrong-customer selection rejected")
+        page.locator("#customerName").fill("Customer C1")
+        broadcast(page,first=10)
+        assert page.locator('input[data-wallet-id="TX-C"]').count()==0
+        print("PASS Chromium: returning to first customer loads only correct registered sources")
 
         page.locator('input[data-wallet-amount="TX-A"]').fill("5")
         page.locator('input[data-wallet-id="TX-A"]').check()

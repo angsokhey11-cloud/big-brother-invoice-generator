@@ -35,7 +35,7 @@ def main():
         page = browser.new_page()
         page.set_content("""<!doctype html><html><body>
         <select id="currency"><option value="USD">USD</option><option value="KHR">KHR</option></select>
-        <select id="paymentMethod"><option value="Bank">Bank</option><option value="Partially Paid in Bank">Partially Paid in Bank</option></select>
+        <select id="paymentMethod"><option value="Bank">Bank</option><option value="Partially Paid in Bank">Partially Paid in Bank</option><option value="Cash + Bank">Cash + Bank</option><option value="Cash">Cash</option></select>
         <div id="transactionIdRow"><input id="transactionId" placeholder="Transaction ID"></div>
         <div id="bbRegisteredPayments"></div></body></html>""")
         page.evaluate("window.selectedCustomer='C1';window.bbGetSelectedCustomerForBank=()=>({customerId:window.selectedCustomer})")
@@ -50,6 +50,26 @@ def main():
         assert [x["source_id"] for x in got["settlement_sources"]]==["TX-A","TX-B"],got
         assert not page.locator("#transactionIdRow").is_visible(), "Old manual Transaction ID still shown for two-bank wallet"
         assert page.locator("#bbMultiWalletReferencesNotice").is_visible()
+        # Regression for Cash + Bank: the normal bank portion requires a
+        # manual Admin Transaction ID even when the multi-bank pilot is loaded.
+        page.select_option("#paymentMethod","Cash + Bank")
+        assert page.locator("#transactionIdRow").is_visible(), "Cash + Bank lost its Transaction ID field"
+        assert not page.locator("#bbMultiWalletPreview").is_visible(), "Multi-bank-only picker should be hidden for Cash + Bank"
+        assert not page.locator("#bbMultiWalletReferencesNotice").is_visible(), "Multi-bank skip-ID note leaked into split payments"
+        assert selection(page) is None, "Multi-bank allocations leaked into unsupported Cash + Bank"
+        page.select_option("#paymentMethod","Bank")
+        assert page.locator("#transactionIdRow").is_visible(), "Manual Transaction ID did not return after leaving Cash + Bank"
+        assert page.locator("#bbMultiWalletPreview").is_visible(), "Multi-bank picker did not return after switching back to Bank"
+        select_two(page,20,35)
+        assert not page.locator("#transactionIdRow").is_visible(), "Two-bank option no longer hides manual ID"
+        page.select_option("#paymentMethod","Partially Paid in Bank")
+        assert not page.locator("#transactionIdRow").is_visible(), "Partially Paid in Bank should hide ID with two selections"
+        page.select_option("#paymentMethod","Cash")
+        assert not page.locator("#transactionIdRow").is_visible(), "Cash-only payment should not display Transaction ID"
+        assert selection(page) is None
+        page.select_option("#paymentMethod","Bank")
+        select_two(page,20,35)
+        print("PASS Chromium: Cash + Bank restores manual Admin ID; unsupported multi-bank selection clears, Bank and Partial unchanged")
         print("PASS Chromium: two-bank wallet hides obsolete Transaction ID entry")
         print("PASS Chromium: panel, checkbox allocations and save payload")
 

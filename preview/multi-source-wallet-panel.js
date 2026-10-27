@@ -21,10 +21,13 @@ function syncLegacyBankReference(selected){
  // settlement_sources. The old single-reference text field is irrelevant.
  const method=document.getElementById('paymentMethod')?.value||'';
  const bankMethod=method==='Bank'||method==='Partially Paid in Bank';
+ const hasBankPortion=bankMethod||method==='Cash + Bank';
  const usingWallet=bankMethod&&selected.selected.length>=2;
  const row=document.getElementById('transactionIdRow');
  if(!row)return;
- row.style.display=bankMethod&&!usingWallet?'':'none';
+ // Cash + Bank still requires its own registered/manual bank Transaction ID.
+ // Hiding it here previously overrode split-payment-v1's visibility rule.
+ row.style.display=hasBankPortion&&!usingWallet?'':'none';
  let note=document.getElementById('bbMultiWalletReferencesNotice');
  if(!note){
   note=document.createElement('div');
@@ -37,8 +40,21 @@ function syncLegacyBankReference(selected){
 }
 function render(){
  const p=ensure();if(!p)return;
- const selected=wallet.snapshot();
+ const method=document.getElementById('paymentMethod')?.value||'';
+ const bankMethod=method==='Bank'||method==='Partially Paid in Bank';
+ // Multi-bank pilot V1 does NOT support Cash + Bank. Clear its selections
+ // when switching methods so split payments use the original single-ID path.
+ let selected=wallet.snapshot();
+ if(!bankMethod&&selected.selected.length){
+  wallet.reset(customer,currency);
+  wallet.loadBankRows({customerId:customer,currency,rows:rows.map(r=>({
+   customer_id:customer,transaction_id:r.id,currency:r.currency,remaining_amount:r.available
+  }))});
+  selected=wallet.snapshot();
+ }
+ p.style.display=bankMethod?'':'none';
  syncLegacyBankReference(selected);
+ if(!bankMethod)return;
  p.innerHTML='<div style="font-weight:900;font-size:15px;margin-bottom:4px">Multi-Source Wallet — Development Preview</div>'+
  '<div style="font-size:11px;color:#8a4a00;margin-bottom:10px">'+(window.BB_MULTI_BANK_SAVE_ENABLED===true?'ADMIN PILOT: This selection will allocate real registered bank balances if the server approves invoice Save.':'Preview only. Existing invoice Save cannot use multiple sources yet.')+'</div>'+
  (!rows.length?'<div>No registered balances loaded. Press Sync Bank first.</div>':
@@ -92,6 +108,8 @@ if(typeof originalClearAll==='function'){
  };
 }
 window.BBInvoiceMultiSourceSelection=function(){
+ const method=document.getElementById('paymentMethod')?.value||'';
+ if(method!=='Bank'&&method!=='Partially Paid in Bank')return null;
  const v=wallet.snapshot();
  if(v.selected.length===0)return null;
  const activeCustomer=String(window.bbGetSelectedCustomerForBank?.()?.customerId||'');

@@ -41,9 +41,18 @@ function ensure(){
  $('bbBankEquivalentApply')?.addEventListener('click',()=>apply());
 }
 let selection=null;
+function activeCustomerId(){
+ return String(window.bbGetSelectedCustomerForBank?.()?.customerId||'').trim();
+}
+function clearSelectedEquivalent(){
+ selection=null;
+ update();
+}
 
 function context(){
  const from=bankCurrency(),to=invoiceCurrency(),invoiceRate=rate(),actual=number($('bbActualBankAmount')?.value);
+ const active=activeCustomerId();
+ if(selection && (!active||selection.customer_id!==active))selection=null;
  const tx=selection&&selection.transaction_id===String($('transactionId')?.value||'').trim()?selection:null;
  const approved=tx?number(tx.approved_exchange_rate):0;
  const r=tx&&from!==to&&approved>1?approved:invoiceRate;
@@ -65,8 +74,15 @@ function update(){
  const panel=$('bbInvoiceBankEquivalentV1');if(!panel)return;
  const c=context(),{from,to,r,actual,tx,available,converted,method,total,planned,debit,remaining,over,mismatch}=c;
  const enabled=['Cash + Bank','Bank','Partially Paid in Bank'].includes(method);
- panel.style.display=enabled?'':'none';if(!enabled)return;
+ panel.style.display=enabled?'':'none';
  const label=$('bbBankEquivalentText'),info=$('bbBankEquivalentAvailable'),button=$('bbBankEquivalentApply');
+ if(!enabled){
+  label.textContent='Enter the actual bank amount to use.';
+  info.textContent='';
+  button.style.display='none';
+  selection=null;
+  return;
+ }
  const value=equivalent(actual,from,to,r);
  if(actual<=0||!Number.isFinite(value)||!Number.isFinite(debit)){
   label.textContent=actual<=0?'Enter the actual bank amount to use.':'Enter a valid exchange rate.';
@@ -120,14 +136,20 @@ function syncBank(){
 
 document.addEventListener('bb:registered-bank-selected',event=>{
  const tx=event.detail||null;
- selection=tx&&tx.transaction_id?tx:null;
+ const current=activeCustomerId();
+ selection=current&&tx&&tx.transaction_id&&String(tx.customer_id||'')===current?tx:null;
  // Keep the previous first-use convenience for Partial Bank: fill Amount
  // Paid only when empty. Never overwrite an amount the accountant entered.
  if(selection&&String($('paymentMethod')?.value||'')==='Partially Paid in Bank'
     &&number($('amountPaid')?.value)<=0)apply();
  else update();
 });
+// Clear the cached registered balance on Undo, customer changes, new invoice,
+// or when manual Transaction ID replaces a registered transfer.
+document.addEventListener('bb:registered-bank-cleared',clearSelectedEquivalent);
 document.addEventListener('input',event=>{
+ if(event.target?.id==='customerName'&&selection&&selection.customer_id!==activeCustomerId())
+  clearSelectedEquivalent();
  if(['bbActualBankAmount','exchangeRate','exchangeRateInput'].includes(event.target?.id))syncBank();
  else if(['splitCashAmount','splitBankAmount','amountPaid','transactionId'].includes(event.target?.id))update();
 });

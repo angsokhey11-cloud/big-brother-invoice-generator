@@ -13,7 +13,10 @@ function activeCustomerId(){
 }
 function reconcileCustomer(){
  const current=activeCustomerId();
- if(current!==customer){
+ // The low-level preview engine also listens to cache events. A late event
+ // could otherwise restore its previous-customer state before this panel
+ // rejects the event, so reconcile BOTH the displayed and engine IDs.
+ if(current!==customer || wallet.snapshot().customerId!==current){
   customer=current;
   rows=[];
   currency=document.getElementById('currency')?.value==='KHR'?'KHR':'USD';

@@ -142,9 +142,12 @@ window.BBInvoiceMultiSourceSelection=function(){
  // programmatically without firing an input/change event.
  const active=activeCustomerId();
  if(active!==customer) {
+  const hadOldSelections=wallet.snapshot().selected.length>0;
   reconcileCustomer();
   render();
-  throw Error('Customer wallet selection changed. Choose this customer\'s bank balances again.');
+  if(hadOldSelections)
+   throw Error('Customer wallet selection changed. Choose this customer\'s bank balances again.');
+  return null;
  }
  const method=document.getElementById('paymentMethod')?.value||'';
  if(method!=='Bank'&&method!=='Partially Paid in Bank')return null;

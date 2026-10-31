@@ -4518,7 +4518,9 @@ function normalizeSimpleBatchRows(openBatches) {
                           member.remainingQty !== undefined
                             ? member.remainingQty
                             : member.issuedQty
-                        ) || 0
+                        ) || 0,
+                      purchasedRemainingQty:Number(member.purchasedRemainingQty ?? member.purchasedPendingQty ?? 0) || 0,
+                      zeroCostRemainingQty:Number(member.zeroCostRemainingQty ?? member.zeroCostPendingQty ?? 0) || 0
                     }))
                   : []
             }))
@@ -4537,7 +4539,9 @@ function normalizeSimpleBatchRows(openBatches) {
                   item.remainingQty !== undefined
                     ? item.remainingQty
                     : item.issuedQty
-                ) || 0
+                ) || 0,
+              purchasedRemainingQty:Number(item.purchasedRemainingQty ?? item.purchasedPendingQty ?? 0) || 0,
+              zeroCostRemainingQty:Number(item.zeroCostRemainingQty ?? item.zeroCostPendingQty ?? 0) || 0
             }))
           : []
     }))

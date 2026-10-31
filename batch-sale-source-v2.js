@@ -16,7 +16,15 @@ const type=row=>clean(row.dataset.entryType||'EXACT').toUpperCase();
 const factor=row=>Math.max(1,num(row.dataset.bbSellingFactor)||1);
 const qtyInput=row=>row.querySelector('.product-qty-input');
 const sourceRow=row=>row.querySelector('.bb-batch-source-v2');
-const isTracked=row=>type(row)==='GROUP'||(clean(row.dataset.itemType||'PRODUCT').toUpperCase()!=='SERVICE'&&clean(row.dataset.trackStock||'true')!=='false');
+const isTracked=row=>{
+ if(type(row)==='GROUP')return true;
+ try{
+  const meta=typeof getInvoiceSearchPool==='function'
+    ?getInvoiceSearchPool().find(p=>clean(p.code)===clean(row.dataset.productCode)):null;
+  if(clean(meta?.itemType||'PRODUCT').toUpperCase()==='SERVICE'||meta?.trackStock===false)return false;
+ }catch(_){}
+ return true;
+};
 function members(row,batch){
  if(!batch)return [];
  if(type(row)==='GROUP'){
@@ -41,7 +49,7 @@ function refreshRows(){
  for(const row of rows()){
   const old=sourceRow(row);
   const has=!!batch&&isTracked(row);
-  if(!has){if(old)old.hidden=true;continue}
+  if(!has){if(old)old.hidden=true;if(qtyInput(row))qtyInput(row).readOnly=false;continue}
   let panel=old;
   if(!panel){
    panel=document.createElement('div');panel.className='bb-batch-source-v2 no-print';

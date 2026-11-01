@@ -103,6 +103,8 @@ const init=()=>{
  if(host)new MutationObserver(draw).observe(host,{childList:true});
  const original=window.handleSimpleBatchChange;
  if(typeof original==='function')window.handleSimpleBatchChange=function(){const r=original.apply(this,arguments);setTimeout(draw,0);return r};
+ const originalLoad=window.loadSimpleBatchPicker;
+ if(typeof originalLoad==='function')window.loadSimpleBatchPicker=async function(){const result=await originalLoad.apply(this,arguments);draw();return result};
  draw();
 };
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();

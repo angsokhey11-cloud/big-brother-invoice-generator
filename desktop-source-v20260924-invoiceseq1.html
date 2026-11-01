@@ -4543,6 +4543,14 @@ function normalizeSimpleBatchRows(openBatches) {
       exactItems:
         Array.isArray(batch.exactItems)
           ? batch.exactItems.map(item => ({
+              purchasedPendingQty:
+                Number(item.purchasedPendingQty ?? item.purchasedRemainingQty ?? 0) || 0,
+              zeroCostPendingQty:
+                Number(item.zeroCostPendingQty ?? item.zeroCostRemainingQty ?? 0) || 0,
+              purchasedRemainingQty:
+                Number(item.purchasedRemainingQty ?? item.purchasedPendingQty ?? 0) || 0,
+              zeroCostRemainingQty:
+                Number(item.zeroCostRemainingQty ?? item.zeroCostPendingQty ?? 0) || 0,
               productCode:
                 String(item.productCode || "").trim(),
               productName:

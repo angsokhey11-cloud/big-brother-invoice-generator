@@ -652,6 +652,13 @@ begin
            or jsonb_array_length(new.stock_allocation_json)=0 then
           raise exception 'Invalid exact Batch Stock allocation';
         end if;
+        if exists (
+          select 1 from jsonb_array_elements(new.stock_allocation_json) e
+          group by upper(trim(coalesce(e.value->>'source',''))),trim(coalesce(e.value->>'productCode',''))
+          having count(*)>1
+        ) then
+          raise exception 'Duplicate Batch source allocation for invoice line %',new.line_id;
+        end if;
         v_allocations:=new.stock_allocation_json;
       else
       v_allocations :=

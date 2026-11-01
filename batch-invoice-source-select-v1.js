@@ -33,10 +33,15 @@ function draw(){
   if(!enabled||!tracked(row)){if(prior)prior.remove();continue}
   const code=clean(row.dataset.productCode),item=stockItem(code),pMax=sourceAvailable(item,'PURCHASED'),zMax=sourceAvailable(item,'ZERO_COST');
   if(pMax===null||zMax===null){if(prior)prior.remove();const warning=document.createElement('div');warning.className='bb-batch-source-select';warning.textContent='Batch stock source balances unavailable. Refresh Batch stock before saving.';warning.style.color='#b42318';row.append(warning);continue}
-  if(prior&&prior.dataset.batch===clean(batch()?.batchId)&&prior.dataset.code===code)continue;
+  const singleSource=(pMax>EPS&&zMax<=EPS)?'PURCHASED':(zMax>EPS&&pMax<=EPS)?'ZERO_COST':null;
+  if(prior&&prior.dataset.batch===clean(batch()?.batchId)&&prior.dataset.code===code){
+    if(prior.dataset.singleSource===String(singleSource))continue;
+  }
   if(prior)prior.remove();
   const panel=document.createElement('div');panel.className='bb-batch-source-select';
   panel.dataset.batch=clean(batch()?.batchId);panel.dataset.code=code;
+  panel.dataset.singleSource=String(singleSource);
+  if(singleSource)panel.style.display='none';
   const label=document.createElement('div');label.textContent='Batch Sale stock source · Purchased / Zero-Cost';label.className='bb-batch-source-title';
   const make=(name,key,max)=>{const wrap=document.createElement('label');wrap.textContent=name+' (available '+max+')';const input=document.createElement('input');input.type='number';input.min='0';input.step='any';input.max=String(max);input.dataset.source=key;input.setAttribute('aria-label',name+' stock sale quantity');wrap.append(input);return wrap};
   const inputs=document.createElement('div');inputs.className='bb-batch-source-grid';
@@ -53,7 +58,17 @@ function draw(){
    status.textContent=ok?'Source total '+(values.p+values.z)+' / Invoice '+lineQty:'Purchased + Zero-Cost must equal invoice quantity and remain within available stock';
    status.style.color=ok?'#2f855a':'#b42318';
   }
-  inputs.addEventListener('input',message);rowQty(row)?.addEventListener('input',message);message();
+  function syncSingleSource(){
+    if(!singleSource)return;
+    const lineQty=Math.max(0,qty(rowQty(row)?.value));
+    const p=panel.querySelector('[data-source="PURCHASED"]');
+    const z=panel.querySelector('[data-source="ZERO_COST"]');
+    p.value=String(singleSource==='PURCHASED'?lineQty:0);
+    z.value=String(singleSource==='ZERO_COST'?lineQty:0);
+  }
+  inputs.addEventListener('input',message);
+  rowQty(row)?.addEventListener('input',()=>{syncSingleSource();message()});
+  syncSingleSource();message();
   row.append(panel);
  }
 }

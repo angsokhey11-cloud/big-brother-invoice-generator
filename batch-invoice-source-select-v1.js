@@ -9,7 +9,7 @@ const EPS=0.000001;
 const clean=x=>String(x==null?'':x).trim();
 const qty=x=>{const n=Number(x);return Number.isFinite(n)?n:0};
 const rows=()=>[...document.querySelectorAll('#productList .product')];
-const active=()=>{try{return !!(typeof getSelectedSimpleBatch==='function'&&getSelectedSimpleBatch())}catch(_){return false}};
+const active=()=>{try{return !!(document.getElementById('batchNumber')?.value&&typeof getSelectedSimpleBatch==='function'&&getSelectedSimpleBatch())}catch(_){return false}};
 const batch=()=>{try{return getSelectedSimpleBatch()}catch(_){return null}};
 const entry=row=>clean(row?.dataset?.entryType||'EXACT').toUpperCase();
 const tracked=row=>entry(row)==='EXACT'&&clean(row?.dataset?.itemType||'PRODUCT').toUpperCase()!=='SERVICE'&&clean(row?.dataset?.trackStock||'true').toLowerCase()!=='false';
@@ -32,7 +32,7 @@ function draw(){
   const prior=row.querySelector('.bb-batch-source-select');
   if(!enabled||!tracked(row)){if(prior)prior.remove();continue}
   const code=clean(row.dataset.productCode),item=stockItem(code),pMax=sourceAvailable(item,'PURCHASED'),zMax=sourceAvailable(item,'ZERO_COST');
-  if(pMax===null||zMax===null){if(prior)prior.remove();continue}
+  if(pMax===null||zMax===null){if(prior)prior.remove();const warning=document.createElement('div');warning.className='bb-batch-source-select';warning.textContent='Batch stock source balances unavailable. Refresh Batch stock before saving.';warning.style.color='#b42318';row.append(warning);continue}
   if(prior&&prior.dataset.batch===clean(batch()?.batchId)&&prior.dataset.code===code)continue;
   if(prior)prior.remove();
   const panel=document.createElement('div');panel.className='bb-batch-source-select';
@@ -101,6 +101,7 @@ if(typeof priorComplete==='function'){
 const init=()=>{
  const host=document.getElementById('productList');
  if(host)new MutationObserver(draw).observe(host,{childList:true});
+ document.getElementById('batchNumber')?.addEventListener('change',()=>setTimeout(draw,0));
  const original=window.handleSimpleBatchChange;
  if(typeof original==='function')window.handleSimpleBatchChange=function(){const r=original.apply(this,arguments);setTimeout(draw,0);return r};
  const originalLoad=window.loadSimpleBatchPicker;

@@ -348,7 +348,7 @@ exception
       raise;
     end if;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.bb_stock_invoice_line_after_insert()
@@ -1862,4 +1862,4 @@ begin
 
 end;
 
-$function$
+$function$;

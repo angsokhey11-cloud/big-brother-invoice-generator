@@ -545,6 +545,10 @@
           ])
         );
 
+        // Bootstrap already includes all current selling-unit definitions.
+        // An empty array is authoritative: do not query one product at a time.
+        window.BB_INVOICE_SELLING_UNITS_BOOTSTRAP_COMPLETE =
+          Array.isArray(data.sellingUnits);
         window.BB_INVOICE_SELLING_UNITS =
           Array.isArray(data.sellingUnits)
             ? data.sellingUnits.map(row => ({

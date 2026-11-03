@@ -3775,6 +3775,9 @@
               arguments
             );
 
+          // A completed invoice changes warehouse stock: require a fresh
+          // balance for the next draft, even if it opens immediately.
+          balanceLoaded = false;
 
           setTimeout(
 
@@ -4074,6 +4077,13 @@
 
     refresh:
       loadBalances,
+
+    // Reuse the stock loaded at startup or an in-flight request.
+    ensure:
+      () => balanceLoaded ? Promise.resolve() : loadBalances(),
+
+    isLoaded:
+      () => balanceLoaded,
 
     balances:
       () =>

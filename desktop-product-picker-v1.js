@@ -9,7 +9,7 @@
 (function(){
   'use strict';
 
-  const BUILD='20261004-keyboard-nav1';
+  const BUILD='20261103-stock-cache1';
   const PAGE_SIZE=7;
   const EPS=0.000001;
 
@@ -42,6 +42,7 @@
   let useGroups=false;
   let open=false;
   let refreshing=false;
+  let lastBatchStockKey='';
   let searchQuery='';
 
   function codeOf(product){
@@ -548,15 +549,16 @@
     }
   }
 
-  async function refreshDirectSaleBeforeOpen(){
+  async function refreshDirectSaleBeforeOpen(force=false){
     if(selectedBatch()||refreshing)return;
+    const direct=window.BBDirectSaleSourceV1;
+    if(!force && direct?.isLoaded?.())return;
 
     refreshing=true;
     render();
 
     try{
-      const refresh=
-        window.BBDirectSaleSourceV1?.refresh;
+      const refresh=force ? direct?.refresh : (direct?.ensure || direct?.refresh);
 
       if(typeof refresh==='function'){
         await refresh();
@@ -618,6 +620,7 @@
             updateSimpleBatchStatus();
           }
         }catch(_){}
+        if(clean(selectedBatch()?.batchId)===wanted)lastBatchStockKey=wanted;
       }
     }catch(error){
       console.warn('Invoice Batch product refresh:',error);
@@ -642,8 +645,9 @@
     searchQuery='';
     render();
 
-    if(selectedBatch()){
-      await refreshBatchBeforeOpen();
+    const batch=selectedBatch();
+    if(batch){
+      if(lastBatchStockKey!==clean(batch.batchId))await refreshBatchBeforeOpen();
     }else{
       await refreshDirectSaleBeforeOpen();
     }
@@ -1076,6 +1080,7 @@
 
     const wrapped=function(){
       const result=original.apply(this,arguments);
+      lastBatchStockKey='';
       page=0;
       activeIndex=0;
       searchQuery='';
@@ -1092,6 +1097,7 @@
     if(typeof after==='function'&&!after.__bbDesktopProductPickerWrapped){
       const wrapped=function(){
         const result=after.apply(this,arguments);
+        lastBatchStockKey='';
         page=0;
         open=false;
         setTimeout(render,0);
@@ -1105,6 +1111,7 @@
     if(typeof clear==='function'&&!clear.__bbDesktopProductPickerWrapped){
       const wrapped=function(){
         const result=clear.apply(this,arguments);
+        lastBatchStockKey='';
         page=0;
         open=false;
         setTimeout(render,0);
@@ -1129,20 +1136,25 @@
     render();
 
     /*
-     * Product + Batch data arrive asynchronously.
-     * This observer keeps the new picker synced without changing any
-     * mobile or accounting behavior.
+     * Bootstrap data can arrive after the picker mounts. Watch for changes
+     * without repeatedly rebuilding the product buttons every 250ms.
+     * All stock updates and saves keep their existing accounting guards.
      */
     let tries=0;
+    let lastProductSignature='';
     const timer=setInterval(()=>{
       tries+=1;
       wrapBatchChange();
       wrapClearFunctions();
-      render();
-
-      if(tries>=80){
-        clearInterval(timer);
+      const batch=selectedBatch();
+      const pool=rawPool();
+      const signature=(batch?clean(batch.batchId):'DIRECT')+'|'+
+        pool.map(row=>codeOf(row)+':'+remainingOf(row)).join('|');
+      if(signature!==lastProductSignature){
+        lastProductSignature=signature;
+        render();
       }
+      if(tries>=80)clearInterval(timer);
     },250);
 
     window.BB_INVOICE_GENERATOR_BUILD=BUILD;

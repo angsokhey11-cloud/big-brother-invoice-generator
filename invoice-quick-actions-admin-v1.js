@@ -108,9 +108,21 @@ function setup(){
  actions.addEventListener('click',e=>{if(e.target.closest('button'))showPanel('bbInvoiceMore',false)});
  $('bbInvoiceNewCustomer').addEventListener('click',()=>openForm('customer'));
  $('bbInvoiceBankDirectory').addEventListener('click',()=>openForm('bank'));
- rpc('bb_is_admin').then(value=>{
-    admin=value===true;adminBtn.hidden=!admin;
- }).catch(()=>{admin=false;adminBtn.hidden=true;showPanel('bbInvoiceAdmin',false)});
+ // Supabase adapter is appended after the legacy page by the Invoice loader.
+ // Wait for the authenticated RPC bridge before checking the admin role.
+ function verifyAdmin(attempt){
+   if(typeof window.BBInvoiceBankRpc!=='function'){
+     if(attempt<30)setTimeout(()=>verifyAdmin(attempt+1),150);
+     return; // Fail closed until the session bridge is ready.
+   }
+   rpc('bb_is_admin').then(value=>{
+      admin=value===true;adminBtn.hidden=!admin;
+      if(!admin)showPanel('bbInvoiceAdmin',false);
+   }).catch(()=>{
+      admin=false;adminBtn.hidden=true;showPanel('bbInvoiceAdmin',false);
+   });
+ }
+ verifyAdmin(0);
 }
 function ensureModal(){
  if($('bbInvoiceAdminModal'))return;

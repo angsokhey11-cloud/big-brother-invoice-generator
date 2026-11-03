@@ -12,14 +12,14 @@ const paths={
  done:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
  print:'<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/>',
  share:'<path d="m22 2-7 20-4-9-9-4L22 2Z"/><path d="M11 13 22 2"/>',
- phone:'<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
- drive:'<path d="M20 18a4 4 0 0 0-1-7.9A7 7 0 0 0 5.6 12 3 3 0 0 0 6 18h14Z"/><path d="M12 10v8m-3-3 3 3 3-3"/>',
+ phone:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 6v9m-3-3 3 3 3-3M10 19h4"/>',
+ drive:'<path d="M20 17a4 4 0 0 0-1.1-7.8A7 7 0 0 0 5.5 11a3 3 0 0 0 .5 6h3"/><path d="M12 11v10m-4-4 4 4 4-4M17 21h4"/>',
  user:'<circle cx="11" cy="8" r="4"/><path d="M4 21v-2a7 7 0 0 1 14 0v2M20 7v6m-3-3h6"/>',
  bank:'<path d="m2 9 10-6 10 6M3 9h18M5 10v8m5-8v8m4-8v8m5-8v8M2 21h20"/>',
  chevron:'<path d="m6 9 6 6 6-6"/>',
  x:'<path d="M5 5 19 19M19 5 5 19"/>'
 };
-const icon=n=>'<svg class="bbqa-svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[n]+'</svg>';
+const icon=n=>'<svg class="bbqa-svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[n]+'</svg>';
 function setLabel(b,n,label){b.innerHTML=icon(n)+'<span>'+label+'</span>';b.setAttribute('aria-label',label)}
 function button(id,n,label){const b=document.createElement('button');b.type='button';b.id=id;setLabel(b,n,label);return b}
 function addCss(){
@@ -28,17 +28,19 @@ function addCss(){
  s.textContent=[
  '#bbInvoiceQuickStack{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:7px!important;margin-top:7px!important}',
  '.bb-action-card #bbInvoiceQuickStack button{min-height:40px!important;width:100%!important;margin:0!important;padding:9px 12px!important;border-radius:9px!important;box-sizing:border-box!important;font:800 12px Arial,sans-serif!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;cursor:pointer!important}',
- '#bbInvoiceQuickStack .bbqa-svg{width:17px!important;height:17px!important;flex:0 0 17px!important}',
- '.bb-action-card #bbInvoiceQuickPreview{background:#f2f6fe!important;color:#1b559d!important;border:1px solid #b4c9e4!important}',
- '.bb-action-card #bbInvoiceMore{background:#ebf2ff!important;color:#174f91!important;border:1px solid #b1c6e7!important}',
- '.bb-action-card #bbInvoiceAdmin{background:#ecf6f1!important;color:#176447!important;border:1px solid #abd4c0!important}',
- '.bb-action-card #bbInvoiceQuickComplete{background:#0953b9!important;color:#fff!important;border:1px solid #0953b9!important}',
+ '#bbInvoiceQuickStack .bbqa-svg{width:19px!important;height:19px!important;flex:0 0 19px!important;stroke-width:2.3!important;opacity:1!important}',
+ '.bb-action-card #bbInvoiceQuickPreview{background:#dbeafe!important;color:#174788!important;border:1px solid #90b8e8!important}',
+ '.bb-action-card #bbInvoiceMore{background:#225bc0!important;color:#fff!important;border:1px solid #225bc0!important}',
+ '.bb-action-card #bbInvoiceAdmin{background:#087b6e!important;color:#fff!important;border:1px solid #087b6e!important}',
+ '.bb-action-card #bbInvoiceQuickComplete{background:#1152bc!important;color:#fff!important;border:1px solid #1152bc!important}',
  '#bbInvoiceQuickStack [hidden],#bbInvoiceAdminModal[hidden]{display:none!important}',
  '#bbInvoiceQuickStack .bbqa-panel{border:1px solid #d9e4f3;border-radius:9px;padding:8px!important;background:#f8fbff}',
  '#bbInvoiceQuickStack #bbInvoiceMorePanel .actions{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:7px!important;margin:0!important;padding:0!important}',
- '.bb-action-card #bbInvoiceMorePanel .print-btn{background:#163451!important;color:#fff!important;border:0!important}',
- '.bb-action-card #bbInvoiceMorePanel .share-btn{background:#159450!important;color:#fff!important;border:0!important}',
- '.bb-action-card #bbInvoiceMorePanel .save-btn{background:#2865c7!important;color:#fff!important;border:0!important}',
+ '.bb-action-card #bbInvoiceMorePanel .print-btn{background:#102f4e!important;color:#fff!important;border:0!important}',
+ '.bb-action-card #bbInvoiceMorePanel .share-btn{background:#0d904b!important;color:#fff!important;border:0!important}',
+ '.bb-action-card #bbInvoiceMorePanel .save-btn{background:#2555c5!important;color:#fff!important;border:0!important}',
+ '.bb-action-card #bbInvoiceMorePanel button[onclick*="saveToDrive"]{background:#087d8b!important;color:#fff!important;border:0!important}',
+ '.bb-action-card #bbInvoiceQuickStack button:focus-visible{outline:3px solid #f2ad42!important;outline-offset:2px!important}',
  '#bbInvoiceAdminPanel{display:grid;gap:7px!important}',
  '.bb-action-card #bbInvoiceAdminPanel button{background:white!important;color:#224a78!important;border:1px solid #cbdbea!important;justify-content:flex-start!important}',
  '#bbInvoiceAdminModal{position:fixed!important;inset:0!important;z-index:1100000!important;background:rgba(10,26,48,.68)!important;display:flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;padding:15px!important;overflow:auto}',
@@ -75,11 +77,11 @@ async function rpc(fn,args){
 }
 function setup(){
  if($('bbInvoiceQuickStack'))return;
- const card=document.querySelector('.bb-action-card.no-print');
- const actions=card?.querySelector('.actions.no-print');
+ const card=document.querySelector('.bb-action-card.no-print')||document.querySelector('.bb-action-card');
+ const actions=card?.querySelector('.actions.no-print')||card?.querySelector('.actions');
  const old=card?.querySelector('.bottom-action-row');
- const preview=old?.querySelector('.preview-btn');
- const complete=old?.querySelector('.complete-btn');
+ const preview=old?.querySelector('.preview-btn')||card?.querySelector('button[onclick*="previewInvoice"]');
+ const complete=old?.querySelector('.complete-btn')||card?.querySelector('button[onclick*="completeInvoice"]');
  if(!card||!actions||!preview||!complete||actions.querySelectorAll('button').length!==4)return;
  addCss();
  const title=card.querySelector('.bb-action-title');if(title)title.textContent='Quick Actions';
@@ -245,5 +247,16 @@ async function saveBank(event){
  }catch(e){notice('Save not confirmed: '+text(e?.message||e)+'. Check Bank Directory before retrying.','error');btn.disabled=false}
  finally{busy=false}
 }
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',setup,{once:true});else setup();
+// The Invoice Generator is loaded through an asynchronous document.open/write/close
+// bootstrap. DOMContentLoaded can precede later feature scripts in some shells.
+// Recheck actual card readiness briefly and initialize exactly once.
+function boot(){
+  if($('bbInvoiceQuickStack'))return true;
+  try{setup();}catch(error){console.error('[BIG BROTHER Quick Actions] Layout initialization failed',error);}
+  return !!$('bbInvoiceQuickStack');
+}
+boot();
+document.addEventListener('DOMContentLoaded',boot);
+window.addEventListener('load',boot);
+[0,80,250,600,1400,2800].forEach(delay=>setTimeout(boot,delay));
 })();

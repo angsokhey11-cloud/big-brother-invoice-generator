@@ -12,6 +12,8 @@ const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0};
 
 let current=null;
 let pendingMeta=null;
+const checkedUnitTargets=new Set();
+const pendingUnitLookups=new Map();
 
 function selectedBatch(){
   try{
@@ -274,9 +276,23 @@ async function refreshUnitsForProduct(product){
   const entry=clean(product.entryType||'EXACT').toUpperCase();
   const productCode=entry==='GROUP'?'':clean(product.code||product.productCode);
   const groupCode=entry==='GROUP'?clean(product.groupCode||product.code):'';
+  if(!productCode && !groupCode)return unitsFor(product);
+  const targetKey=(entry==='GROUP'?'GROUP|'+groupCode:'PRODUCT|'+productCode);
 
-  await window.loadInvoiceSellingUnitsForTarget(productCode,groupCode);
-  return unitsFor(product);
+  // The bootstrap contains every current selling unit, including the fact
+  // that some products have none. Avoid an RPC for each ordinary product.
+  if(window.BB_INVOICE_SELLING_UNITS_BOOTSTRAP_COMPLETE===true ||
+     checkedUnitTargets.has(targetKey))return unitsFor(product);
+  if(pendingUnitLookups.has(targetKey))return pendingUnitLookups.get(targetKey);
+
+  const task=window.loadInvoiceSellingUnitsForTarget(productCode,groupCode)
+    .then(()=>{
+      checkedUnitTargets.add(targetKey);
+      return unitsFor(product);
+    })
+    .finally(()=>pendingUnitLookups.delete(targetKey));
+  pendingUnitLookups.set(targetKey,task);
+  return task;
 }
 
 function setupPrompt(product,effectiveUsdPrice){
@@ -290,7 +306,7 @@ function setupPrompt(product,effectiveUsdPrice){
   renderOptions();
   refreshPreview();
 
-  if(!current.units.length){
+  if(!current.units.length && window.BB_INVOICE_SELLING_UNITS_BOOTSTRAP_COMPLETE!==true){
     const expected=current;
     refreshUnitsForProduct(product).then(fresh=>{
       if(current!==expected)return;
@@ -592,6 +608,7 @@ function ensureDesktopRowOptions(row,product){
   const resolvedProduct=product||productForRow(row);
   const units=unitsFor(resolvedProduct);
   if(!units.length){
+    if(window.BB_INVOICE_SELLING_UNITS_BOOTSTRAP_COMPLETE===true)return;
     if(row.dataset.bbSellingUnitLookup!=='1'){
       row.dataset.bbSellingUnitLookup='1';
       refreshUnitsForProduct(resolvedProduct).then(fresh=>{

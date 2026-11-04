@@ -188,6 +188,20 @@
   let bbLastCustomerLocationAlertKey = '';
   let bbLastCustomerLocationAlertAt = 0;
 
+  // Never persist this convenience preference across Generator visits.
+  // Also clear it when a suspended page is restored from browser back/forward cache.
+  function bbResetVisitLocationAlertChoice() {
+    const checkbox = document.getElementById('bbInvoiceSkipOtherLocationAlert');
+    if (checkbox) checkbox.checked = false;
+    bbLastCustomerLocationAlertKey = '';
+    bbLastCustomerLocationAlertAt = 0;
+  }
+  bbResetVisitLocationAlertChoice();
+  window.addEventListener('pagehide', bbResetVisitLocationAlertChoice);
+  window.addEventListener('pageshow', event => {
+    if (event.persisted) bbResetVisitLocationAlertChoice();
+  });
+
   function bbLocationLabel(code, fallbackName = '') {
     const wanted = String(code || '').trim();
     const match = locations.find(item =>

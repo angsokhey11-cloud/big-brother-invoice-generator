@@ -5,6 +5,16 @@
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <style>
+   /* Cross-location warning opt-out is DOM-only and resets every Generator launch.
+      It never changes customer/location mapping or stock checks. */
+   .bb-invoice-title-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 14px;margin-bottom:12px}
+   .bb-invoice-title-row .section-title{margin-bottom:0!important}
+   .bb-invoice-location-alert-toggle{display:inline-flex!important;align-items:center!important;gap:7px!important;width:auto!important;max-width:100%;cursor:pointer;border:1px solid #b8cfe9;border-radius:8px;background:#eff6ff;color:#164e81;padding:7px 10px;margin:0!important;font:700 11px/1.35 Arial,sans-serif}
+   .bb-invoice-location-alert-toggle input[type="checkbox"]{appearance:auto!important;flex:0 0 16px;width:16px!important;min-width:16px!important;height:16px!important;min-height:16px!important;margin:0!important;padding:0!important;accent-color:#205ec0}
+   .bb-invoice-location-alert-toggle small{font:600 10px Arial,sans-serif;color:#647e9a}
+   .bb-invoice-location-alert-toggle:has(input:checked){background:#eaf8f0;color:#196545;border-color:#a9d8c0}
+   @media(max-width:600px){.bb-invoice-title-row{align-items:flex-start}.bb-invoice-location-alert-toggle{font-size:10px}}
+   @media print{.bb-invoice-location-alert-toggle{display:none!important}}
    * { box-sizing: border-box; }
 
 body {
@@ -3676,8 +3686,12 @@ textarea:focus{
    <div class="bb-desktop-workspace">
     <div class="bb-left-column">
 <div class="card invoice-card">
-    <div class="section-title">
-     Invoice Information
+    <div class="bb-invoice-title-row">
+      <div class="section-title">Invoice Information</div>
+      <label class="bb-invoice-location-alert-toggle" for="bbInvoiceSkipOtherLocationAlert" title="Applies only until you exit the Invoice Generator">
+        <input id="bbInvoiceSkipOtherLocationAlert" type="checkbox" autocomplete="off"/>
+        <span>Don't repeat other-location customer alert <small>(until exit)</small></span>
+      </label>
     </div>
     <div class="grid-2 invoice-grid">
      <div>
@@ -9121,11 +9135,9 @@ async function completeInvoice(event) {
     return;
   }
 
-  const confirmed =
-    await bbConfirmInvoiceCompletion(payload);
-
-  if (!confirmed) return;
-
+  // The old extra Complete confirmation could show stale/incorrect values.
+  // Complete immediately after all existing customer, payment, bank, quantity
+  // and inventory validations. Keep the duplicate / stock / RPC save guards.
   window.bbInvoiceSaving = true;
 
   const oldText = button ? button.innerHTML : "";

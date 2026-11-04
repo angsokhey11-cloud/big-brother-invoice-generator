@@ -323,6 +323,16 @@
       return false;
     }
 
+    // User opt-out is limited to THIS loaded Invoice Generator document.
+    // Never use localStorage/sessionStorage: exiting/reopening resets it.
+    // Only the advisory location popup is suppressed; authoritative
+    // customer IDs, batch stock sources and all invoice validations remain.
+    if (document.getElementById('bbInvoiceSkipOtherLocationAlert')?.checked === true) {
+      bbLastCustomerLocationAlertKey = '';
+      bbLastCustomerLocationAlertAt = 0;
+      return false;
+    }
+
     const key = [
       batchId,
       String(customer?.customerId || customer?.name || '').trim(),

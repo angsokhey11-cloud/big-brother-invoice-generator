@@ -187,6 +187,10 @@
 
   let bbLastCustomerLocationAlertKey = '';
   let bbLastCustomerLocationAlertAt = 0;
+  // A successful Complete must never reopen the location advisory during
+  // the saved-invoice reset or through delayed customer selection callbacks.
+  // The next genuine customer selection re-enables the normal pre-save alert.
+  let bbPostSaveLocationAlertSuppressed = false;
 
   // Never persist this convenience preference across Generator visits.
   // Also clear it when a suspended page is restored from browser back/forward cache.
@@ -195,12 +199,23 @@
     if (checkbox) checkbox.checked = false;
     bbLastCustomerLocationAlertKey = '';
     bbLastCustomerLocationAlertAt = 0;
+    bbPostSaveLocationAlertSuppressed = false;
   }
   bbResetVisitLocationAlertChoice();
   window.addEventListener('pagehide', bbResetVisitLocationAlertChoice);
   window.addEventListener('pageshow', event => {
     if (event.persisted) bbResetVisitLocationAlertChoice();
   });
+  // Only genuine customer entry re-arms the location advisory for the next invoice.
+  // Programmatic input events emitted while resetting a saved form cannot do that.
+  document.getElementById('customerName')?.addEventListener('input', event => {
+    if (event.isTrusted && String(event.currentTarget?.value || '').trim()) {
+      bbPostSaveLocationAlertSuppressed = false;
+    }
+  }, true);
+  document.getElementById('customerOptions')?.addEventListener('pointerdown', event => {
+    if (event.isTrusted) bbPostSaveLocationAlertSuppressed = false;
+  }, true);
 
   function bbLocationLabel(code, fallbackName = '') {
     const wanted = String(code || '').trim();
@@ -324,6 +339,14 @@
   }
 
   function bbShowCustomerLocationAlert(customer) {
+    // This is a pre-save customer-selection hint ONLY. Never show it while
+    // completing a saved invoice or resetting the form for the next invoice.
+    // Independent of the "don't repeat" checkbox.
+    if (window.bbInvoiceSaving === true ||
+        window.bbInvoiceResettingAfterSave === true ||
+        bbPostSaveLocationAlertSuppressed) {
+      return false;
+    }
     const batchLocationCode = bbCurrentBatchLocationCode();
     const customerLocationCode = String(customer?.locationCode || '').trim();
     const batchId = String(document.getElementById('batchNumber')?.value || '').trim();
@@ -1374,6 +1397,13 @@
   window.clearAllAfterSuccessfulSave = function clearAllAfterSuccessfulSaveSupabase() {
     const manualSequence = bbReadInvoiceSequence();
 
+    // A saved invoice has already been committed. Dismiss the old customer's
+    // advisory immediately and suppress callbacks until new customer entry.
+    window.bbInvoiceResettingAfterSave = true;
+    bbPostSaveLocationAlertSuppressed = true;
+    const locationOverlay = document.getElementById('bbCustomerLocationAlert');
+    if (locationOverlay) locationOverlay.hidden = true;
+
     bbSelectedCustomerId = '';
     bbSelectedCustomerLocationCode = '';
     bbGlobalCustomers = [];
@@ -1386,15 +1416,22 @@
      *   user enters 1000 -> completes -> next stays 1001
      *   automatic INV-3462 -> completes -> next stays INV-3463
      */
-    bbOriginalClearAfterSave();
-    // Clear the recovery guard only after completion clears the saved form.
-    // Manual Clear never removes an uncertain attempt.
-    if(bbReadPendingInvoice()?.confirmedSaved)bbWritePendingInvoice(null);
+    try {
+      bbOriginalClearAfterSave();
+      // Clear the recovery guard only after completion clears the saved form.
+      // Manual Clear never removes an uncertain attempt.
+      if(bbReadPendingInvoice()?.confirmedSaved)bbWritePendingInvoice(null);
 
-    if (manualSequence?.mode === 'manual') {
-      bbWriteManualInvoiceSequence(
-        document.getElementById('invoiceNumber')?.value || ''
-      );
+      if (manualSequence?.mode === 'manual') {
+        bbWriteManualInvoiceSequence(
+          document.getElementById('invoiceNumber')?.value || ''
+        );
+      }
+    } finally {
+      // No late Location Alert from the invoice we already saved.
+      const oldLocationOverlay = document.getElementById('bbCustomerLocationAlert');
+      if (oldLocationOverlay) oldLocationOverlay.hidden = true;
+      window.bbInvoiceResettingAfterSave = false;
     }
   };
 

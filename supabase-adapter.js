@@ -202,6 +202,32 @@
     bbPostSaveLocationAlertSuppressed = false;
   }
   bbResetVisitLocationAlertChoice();
+
+  // COMPLETE INTENT MUST BE CAPTURED BEFORE BLUR/CHANGE ON CUSTOMER NAME.
+  // The Complete button may validate an incomplete form and focus/open the
+  // Payment Method picker. That focus change can trigger the old customer
+  // change handler before bbInvoiceSaving is set. Location alerts belong to
+  // customer selection only, never the Complete action (checked or unchecked).
+  function bbSuppressLocationAlertOnCompleteIntent(event) {
+    if (!event?.target?.closest?.('.complete-btn')) return;
+    bbPostSaveLocationAlertSuppressed = true;
+    bbLastCustomerLocationAlertKey = '';
+    bbLastCustomerLocationAlertAt = 0;
+    const oldAlert = document.getElementById('bbCustomerLocationAlert');
+    if (oldAlert) oldAlert.hidden = true;
+  }
+  // Capture before the browser moves focus and dispatches change/blur.
+  document.addEventListener('pointerdown', bbSuppressLocationAlertOnCompleteIntent, true);
+  document.addEventListener('mousedown', bbSuppressLocationAlertOnCompleteIntent, true);
+  document.addEventListener('touchstart', bbSuppressLocationAlertOnCompleteIntent, {capture:true,passive:true});
+  // Keyboard activation and programmatic click fallbacks.
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      bbSuppressLocationAlertOnCompleteIntent(event);
+    }
+  }, true);
+  document.addEventListener('click', bbSuppressLocationAlertOnCompleteIntent, true);
+
   window.addEventListener('pagehide', bbResetVisitLocationAlertChoice);
   window.addEventListener('pageshow', event => {
     if (event.persisted) bbResetVisitLocationAlertChoice();

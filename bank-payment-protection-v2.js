@@ -14,6 +14,24 @@ let adminMayTypeManualId=false;
 let availableCustomerId='';
 let availableLoadSeq=0;
 let availableTimer=null;
+// Invoice Generator staff restriction: receipt date must be >= sale date.
+// Server trigger enforces it even if the client has a stale cached balance.
+function receivedISO(row){
+ const m=clean(row?.received_date).match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/);
+ return m?m[1]+'-'+m[2]+'-'+m[3]:'';
+}
+function eligibleForSale(row){
+ if(adminMayTypeManualId)return true;
+ const sale=clean($('invoiceDate')?.value),received=receivedISO(row);
+ return !!sale&&!!received&&received>=sale;
+}
+function refreshSaleEligibility(){
+ const id=clean(window.bbGetSelectedCustomerForBank?.()?.customerId);
+ const all=customerCachedRows(id);
+ const selected=all.find(x=>clean(x.transaction_id)===userSelectedRegisteredId);
+ if(selected&&!eligibleForSale(selected))resetPreviousBankPayment('sale-date-changed');
+ availablePayments=all.filter(eligibleForSale);renderAvailablePayments();
+}
 function clearMethod(){
  const select=$('paymentMethod');
  if(select){select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));}
@@ -89,6 +107,7 @@ function clearRegisteredSelection(){
 }
 function applyRegisteredPayment(tx){
  if(!tx)return;
+ if(!eligibleForSale(tx)){alert('This bank receipt is older than the invoice sale date. Staff must ask Admin to use it.');return;}
  userSelectedRegisteredId=clean(tx.transaction_id);
  const id=$('transactionId');
  if(id){
@@ -116,7 +135,9 @@ function renderAvailablePayments(){
    return;
  }
  if(!availablePayments.length){
-   box.innerHTML='<div style="font-size:12px;color:#6a7d91">No available registered bank payment for this customer.</div>';
+   const blocked=customerCachedRows(availableCustomerId).length&&!adminMayTypeManualId;
+   box.innerHTML='<div style="font-size:12px;color:#6a7d91">'+
+    (blocked?'No eligible bank receipts for this sale date. Staff can use only bank receipts received on or after the invoice sale date. Ask Admin to use older balances.':'No available registered bank payment for this customer.')+'</div>';
    return;
  }
  box.innerHTML='<div style="font-size:12px;font-weight:900;color:#17457a;margin-bottom:8px">Admin-verified payments for this customer</div>'+
@@ -157,7 +178,7 @@ function bulkWrite(snapshot){localStorage.setItem(bulkCacheKey(),JSON.stringify(
 function customerCachedRows(id){return (bulkRead()?.rows||[]).filter(x=>clean(x.customer_id)===clean(id)&&Number(x.remaining_amount)>0);}
 function loadCachedPayments(id){
  const rows=customerCachedRows(id);
- availablePayments=rows;
+ availablePayments=rows.filter(eligibleForSale);
  renderAvailablePayments();
  return {transactions:rows};
 }
@@ -255,6 +276,7 @@ async function installManualIdLock(){
  }
  tx.readOnly=!adminMayTypeManualId;
  tx.setAttribute('aria-readonly',String(!adminMayTypeManualId));
+ refreshSaleEligibility();
  if(adminMayTypeManualId){
   tx.placeholder='Enter new Transaction ID or select Use';
   info.textContent='Admin: manual Transaction ID allowed. Registered transfers are optional.';
@@ -268,6 +290,10 @@ async function validateBank(payload){
  const curr=$('bbActualBankCurrency')?.value||payload.currency;
  const supplied=clean($('bbActualBankAmount')?.value)!=='';
  if(supplied&&(!Number.isFinite(actual)||actual<=0))throw new Error('Enter a valid actual bank amount.');
+ if(!adminMayTypeManualId){
+  const tx=customerCachedRows(payload.customerId).find(r=>clean(r.transaction_id).toUpperCase()===clean(payload.transactionId).toUpperCase());
+  if(tx&&!eligibleForSale(tx))throw new Error('Staff cannot use a bank receipt dated before this invoice sale. Ask Admin.');
+ }
  try{
   const good=await window.BBInvoiceBankRpc('bb_bank_validate_invoice_input',{
    p_customer_id:payload.customerId,p_transaction_id:payload.transactionId,
@@ -299,7 +325,7 @@ function installBankReuseDuplicateCheck(){
   const matching=availablePayments.some(tx=>
     clean(tx.transaction_id).toLowerCase()===selected.toLowerCase()&&
     Number(tx.remaining_amount)>0&&
-    clean(tx.customer_id)===currentCustomer
+    clean(tx.customer_id)===currentCustomer&&eligibleForSale(tx)
   );
   if(result?.exists===true&&!result?.pending&&
      selected&&selected.toLowerCase()===clean(transactionId).toLowerCase()&&
@@ -370,6 +396,8 @@ customer?.addEventListener('input',()=>{
  }
 });
 customer?.addEventListener('change',scheduleAvailablePayments);
+$('invoiceDate')?.addEventListener('change',refreshSaleEligibility);
+$('invoiceDate')?.addEventListener('input',refreshSaleEligibility);
 $('transactionId')?.addEventListener('input',()=>{
  if(userSelectedRegisteredId&&clean($('transactionId').value)!==userSelectedRegisteredId){
    userSelectedRegisteredId='';

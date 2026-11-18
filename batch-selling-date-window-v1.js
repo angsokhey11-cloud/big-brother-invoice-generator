@@ -5,6 +5,8 @@ if(window.BBBatchSellingWindowInvoiceV1)return;window.BBBatchSellingWindowInvoic
 const $=id=>document.getElementById(id);
 const iso=x=>String(x??'').trim().match(/^\d{4}-\d{2}-\d{2}$/)?.[0]||'';
 let admin=false,checked=false,hint=null,lastBatchId='';
+// Retain the last staff-approved selling date for each Batch within this generator session.
+const lastValidDates=new Map();
 function selected(){
  try{return typeof window.getSelectedSimpleBatch==='function'?window.getSelectedSimpleBatch():null}
  catch(_){return null}
@@ -26,6 +28,37 @@ function show(message,warning=false){
  hint.style.background=warning?'#fff0f0':'#eaf8ef';
  hint.hidden=!message;
 }
+function allowed(date,limit){
+ return !!(limit?.batchId&&limit.from&&limit.to&&limit.from<=limit.to&&date&&date>=limit.from&&date<=limit.to);
+}
+function rememberValidDate(){
+ const range=currentRange(),date=iso($('invoiceDate')?.value);
+ if(allowed(date,range))lastValidDates.set(range.batchId,date);
+}
+function restoreAfterCompletedInvoice(){
+ const original=window.clearAllAfterSuccessfulSave;
+ if(typeof original!=='function'||original.__bbBatchDateStickyV2)return;
+ const wrapped=function(...args){
+  const before=currentRange(),date=iso($('invoiceDate')?.value);
+  const validForBatch=allowed(date,before);
+  // Remember only dates that fall inside this Batch's configured selling window.
+  if(validForBatch)lastValidDates.set(before.batchId,date);
+  const result=original.apply(this,args);
+  const after=currentRange();
+  const input=$('invoiceDate');
+  // Original reset calls setTodayDate(), which may replace the last valid Batch date
+  // with today's date. Restore it for the NEXT invoice without touching saved invoices.
+  if(input&&validForBatch&&after?.batchId===before.batchId&&
+     (admin||allowed(date,after))){
+   if(input.value!==date)input.value=date;
+   if(typeof window.updateInvoiceDate==='function')window.updateInvoiceDate(false);
+  }
+  onBatchChange();
+  return result;
+ };
+ wrapped.__bbBatchDateStickyV2=true;
+ window.clearAllAfterSuccessfulSave=wrapped;
+}
 function onBatchChange(){
  const limit=currentRange();
  const dateInput=$('invoiceDate');
@@ -41,9 +74,14 @@ function onBatchChange(){
  if(!admin){
   dateInput.min=limit.from;dateInput.max=limit.to;
   const chosen=iso(dateInput.value);
-  if(changed&&(!chosen||chosen<limit.from||chosen>limit.to)){
-   dateInput.value=limit.from;
-   if(typeof window.updateInvoiceDate==='function')window.updateInvoiceDate(false);
+  if(changed){
+   const saved=lastValidDates.get(id);
+   const nextDate=allowed(saved,limit)?saved:
+     (allowed(chosen,limit)?chosen:limit.from);
+   if(nextDate!==chosen){
+    dateInput.value=nextDate;
+    if(typeof window.updateInvoiceDate==='function')window.updateInvoiceDate(false);
+   }
   }
  }
  const chosen=iso(dateInput.value),out=!admin&&chosen&&(chosen<limit.from||chosen>limit.to);
@@ -88,8 +126,8 @@ function install(){
   place?.append(hint);
  }else hint=$('bbInvoiceBatchSellingDateHint');
  batch.addEventListener('change',onBatchChange);
- date.addEventListener('change',()=>onBatchChange());
- date.addEventListener('input',()=>onBatchChange());
+ date.addEventListener('change',()=>{rememberValidDate();onBatchChange()});
+ date.addEventListener('input',()=>{rememberValidDate();onBatchChange()});
  const oldChange=window.handleSimpleBatchChange;
  if(typeof oldChange==='function'&&!oldChange.__bbBatchDates){
   const patched=function(...args){const out=oldChange.apply(this,args);onBatchChange();return out};
@@ -104,7 +142,9 @@ function install(){
  observer.observe(batch,{childList:true,subtree:false});
  protectSave('postSalesInvoiceBundle');
  protectSave('postSalesInvoice');
+ restoreAfterCompletedInvoice();
  onBatchChange();
+ rememberValidDate();
  if(typeof window.BBInvoiceBankRpc==='function'){
   window.BBInvoiceBankRpc('bb_is_admin').then(value=>{
    admin=value===true;checked=true;onBatchChange();

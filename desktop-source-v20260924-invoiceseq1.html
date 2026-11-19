@@ -7392,14 +7392,7 @@ function printInvoice(event) {
   const state = getFinalInvoiceState();
   const invoiceHtml = buildFinalInvoiceHtml(state);
 
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Please allow pop-ups for this invoice to print.");
-    return;
-  }
-
-  printWindow.document.open();
-  printWindow.document.write(`<!DOCTYPE html>
+  const printHtml = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
@@ -7440,7 +7433,20 @@ function printInvoice(event) {
 </style>
 </head>
 <body>${invoiceHtml}</body>
-</html>`);
+</html>`;
+  if(typeof window.BBNativePrint?.postMessage==="function"){
+    try{
+      window.BBNativePrint.postMessage(JSON.stringify({action:"printInvoice",title:String(state.invoiceNo||"BIG BROTHER Invoice"),layout:"a4",html:printHtml}));
+    }catch(e){alert("Could not start Android printing: "+(e?.message||e));}
+    return;
+  }
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Please allow pop-ups for this invoice to print.");
+    return;
+  }
+  printWindow.document.open();
+  printWindow.document.write(printHtml);
   printWindow.document.close();
   printWindow.onload = () => {
     setTimeout(() => {

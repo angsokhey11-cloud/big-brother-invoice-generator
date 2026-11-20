@@ -7432,7 +7432,28 @@ function printInvoice(event) {
 .final-bill-row{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 205px!important;gap:20px!important;margin-bottom:18px!important;min-height:105px!important}.final-bill,.final-shipping{font-size:13px!important;line-height:1.5!important;min-width:0!important}.final-shipping{border-left:1px solid #9eacc0!important;padding-left:20px!important}.final-bill-label,.final-shipping-label{font-weight:800!important;font-size:14px!important;margin-bottom:10px!important}.final-bill-detail-row{display:grid!important;grid-template-columns:112px 10px minmax(0,1fr)!important;gap:4px!important;margin-bottom:7px!important;align-items:start!important}.final-bill-detail-label{font-weight:700!important;white-space:nowrap!important}.final-shipping-value{white-space:pre-line!important;overflow-wrap:anywhere!important}
 </style>
 </head>
-<body>${invoiceHtml}</body>
+<body>${invoiceHtml}<script>
+(function(){
+const n=document.getElementById("invoiceNumber"),b=document.getElementById("batchNumber");
+if(!n||!b)return;
+const key="bbDirectSaleNext20261120";
+let next=Number(localStorage.getItem(key)||12305),last="",direct=false;
+function sync(){
+ const v=b.value, label=b.options[b.selectedIndex]?.textContent||"";
+ const d=!v||/no batch|direct sale/i.test(label);
+ if(d){
+ if(!direct){last=n.value;direct=true;}
+ n.readOnly=true;
+ n.title="Automatic Direct Sale invoice number";
+ if(/^INV-\d+$/.test(n.value)&&Number(n.value.slice(4))===next+1){next++;localStorage.setItem(key,String(next));}
+ n.value="INV-"+next;
+ }else if(direct){direct=false;n.readOnly=false;n.title="";n.value=last;}
+}
+b.addEventListener("change",sync);
+sync();setInterval(sync,150);
+})();
+</script>
+</body>
 </html>`;
   if(typeof window.BBNativePrint?.postMessage==="function"){
     try{

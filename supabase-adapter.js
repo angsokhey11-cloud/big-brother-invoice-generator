@@ -485,52 +485,10 @@
     return BB_INVOICE_SEQUENCE_PREFIX + account;
   }
 
-  function bbReadInvoiceSequence() {
-    try {
-      const value = JSON.parse(
-        localStorage.getItem(bbInvoiceSequenceKey()) || 'null'
-      );
-      if (
-        value &&
-        value.mode === 'manual' &&
-        String(value.invoiceNo || '').trim()
-      ) {
-        const invoiceNo=String(value.invoiceNo || '').trim();
-        if(invoiceNo==='Range Complete'){
-          localStorage.removeItem(bbInvoiceSequenceKey());
-          return null;
-        }
-        return {
-          mode: 'manual',
-          invoiceNo
-        };
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  function bbWriteManualInvoiceSequence(invoiceNo) {
-    const value = String(invoiceNo || '').trim();
-    if (
-      !value ||
-      value === 'Loading...' ||
-      value === 'Unavailable' ||
-      value === 'Range Complete'
-    ) return;
-
-    try {
-      localStorage.setItem(
-        bbInvoiceSequenceKey(),
-        JSON.stringify({
-          mode: 'manual',
-          invoiceNo: value
-        })
-      );
-    } catch (_) {}
-  }
-
+  function bbWriteManualInvoiceSequence() {}
   function bbManualInvoiceSequenceNo() {
-    return bbReadInvoiceSequence()?.invoiceNo || '';
+    try { localStorage.removeItem(bbInvoiceSequenceKey()); } catch (_) {}
+    return '';
   }
 
   window.bbClearManualInvoiceSequence = function bbClearManualInvoiceSequence() {

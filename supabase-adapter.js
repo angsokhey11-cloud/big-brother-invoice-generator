@@ -485,6 +485,7 @@
     return BB_INVOICE_SEQUENCE_PREFIX + account;
   }
 
+  function bbReadInvoiceSequence() { return null; }
   function bbWriteManualInvoiceSequence() {}
   function bbManualInvoiceSequenceNo() {
     try { localStorage.removeItem(bbInvoiceSequenceKey()); } catch (_) {}

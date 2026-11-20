@@ -1083,7 +1083,7 @@
   ----------------------------- */
   window.checkInvoiceNumberAvailable = async function checkInvoiceNumberAvailableSupabase(invoiceNo) {
     const requested = String(invoiceNo || '').trim();
-    if (!requested || requested === 'Loading...' || requested === 'Unavailable') {
+    if (!/^INV-[0-9]+$/.test(requested)) {
       throw new Error('Invoice number is not ready yet.');
     }
 
@@ -1624,7 +1624,24 @@
   }
   seqInput?.addEventListener('focus',()=>{if(!seqBatch?.value)seqInput.blur();});
   lockSequence();
-  seqBatch?.addEventListener('change',()=>{lockSequence();if(!seqBatch.value)window.loadNextInvoiceNumber().catch(()=>{});});
+  let seqRequest=0;
+  seqBatch?.addEventListener('change',async()=>{
+    lockSequence();
+    const batch=seqBatch.value, request=++seqRequest;
+    if(!batch){await window.loadNextInvoiceNumber().catch(()=>{});return;}
+    seqInput.value='Loading...';seqInput.readOnly=true;
+    try{
+      const data=await bbRpc('bb_sales_batch_next_invoice_no',{p_batch_id:batch});
+      if(request!==seqRequest||seqBatch.value!==batch)return;
+      if(!data?.success||!data.invoiceNo)throw Error('Batch invoice number unavailable');
+      seqInput.value=data.invoiceNo;lockSequence();
+    }catch(e){if(request===seqRequest){seqInput.value='Unavailable';bbShowDatabaseError(e);}}
+  });
+  seqInput?.addEventListener('input',()=>{
+    if(!seqBatch?.value)return;
+    const raw=seqInput.value.replace(/^INV-/i,'');
+    seqInput.value='INV-'+raw.replace(/[๐-๙០-៩]/g,d=>String(d.charCodeAt(0)-(d.charCodeAt(0)>=0x17e0?0x17e0:0x0e50))).replace(/[^0-9]/g,'');
+  });
   bbTrackManualInvoiceNumber();
   bbStartSupabaseInvoice();
   // Narrow authenticated RPC bridge for bank verification V2.

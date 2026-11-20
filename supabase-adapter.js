@@ -606,13 +606,6 @@
           location.salespersonStaffId = rawLocationMap.get(location.locationCode) || '';
         });
 
-        const manualInvoiceNo = bbManualInvoiceSequenceNo();
-        if (manualInvoiceNo) {
-          setInvoiceNumber(manualInvoiceNo);
-        } else if (data.invoiceNo) {
-          setInvoiceNumber(data.invoiceNo);
-        }
-
         const status = document.getElementById('customerStatus');
         if (status && !currentLocationCode) {
           status.textContent = 'Supabase ready • select a Main Location.';
@@ -1604,12 +1597,7 @@
         loadSimpleBatchPicker()
       ]);
 
-      if (
-        document.getElementById('invoiceNumber')?.value === 'Loading...' ||
-        document.getElementById('invoiceNumber')?.value === 'Unavailable'
-      ) {
-        await loadNextInvoiceNumber();
-      }
+      if (!document.getElementById('batchNumber')?.value) { await window.loadNextInvoiceNumber(); }
     } catch (error) {
       bbShowDatabaseError(error);
       const button = document.querySelector('.complete-btn');
@@ -1620,6 +1608,11 @@
     }
   }
 
+  const seqInput=document.getElementById('invoiceNumber');
+  const seqBatch=document.getElementById('batchNumber');
+  function lockSequence(){if(seqInput)seqInput.readOnly=!seqBatch?.value;}
+  lockSequence();
+  seqBatch?.addEventListener('change',()=>{lockSequence();if(!seqBatch.value)window.loadNextInvoiceNumber().catch(()=>{});});
   bbTrackManualInvoiceNumber();
   bbStartSupabaseInvoice();
   // Narrow authenticated RPC bridge for bank verification V2.

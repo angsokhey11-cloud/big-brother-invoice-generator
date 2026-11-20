@@ -4161,44 +4161,9 @@ function bbValidInvoiceDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
 }
 
-function bbRememberInvoiceDate(value) {
-  const cleanValue = String(value || "").trim();
-  if (!bbValidInvoiceDate(cleanValue)) return;
-
-  try {
-    localStorage.setItem(
-      bbInvoiceDateAccountKey(),
-      cleanValue
-    );
-  } catch (_) {}
-}
-
-function bbSavedInvoiceDate() {
-  try {
-    const value =
-      localStorage.getItem(
-        bbInvoiceDateAccountKey()
-      ) || "";
-
-    return bbValidInvoiceDate(value)
-      ? value
-      : "";
-  } catch (_) {
-    return "";
-  }
-}
-
-function bbTodayIsoDate() {
-  const today = new Date();
-
-  const year = today.getFullYear();
-  const month =
-    String(today.getMonth() + 1).padStart(2, "0");
-  const day =
-    String(today.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
+function bbRememberInvoiceDate() { try { localStorage.removeItem(bbInvoiceDateAccountKey()); } catch (_) {} }
+function bbSavedInvoiceDate() { bbRememberInvoiceDate(); return ""; }
+function bbTodayIsoDate() { return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Phnom_Penh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()); }
 
 function setTodayDate() {
   const picker =
@@ -4207,8 +4172,7 @@ function setTodayDate() {
   if (!picker) return;
 
   picker.value =
-    bbSavedInvoiceDate() ||
-    bbTodayIsoDate();
+    (document.getElementById('batchNumber')?.value && picker.value) || bbSavedInvoiceDate() || bbTodayIsoDate();
 }
 
 setTodayDate();

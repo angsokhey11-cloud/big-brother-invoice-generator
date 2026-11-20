@@ -1628,13 +1628,15 @@
   seqBatch?.addEventListener('change',async()=>{
     lockSequence();
     const batch=seqBatch.value, request=++seqRequest;
-    if(!batch){await window.loadNextInvoiceNumber().catch(()=>{});return;}
+    if(!batch){setTodayDate();updateInvoiceDate(false);await window.loadNextInvoiceNumber().catch(()=>{});return;}
     seqInput.value='Loading...';seqInput.readOnly=true;
     try{
       const data=await bbRpc('bb_sales_batch_next_invoice_no',{p_batch_id:batch});
       if(request!==seqRequest||seqBatch.value!==batch)return;
       if(!data?.success||!data.invoiceNo)throw Error('Batch invoice number unavailable');
       seqInput.value=data.invoiceNo;lockSequence();
+      const datePicker=document.getElementById('invoiceDate');
+      if(datePicker&&data.invoiceDate){datePicker.value=data.invoiceDate;updateInvoiceDate(false);}
     }catch(e){if(request===seqRequest){seqInput.value='Unavailable';bbShowDatabaseError(e);}}
   });
   seqInput?.addEventListener('input',()=>{

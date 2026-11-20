@@ -1610,7 +1610,18 @@
 
   const seqInput=document.getElementById('invoiceNumber');
   const seqBatch=document.getElementById('batchNumber');
-  function lockSequence(){if(seqInput)seqInput.readOnly=!seqBatch?.value;}
+  function lockSequence(){
+    if(!seqInput)return;
+    const locked=!seqBatch?.value;
+    seqInput.readOnly=locked;
+    seqInput.tabIndex=locked?-1:0;
+    seqInput.style.pointerEvents=locked?'none':'';
+    seqInput.style.backgroundColor=locked?'#eef2f7':'';
+    seqInput.style.userSelect=locked?'none':'';
+    seqInput.setAttribute('aria-disabled',String(locked));
+    if(locked&&document.activeElement===seqInput)seqInput.blur();
+  }
+  seqInput?.addEventListener('focus',()=>{if(!seqBatch?.value)seqInput.blur();});
   lockSequence();
   seqBatch?.addEventListener('change',()=>{lockSequence();if(!seqBatch.value)window.loadNextInvoiceNumber().catch(()=>{});});
   bbTrackManualInvoiceNumber();

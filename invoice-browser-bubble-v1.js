@@ -138,16 +138,25 @@
     bookmarks.value = '';
   }
 
+  // Keep the drag state tied to an actual held primary pointer. Previously a
+  // missed pointerup/lost capture could leave the widget following mouse hover.
+  function isHeld(event) {
+    return event.isPrimary !== false &&
+      (event.pointerType !== 'mouse' && event.pointerType !== 'pen' ||
+       (event.buttons & 1) === 1);
+  }
+
   function startBubbleDrag() {
     var start = null;
     bubble.addEventListener('pointerdown', function (event) {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || !isHeld(event)) return;
       var r = bubble.getBoundingClientRect();
       start = { pointer: event.pointerId, x: event.clientX, y: event.clientY, left: r.left, top: r.top, moved: false };
       try { bubble.setPointerCapture(event.pointerId); } catch (_) {}
     });
     bubble.addEventListener('pointermove', function (event) {
       if (!start || event.pointerId !== start.pointer) return;
+      if (!isHeld(event)) { start = null; return; }
       var dx = event.clientX - start.x, dy = event.clientY - start.y;
       if (Math.abs(dx) + Math.abs(dy) > 7) start.moved = true;
       if (!start.moved) return;
@@ -156,8 +165,8 @@
       bubble.style.right = 'auto';
       event.preventDefault();
     });
-    bubble.addEventListener('pointerup', function (event) {
-      if (!start || event.pointerId !== start.pointer) return;
+    function finish(event) {
+      if (!start || (event && event.pointerId !== start.pointer)) return;
       if (start.moved) {
         var r = bubble.getBoundingClientRect();
         state.bubble = { x: Math.round(r.left), y: Math.round(r.top) };
@@ -165,8 +174,11 @@
         bubble.dataset.justDragged = '1';
       }
       start = null;
-    });
-    bubble.addEventListener('pointercancel', function () { start = null; });
+    }
+    bubble.addEventListener('pointerup', finish);
+    bubble.addEventListener('pointercancel', finish);
+    bubble.addEventListener('lostpointercapture', function () { start = null; });
+    window.addEventListener('blur', function () { start = null; });
     bubble.addEventListener('click', function (event) {
       if (bubble.dataset.justDragged === '1') {
         event.preventDefault();
@@ -180,7 +192,7 @@
   function startPanelDrag(handle) {
     var start = null;
     handle.addEventListener('pointerdown', function (event) {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || !isHeld(event)) return;
       var r = panel.getBoundingClientRect();
       start = { id: event.pointerId, x: event.clientX, y: event.clientY, left: r.left, top: r.top };
       try { handle.setPointerCapture(event.pointerId); } catch (_) {}
@@ -188,23 +200,27 @@
     });
     handle.addEventListener('pointermove', function (event) {
       if (!start || event.pointerId !== start.id) return;
+      // Never drag merely because the mouse is hovering over the title bar.
+      if (!isHeld(event)) { start = null; return; }
       panel.style.left = clamp(start.left + event.clientX - start.x, 8, window.innerWidth - panel.offsetWidth - 8) + 'px';
       panel.style.top = clamp(start.top + event.clientY - start.y, 8, window.innerHeight - panel.offsetHeight - 8) + 'px';
       event.preventDefault();
     });
     function finish(event) {
-      if (!start || event.pointerId !== start.id) return;
+      if (!start || (event && event.pointerId !== start.id)) return;
       start = null;
       rememberPanel();
     }
     handle.addEventListener('pointerup', finish);
     handle.addEventListener('pointercancel', finish);
+    handle.addEventListener('lostpointercapture', function () { start = null; });
+    window.addEventListener('blur', function () { start = null; });
   }
 
   function startResize(grip) {
     var start = null;
     grip.addEventListener('pointerdown', function (event) {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || !isHeld(event)) return;
       var r = panel.getBoundingClientRect();
       start = { id: event.pointerId, x: event.clientX, y: event.clientY, w: r.width, h: r.height, left: r.left, top: r.top };
       try { grip.setPointerCapture(event.pointerId); } catch (_) {}
@@ -212,6 +228,8 @@
     });
     grip.addEventListener('pointermove', function (event) {
       if (!start || event.pointerId !== start.id) return;
+      // Never resize when pointer capture ended or the button was released.
+      if (!isHeld(event)) { start = null; return; }
       var maxW = window.innerWidth - start.left - 8;
       var maxH = window.innerHeight - start.top - 8;
       panel.style.width = clamp(start.w + event.clientX - start.x, Math.min(300, maxW), maxW) + 'px';
@@ -219,12 +237,14 @@
       event.preventDefault();
     });
     function finish(event) {
-      if (!start || event.pointerId !== start.id) return;
+      if (!start || (event && event.pointerId !== start.id)) return;
       start = null;
       rememberPanel();
     }
     grip.addEventListener('pointerup', finish);
     grip.addEventListener('pointercancel', finish);
+    grip.addEventListener('lostpointercapture', function () { start = null; });
+    window.addEventListener('blur', function () { start = null; });
   }
 
   function init() {

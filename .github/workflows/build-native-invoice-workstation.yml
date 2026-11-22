@@ -30,6 +30,27 @@ jobs:
       - name: Publish portable Windows x64 application
         run: dotnet publish windows-workstation/BBInvoiceWorkstation.csproj --configuration Release --runtime win-x64 --self-contained true --output package/BIG-BROTHER-Invoice-Workstation-Test-Win64 -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false
 
+      - name: Verify native WebView2 Windows SDK dependencies are packaged
+        shell: pwsh
+        run: |
+          $out = 'package/BIG-BROTHER-Invoice-Workstation-Test-Win64'
+          $sdk = Join-Path $out 'Microsoft.Windows.SDK.NET.dll'
+          $webview = Join-Path $out 'Microsoft.Web.WebView2.Wpf.dll'
+          if (-not (Test-Path $sdk)) {
+            Get-ChildItem $out -Filter '*Windows*SDK*' | Select-Object Name
+            throw "Missing Microsoft.Windows.SDK.NET.dll in published app. Do not distribute this build."
+          }
+          if (-not (Test-Path $webview)) {
+            throw "Missing Microsoft.Web.WebView2.Wpf.dll in published app."
+          }
+          $actual = [System.Reflection.AssemblyName]::GetAssemblyName((Resolve-Path $sdk).Path)
+          Write-Host ("Windows SDK assembly bundled: " + $actual.FullName)
+          $expected = [version]'10.0.17763.10'
+          if ($actual.Version -lt $expected) {
+            throw "Windows SDK projection assembly is older than WebView2 requires."
+          }
+          Write-Host 'Native browser assembly validation passed.'
+
       - name: Include Windows start guide
         shell: pwsh
         run: |

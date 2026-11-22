@@ -71,8 +71,12 @@ internal static class SettingsStore
         var value = (raw ?? "").Trim();
         if (value.Length == 0) return false;
         if (!value.Contains("://", StringComparison.Ordinal)) value = "https://" + value;
-        return Uri.TryCreate(value, UriKind.Absolute, out uri!) &&
-               (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp) &&
-               uri.Host.Length > 0 && uri.UserInfo.Length == 0;
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var parsed) || parsed == null)
+            return false;
+        if ((parsed.Scheme != Uri.UriSchemeHttps && parsed.Scheme != Uri.UriSchemeHttp) ||
+            parsed.Host.Length == 0 || parsed.UserInfo.Length != 0)
+            return false;
+        uri = parsed;
+        return true;
     }
 }

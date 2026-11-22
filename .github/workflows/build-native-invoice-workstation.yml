@@ -1,0 +1,45 @@
+name: Build BIG BROTHER Native Invoice Workstation (TEST)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'windows-workstation/**'
+      - '.github/workflows/build-native-invoice-workstation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-build:
+    name: Windows x64 self-contained application
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore and compile native application
+        run: dotnet build windows-workstation/BBInvoiceWorkstation.csproj --configuration Release --no-incremental --warnaserror
+
+      - name: Publish portable Windows x64 application
+        run: dotnet publish windows-workstation/BBInvoiceWorkstation.csproj --configuration Release --runtime win-x64 --self-contained true --output package/BIG-BROTHER-Invoice-Workstation-Test-Win64 -p:PublishSingleFile=false -p:DebugType=None -p:DebugSymbols=false
+
+      - name: Include Windows start guide
+        shell: pwsh
+        run: |
+          Copy-Item windows-workstation/START-HERE.txt package/BIG-BROTHER-Invoice-Workstation-Test-Win64/START-HERE.txt
+          Get-ChildItem package/BIG-BROTHER-Invoice-Workstation-Test-Win64
+
+      - name: Upload Windows executable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: BIG-BROTHER-Invoice-Workstation-Test-Win64
+          path: package/BIG-BROTHER-Invoice-Workstation-Test-Win64/
+          if-no-files-found: error
+          retention-days: 14

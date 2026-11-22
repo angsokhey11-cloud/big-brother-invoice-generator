@@ -1,0 +1,55 @@
+BIG BROTHER — INVOICE WORKSTATION / NATIVE BROWSER TEST V1
+=========================================================
+
+IMPORTANT: THIS IS A TEST CLIENT, NOT A REPLACEMENT FOR EXISTING APPS.
+Opening the invoice page connects to the REAL Cloud or Local backend. If you
+complete an invoice, it can save real accounting transactions!
+Test browser features WITHOUT submitting or saving live invoices.
+
+HOW TO START ON WINDOWS 10/11 (64-BIT)
+1. Extract the entire GitHub Actions Windows build ZIP to a PC folder.
+2. Run BIG-BROTHER-Invoice-Workstation.exe.
+   Windows may display a SmartScreen warning for this unsigned test build.
+3. Default Invoice URL is Cloud; to use Local V5/V6, enter the correct local
+   Invoice Generator page URL at the top, then click Load invoice.
+4. Click the circular blue button at the TOP RIGHT.
+5. Telegram Web should open as a top-level website in native WebView2.
+6. Log in normally. Minimize with — and restore with the circle.
+7. Drag title bar to move; drag the bottom-right corner to resize.
+8. Close and reopen the whole app; verify Telegram login is remembered.
+
+REQUIREMENTS
+- Windows 10/11 x64
+- Microsoft Edge WebView2 Runtime installed (usually already present)
+- Internet for Telegram, even if Local Brain Invoice works offline
+
+PERSISTENT DEVICE PROFILE
+%LOCALAPPDATA%\BIG BROTHER\Invoice Workstation Test V1\
+  InvoiceProfile\ : invoice WebView2 data
+  BrowserProfile\ : Telegram/other external website cookies, storage, login
+  settings.json   : URLs without query/fragment, bookmarks, panel geometry
+
+BrowserProfile contains sensitive authentication data. Do not share or
+copy it to another computer. Data is not uploaded to BIG BROTHER by the
+test shell. Each WebView2 profile is separate from your existing Chrome
+profile; you must log in once in the native test client.
+
+IMPORTANT LIMITATIONS
+- This is an optional separate Windows app, not a feature of normal Chrome,
+  the Android APK or the existing browser tab.
+- Telegram compatibility and session persistence require REAL PC testing.
+- Some sites require popup/OAuth flows that may need additional support.
+- A website can still expire or revoke its own session.
+- The normal accounting functions are NOT changed by this build.
+- This test app is UNSIGNED and NOT a supported production release.
+
+TEST CHECKLIST
+[ ] Invoice Generator loads without interacting with real invoices
+[ ] Telegram Web loads without "refused to connect" iframe error
+[ ] Log in, minimize, restore; same page continues
+[ ] Close/reopen Windows app; login remains available
+[ ] Drag with left button held; hover alone does NOT move window
+[ ] Resize; verify invoice beneath remains unchanged
+[ ] Save URL as favorite; reopen successfully
+[ ] Switch Invoice URL to Local V5/V6 if you want to test it
+[ ] DO NOT COMPLETE a real invoice during test

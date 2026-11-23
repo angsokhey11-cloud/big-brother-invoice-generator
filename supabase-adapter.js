@@ -1598,7 +1598,19 @@
         loadSimpleBatchPicker()
       ]);
 
-      if (!document.getElementById('batchNumber')?.value) { await window.loadNextInvoiceNumber(); }
+      // The saved Batch selection is restored by loadSimpleBatchPicker() without
+      // a native "change" event. Run the existing Batch invoice-number loader
+      // exactly as if the user selected that Batch again (rather than leaving
+      // Invoice No. stuck at "Loading..."). Do not bypass its Supabase guard.
+      const restoredBatchSelect = document.getElementById('batchNumber');
+      const restoredBatchId = String(restoredBatchSelect?.value || '').trim();
+      const restoredBatch = typeof getSelectedSimpleBatch === 'function'
+        ? getSelectedSimpleBatch() : null;
+      if (restoredBatchId && restoredBatch?.batchId === restoredBatchId) {
+        restoredBatchSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        await window.loadNextInvoiceNumber();
+      }
     } catch (error) {
       bbShowDatabaseError(error);
       const button = document.querySelector('.complete-btn');
